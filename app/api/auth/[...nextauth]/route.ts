@@ -1,12 +1,12 @@
 // app/api/auth/[...nextauth]/route.ts
-import NextAuth from "next-auth";
+import NextAuth, { type NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcrypt";
 
-export const authOptions = {
+export const authOptions: NextAuthOptions = {
   pages: {
     signIn: "/auth/login",
   },
@@ -106,7 +106,5 @@ export const authOptions = {
     },
   },
 };
-
 const handler = NextAuth(authOptions);
-
 export { handler as GET, handler as POST };
