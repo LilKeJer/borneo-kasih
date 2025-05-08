@@ -14,7 +14,7 @@ interface SidebarProps {
   items: {
     title: string;
     href: string;
-    icon: React.ReactNode;
+    icon?: React.ReactNode;
   }[];
 }
 /*interface SidebarProps {

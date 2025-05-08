@@ -1,4 +1,5 @@
 // components/dashboard/dashboard-header.tsx
+"use client";
 import { UserNav } from "./user-nav";
 import { MobileSidebar } from "./sidebar";
 //import { cn } from "@/lib/utils";
