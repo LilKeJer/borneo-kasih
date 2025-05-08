@@ -26,7 +26,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         // Cari user berdasarkan username
-        const user = await db.query.users.findFirst({
+        const foundUser = await db.query.users.findFirst({
           where: eq(users.username, credentials.username),
           with: {
             adminDetails: true,
@@ -38,14 +38,14 @@ export const authOptions: NextAuthOptions = {
           },
         });
 
-        if (!user) {
+        if (!foundUser) {
           return null;
         }
 
         // Verifikasi password
         const passwordMatch = await bcrypt.compare(
           credentials.password,
-          user.password
+          foundUser.password
         );
 
         if (!passwordMatch) {
@@ -54,45 +54,47 @@ export const authOptions: NextAuthOptions = {
 
         // Ambil data detail sesuai role
         let details;
-        switch (user.role) {
+        switch (foundUser.role) {
           case "Admin":
-            details = user.adminDetails;
+            details = foundUser.adminDetails;
             break;
           case "Doctor":
-            details = user.doctorDetails;
+            details = foundUser.doctorDetails;
             break;
           case "Nurse":
-            details = user.nurseDetails;
+            details = foundUser.nurseDetails;
             break;
           case "Receptionist":
-            details = user.receptionistDetails;
+            details = foundUser.receptionistDetails;
             break;
           case "Pharmacist":
-            details = user.pharmacistDetails;
+            details = foundUser.pharmacistDetails;
             break;
           case "Patient":
-            details = user.patientDetails;
+            details = foundUser.patientDetails;
             break;
         }
 
         // Return user untuk dimasukkan ke JWT token
+        // Perbaikan pertama: konversi null ke undefined untuk email
         return {
-          id: user.id.toString(),
-          username: user.username,
-          role: user.role,
-          name: details?.name,
-          email: details?.email,
+          id: foundUser.id.toString(),
+          username: foundUser.username,
+          role: foundUser.role,
+          name: details?.name || undefined,
+          email: details?.email || undefined, // Konversi null ke undefined
         };
       },
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id;
-        token.role = user.role;
-        token.username = user.username;
-        token.name = user.name;
+    // Perbaikan kedua: rename parameter user menjadi authUser untuk menghindari konflik
+    async jwt({ token, user: authUser }) {
+      if (authUser) {
+        token.id = authUser.id;
+        token.role = authUser.role;
+        token.username = authUser.username;
+        token.name = authUser.name;
       }
       return token;
     },
