@@ -7,11 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "db:seed": "ts-node --transpile-only ./db/seed.ts",
+    "postinstall": "npm run db:generate",
     "db:generate": "drizzle-kit generate:pg",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "ts-node --transpile-only ./db/migrate.ts",
     "db:push": "drizzle-kit push:pg",
-    "db:studio": "drizzle-kit studio",
-    "db:seed": "ts-node --transpile-only ./db/seed.ts"
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",
