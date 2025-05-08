@@ -13,15 +13,15 @@ type ModalType =
   | "confirm";
 
 interface ModalData {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any;
 }
-
 interface ModalState {
   type: ModalType | null;
   data: ModalData;
   isOpen: boolean;
-  onClose: (() => void) | null;
-  onConfirm: (() => void) | null;
+  onClose: (() => void) | undefined;
+  onConfirm: (() => void) | undefined;
   openModal: (
     type: ModalType,
     data?: ModalData,
@@ -35,16 +35,16 @@ export const useModalStore = create<ModalState>((set) => ({
   type: null,
   data: {},
   isOpen: false,
-  onClose: null,
-  onConfirm: null,
-  openModal: (type, data = {}, onClose = null, onConfirm = null) =>
+  onClose: undefined,
+  onConfirm: undefined,
+  openModal: (type, data = {}, onClose = undefined, onConfirm = undefined) =>
     set({ type, data, isOpen: true, onClose, onConfirm }),
   closeModal: () =>
     set({
       type: null,
       data: {},
       isOpen: false,
-      onClose: null,
-      onConfirm: null,
+      onClose: undefined,
+      onConfirm: undefined,
     }),
 }));
