@@ -13,12 +13,6 @@ export default defineConfig({
     },
   },
   dbCredentials: {
-    // Pastikan environment variable ini ada di .env Anda
-    host: process.env.DB_HOST!, // Ambil dari env
-    port: Number(process.env.DB_PORT),
-    user: process.env.DB_USER!,
-    password: process.env.DB_PASSWORD!,
-    database: process.env.DB_NAME!,
-    ssl: process.env.DB_SSL === "true",
+    url: process.env.DATABASE_URL!,
   },
 });
