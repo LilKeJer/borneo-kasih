@@ -7,6 +7,7 @@ import { users } from "@/db/schema/auth"; // Make sure the path is correct
 import { eq } from "drizzle-orm";
 
 export const authOptions: NextAuthOptions = {
+  secret: process.env.NEXTAUTH_SECRET,
   pages: {
     signIn: "/auth/login",
   },
