@@ -1,32 +1,50 @@
-// app/(dashboard)/admin/page.tsx
+// app/dashboard/admin/page.tsx
 import { DashboardCard } from "@/components/dashboard/dashboard-card";
 import { RecentActivity } from "@/components/dashboard/recent-activity";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, Calendar, FileText, DollarSign } from "lucide-react";
+import { Users, Calendar, UserCheck, Server } from "lucide-react";
 
 export default function AdminDashboardPage() {
-  // Mock data - in a real app this would come from an API call
+  // Data statistik (nanti akan diambil dari database)
+  const stats = {
+    totalUsers: 1234,
+    totalPatients: 985,
+    activeStaff: 24,
+    todayAppointments: 42,
+    totalDoctors: 8,
+    totalNurses: 12,
+    systemUptime: "99.9%",
+  };
+
+  // Mock data
   const mockActivities = [
     {
       id: "1",
-      title: "New doctor added",
-      description: "Dr. Sarah Smith was added to the system",
-      timestamp: "10 minutes ago",
+      title: "Dokter baru ditambahkan",
+      description: "Dr. Sarah Smith telah ditambahkan ke sistem",
+      timestamp: "10 menit yang lalu",
       type: "other" as const,
     },
     {
       id: "2",
-      title: "Medicine inventory updated",
-      description: "Paracetamol stock increased by 200 units",
-      timestamp: "1 hour ago",
+      title: "Stok obat diperbarui",
+      description: "Stok Paracetamol ditambah 200 unit",
+      timestamp: "1 jam yang lalu",
       type: "medicine" as const,
     },
     {
       id: "3",
-      title: "New patient registered",
-      description: "Budi Santoso registered as a new patient",
-      timestamp: "3 hours ago",
+      title: "Pasien baru terdaftar",
+      description: "Budi Santoso mendaftar sebagai pasien baru",
+      timestamp: "3 jam yang lalu",
       type: "record" as const,
+    },
+    {
+      id: "4",
+      title: "Permintaan verifikasi pasien",
+      description: "5 pasien baru menunggu verifikasi",
+      timestamp: "5 jam yang lalu",
+      type: "appointment" as const,
     },
   ];
 
@@ -34,36 +52,36 @@ export default function AdminDashboardPage() {
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <DashboardCard
-          title="Total Patients"
-          value="1,234"
+          title="Total Pengguna"
+          value={stats.totalUsers.toString()}
           icon={<Users className="h-4 w-4" />}
-          description="+12% from last month"
+          description="+12% dari bulan lalu"
         />
         <DashboardCard
-          title="Appointments Today"
-          value="42"
+          title="Janji Temu Hari Ini"
+          value={stats.todayAppointments.toString()}
           icon={<Calendar className="h-4 w-4" />}
-          description="8 pending approval"
+          description="8 menunggu persetujuan"
         />
         <DashboardCard
-          title="Medical Records"
-          value="5,631"
-          icon={<FileText className="h-4 w-4" />}
-          description="Updated today"
+          title="Dokter Aktif"
+          value={stats.totalDoctors.toString()}
+          icon={<UserCheck className="h-4 w-4" />}
+          description="Dari total 10 dokter"
         />
         <DashboardCard
-          title="Revenue This Month"
-          value="Rp 24,500,000"
-          icon={<DollarSign className="h-4 w-4" />}
-          description="+5% from last month"
+          title="Status Sistem"
+          value="Aktif"
+          icon={<Server className="h-4 w-4" />}
+          description={`Uptime: ${stats.systemUptime}`}
         />
       </div>
 
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
-          <TabsTrigger value="reports">Reports</TabsTrigger>
+          <TabsTrigger value="overview">Ikhtisar</TabsTrigger>
+          <TabsTrigger value="analytics">Statistik</TabsTrigger>
+          <TabsTrigger value="reports">Laporan</TabsTrigger>
         </TabsList>
         <TabsContent value="overview" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
@@ -71,19 +89,19 @@ export default function AdminDashboardPage() {
 
             <div className="col-span-3 grid gap-4 md:grid-cols-1">
               <DashboardCard
-                title="Active Staff"
-                value="24"
-                description="Doctors, nurses, and staff on duty today"
+                title="Staff Aktif"
+                value={stats.activeStaff.toString()}
+                description="Dokter, perawat, dan staff yang bertugas hari ini"
               />
               <DashboardCard
-                title="Pharmacist Status"
-                value="Stocked"
-                description="Last inventory update: Today at 09:30"
+                title="Status Apoteker"
+                value="Stok Tersedia"
+                description="Update stok terakhir: Hari ini jam 09:30"
               />
               <DashboardCard
-                title="System Status"
-                value="Healthy"
-                description="All systems operational"
+                title="Database Status"
+                value="Optimal"
+                description="Terakhir backup: Hari ini jam 00:00"
               />
             </div>
           </div>
@@ -91,15 +109,17 @@ export default function AdminDashboardPage() {
         <TabsContent value="analytics">
           <div className="h-[400px] rounded-md border p-4">
             <p className="text-sm text-muted-foreground">
-              Analytics content will be displayed here
+              Konten statistik akan ditampilkan di sini
             </p>
+            {/* Tambahkan komponen chart di sini */}
           </div>
         </TabsContent>
         <TabsContent value="reports">
           <div className="h-[400px] rounded-md border p-4">
             <p className="text-sm text-muted-foreground">
-              Reports content will be displayed here
+              Laporan akan ditampilkan di sini
             </p>
+            {/* Tambahkan komponen tabel laporan di sini */}
           </div>
         </TabsContent>
       </Tabs>
