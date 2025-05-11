@@ -1,6 +1,10 @@
 // app/dashboard/admin/page.tsx
+
 import { DashboardCard } from "@/components/dashboard/dashboard-card";
 import { RecentActivity } from "@/components/dashboard/recent-activity";
+import { VisitorsChart } from "@/components/admin/visitors-chart";
+import { Breadcrumb } from "@/components/dashboard/breadcrumb";
+import { ReportsTable } from "@/components/admin/reports-table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Users, Calendar, UserCheck, Server } from "lucide-react";
 
@@ -50,6 +54,8 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="space-y-6">
+      <Breadcrumb />
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <DashboardCard
           title="Total Pengguna"
@@ -83,44 +89,21 @@ export default function AdminDashboardPage() {
           <TabsTrigger value="analytics">Statistik</TabsTrigger>
           <TabsTrigger value="reports">Laporan</TabsTrigger>
         </TabsList>
-        <TabsContent value="overview" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-            <RecentActivity activities={mockActivities} />
 
-            <div className="col-span-3 grid gap-4 md:grid-cols-1">
-              <DashboardCard
-                title="Staff Aktif"
-                value={stats.activeStaff.toString()}
-                description="Dokter, perawat, dan staff yang bertugas hari ini"
-              />
-              <DashboardCard
-                title="Status Apoteker"
-                value="Stok Tersedia"
-                description="Update stok terakhir: Hari ini jam 09:30"
-              />
-              <DashboardCard
-                title="Database Status"
-                value="Optimal"
-                description="Terakhir backup: Hari ini jam 00:00"
-              />
-            </div>
+        <TabsContent value="overview" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-1">
+            <RecentActivity activities={mockActivities} />
           </div>
         </TabsContent>
+
         <TabsContent value="analytics">
-          <div className="h-[400px] rounded-md border p-4">
-            <p className="text-sm text-muted-foreground">
-              Konten statistik akan ditampilkan di sini
-            </p>
-            {/* Tambahkan komponen chart di sini */}
+          <div className="grid gap-4">
+            <VisitorsChart />
           </div>
         </TabsContent>
+
         <TabsContent value="reports">
-          <div className="h-[400px] rounded-md border p-4">
-            <p className="text-sm text-muted-foreground">
-              Laporan akan ditampilkan di sini
-            </p>
-            {/* Tambahkan komponen tabel laporan di sini */}
-          </div>
+          <ReportsTable />
         </TabsContent>
       </Tabs>
     </div>

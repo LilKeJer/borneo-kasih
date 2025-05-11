@@ -2,7 +2,7 @@
 import { ReactNode } from "react";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
-import { Users, Settings, BarChart, User, Home } from "lucide-react";
+import { Users, Settings, BarChart, User, Home, Shield } from "lucide-react";
 
 const navItems = [
   {
@@ -14,6 +14,11 @@ const navItems = [
     title: "Users",
     href: "/dashboard/admin/users",
     icon: <Users className="h-4 w-4" />,
+  },
+  {
+    title: "Roles",
+    href: "/dashboard/admin/roles",
+    icon: <Shield className="h-4 w-4" />,
   },
   {
     title: "Doctors",
