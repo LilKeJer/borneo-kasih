@@ -130,6 +130,81 @@ export function StaffTable({ onEdit }: StaffTableProps) {
     }
   };
 
+  const StaffTableRow = ({ member }: { member: StaffMember }) => {
+    const [isOpen, setIsOpen] = useState(false);
+
+    return (
+      <TableRow key={member.id}>
+        <TableCell className="font-medium">
+          {member.details?.name || "-"}
+        </TableCell>
+        <TableCell>{member.username}</TableCell>
+        <TableCell>{member.details?.email || "-"}</TableCell>
+        <TableCell>{member.details?.phone || "-"}</TableCell>
+        <TableCell>
+          <Badge variant={getRoleBadgeVariant(member.role)}>
+            {getRoleLabel(member.role)}
+          </Badge>
+        </TableCell>
+        <TableCell>
+          {member.role === "Doctor" && member.details?.specialization
+            ? member.details.specialization
+            : "-"}
+        </TableCell>
+        <TableCell className="text-right">
+          <DropdownMenu open={isOpen} onOpenChange={setIsOpen} modal={false}>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                className="h-8 w-8 p-0"
+                // Hapus onClick handler di sini
+              >
+                <span className="sr-only">Open menu</span>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              onCloseAutoFocus={(e) => e.preventDefault()}
+              // Tambahkan ini untuk mencegah penutupan prematur
+              onInteractOutside={(e) => {
+                const isTrigger =
+                  e.target instanceof HTMLElement &&
+                  e.target.closest("[data-radix-dropdown-menu-trigger]");
+
+                if (isTrigger) {
+                  e.preventDefault();
+                }
+              }}
+            >
+              <DropdownMenuItem
+                onSelect={(e) => {
+                  e.preventDefault();
+                  setIsOpen(false);
+                  onEdit(member);
+                }}
+              >
+                <Edit className="mr-2 h-4 w-4" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={(e) => {
+                  e.preventDefault();
+                  setIsOpen(false);
+                  handleDelete(member.id);
+                }}
+                className="text-red-600"
+              >
+                <Trash className="mr-2 h-4 w-4" />
+                Hapus
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </TableCell>
+      </TableRow>
+    );
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-4">
@@ -174,7 +249,7 @@ export function StaffTable({ onEdit }: StaffTableProps) {
             {loading ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center">
-                  Loading...
+                  Memuat data...
                 </TableCell>
               </TableRow>
             ) : staff.length === 0 ? (
@@ -185,47 +260,7 @@ export function StaffTable({ onEdit }: StaffTableProps) {
               </TableRow>
             ) : (
               staff.map((member) => (
-                <TableRow key={member.id}>
-                  <TableCell className="font-medium">
-                    {member.details?.name || "-"}
-                  </TableCell>
-                  <TableCell>{member.username}</TableCell>
-                  <TableCell>{member.details?.email || "-"}</TableCell>
-                  <TableCell>{member.details?.phone || "-"}</TableCell>
-                  <TableCell>
-                    <Badge variant={getRoleBadgeVariant(member.role)}>
-                      {getRoleLabel(member.role)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {member.role === "Doctor" && member.details?.specialization
-                      ? member.details.specialization
-                      : "-"}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Open menu</span>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => onEdit(member)}>
-                          <Edit className="mr-2 h-4 w-4" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleDelete(member.id)}
-                          className="text-red-600"
-                        >
-                          <Trash className="mr-2 h-4 w-4" />
-                          Hapus
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
+                <StaffTableRow key={member.id} member={member} />
               ))
             )}
           </TableBody>

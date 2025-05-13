@@ -300,7 +300,12 @@ export function StaffForm({
           <Button
             type="button"
             variant="outline"
-            onClick={onCancel}
+            onClick={() => {
+              form.reset();
+              if (onCancel) {
+                onCancel();
+              }
+            }}
             disabled={isSubmitting}
           >
             Batal

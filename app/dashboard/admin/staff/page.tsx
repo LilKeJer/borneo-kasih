@@ -1,7 +1,7 @@
 // app/dashboard/admin/staff/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
 import { PlusCircle } from "lucide-react";
@@ -18,20 +18,36 @@ export default function StaffManagementPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const handleAddSuccess = () => {
     setIsAddDialogOpen(false);
+    setRefreshKey((prev) => prev + 1);
   };
 
   const handleEditSuccess = () => {
     setIsEditDialogOpen(false);
     setSelectedStaff(null);
+    setRefreshKey((prev) => prev + 1);
   };
 
-  const handleEdit = (staff: any) => {
+  const handleEdit = useCallback((staff: any) => {
     setSelectedStaff(staff);
     setIsEditDialogOpen(true);
-  };
+  }, []);
+
+  const handleCloseEditDialog = useCallback((open: boolean) => {
+    if (!open) {
+      setIsEditDialogOpen(false);
+      setSelectedStaff(null);
+    }
+  }, []);
+
+  const handleCloseAddDialog = useCallback((open: boolean) => {
+    if (!open) {
+      setIsAddDialogOpen(false);
+    }
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -45,26 +61,33 @@ export default function StaffManagementPage() {
         </Button>
       </PageHeader>
 
-      <StaffTable onEdit={handleEdit} />
+      <StaffTable key={refreshKey} onEdit={handleEdit} />
 
       {/* Dialog Tambah Staff */}
-      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+      <Dialog open={isAddDialogOpen} onOpenChange={handleCloseAddDialog}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Tambah Staff Baru</DialogTitle>
           </DialogHeader>
-          <StaffForm onSuccess={handleAddSuccess} />
+          <StaffForm
+            onSuccess={handleAddSuccess}
+            onCancel={() => setIsAddDialogOpen(false)}
+          />
         </DialogContent>
       </Dialog>
 
       {/* Dialog Edit Staff */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+      <Dialog open={isEditDialogOpen} onOpenChange={handleCloseEditDialog}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Edit Staff</DialogTitle>
           </DialogHeader>
           <StaffForm
             onSuccess={handleEditSuccess}
+            onCancel={() => {
+              setIsEditDialogOpen(false);
+              setSelectedStaff(null);
+            }}
             initialData={selectedStaff}
             isEdit={true}
           />
