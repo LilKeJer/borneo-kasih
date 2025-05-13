@@ -5,7 +5,7 @@ import { useState } from "react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
 import { PlusCircle } from "lucide-react";
-import { UserManagementTable } from "@/components/admin/user-management-table";
+import { SimpleUserTable } from "@/components/admin/simple-user-table";
 import { AddUserForm } from "@/components/admin/add-user-form";
 import {
   Dialog,
@@ -29,7 +29,7 @@ export default function UserManagementPage() {
         </Button>
       </PageHeader>
 
-      <UserManagementTable />
+      <SimpleUserTable />
 
       <Dialog open={isAddUserDialogOpen} onOpenChange={setIsAddUserDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
