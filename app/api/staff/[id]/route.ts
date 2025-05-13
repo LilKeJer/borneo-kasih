@@ -16,7 +16,7 @@ import bcrypt from "bcrypt";
 // GET - Get single staff member by ID
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -25,7 +25,8 @@ export async function GET(
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    const staffId = parseInt(params.id);
+    const resolvedParams = await params; // 2. Await promise
+    const staffId = parseInt(resolvedParams.id); // 3. Akses ID dari resolved params
 
     // Get user
     const staff = await db.query.users.findFirst({
@@ -80,7 +81,7 @@ export async function GET(
 // PUT - Update staff member
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -88,8 +89,9 @@ export async function PUT(
     if (!session || session.user.role !== "Admin") {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
+    const resolvedParams = await params; // 2. Await promise
+    const staffId = parseInt(resolvedParams.id); // 3. Akses ID dari resolved params
 
-    const staffId = parseInt(params.id);
     const body = await req.json();
     const { name, email, phone, specialization, password } = body;
 
@@ -161,7 +163,7 @@ export async function PUT(
 // DELETE - Soft delete staff member
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -170,7 +172,8 @@ export async function DELETE(
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    const staffId = parseInt(params.id);
+    const resolvedParams = await params; // 2. Await promise
+    const staffId = parseInt(resolvedParams.id); // 3. Akses ID dari resolved params
 
     // Check if user exists
     const existingUser = await db.query.users.findFirst({
