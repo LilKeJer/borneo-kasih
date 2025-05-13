@@ -5,7 +5,6 @@ import { useState, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -25,19 +24,38 @@ import {
 } from "@/components/ui/select";
 import { staffSchema, type StaffFormValues } from "@/lib/validations/staff";
 
-interface StaffFormProps {
-  onSuccess?: () => void;
-  onCancel?: () => void;
-  initialData?: any;
-  isEdit?: boolean;
+export interface StaffDetails {
+  name?: string;
+  email?: string;
+  phone?: string;
+  specialization?: string;
 }
 
-export function StaffForm({
-  onSuccess,
-  onCancel,
-  initialData,
-  isEdit = false,
-}: StaffFormProps) {
+export interface StaffFormInitialData {
+  id: string;
+  username: string;
+  role: "Doctor" | "Nurse" | "Receptionist" | "Pharmacist";
+  details?: StaffDetails;
+}
+
+type StaffFormProps =
+  | {
+      isEdit: true;
+      initialData: StaffFormInitialData;
+      onSuccess?: () => void;
+      onCancel?: () => void;
+    }
+  | {
+      isEdit?: false;
+      initialData?: never;
+      onSuccess?: () => void;
+      onCancel?: () => void;
+    };
+
+export function StaffForm(props: StaffFormProps) {
+  const { onSuccess, onCancel, isEdit = false } = props;
+  const initialData = props.isEdit ? props.initialData : undefined;
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<StaffFormValues>({
@@ -72,10 +90,9 @@ export function StaffForm({
   async function onSubmit(values: StaffFormValues) {
     setIsSubmitting(true);
     try {
-      const url = isEdit ? `/api/staff/${initialData.id}` : "/api/staff";
+      const url = isEdit ? `/api/staff/${initialData!.id}` : "/api/staff";
       const method = isEdit ? "PUT" : "POST";
 
-      // Jika edit dan password kosong, jangan kirim password
       const dataToSend = { ...values };
       if (isEdit && !values.password) {
         delete dataToSend.password;
@@ -103,9 +120,7 @@ export function StaffForm({
         form.reset();
       }
 
-      if (onSuccess) {
-        onSuccess();
-      }
+      onSuccess?.();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Terjadi kesalahan");
     } finally {
@@ -302,9 +317,7 @@ export function StaffForm({
             variant="outline"
             onClick={() => {
               form.reset();
-              if (onCancel) {
-                onCancel();
-              }
+              onCancel?.();
             }}
             disabled={isSubmitting}
           >

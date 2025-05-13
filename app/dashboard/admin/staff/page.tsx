@@ -6,7 +6,10 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
 import { PlusCircle } from "lucide-react";
 import { StaffTable } from "@/components/admin/staff-table";
-import { StaffForm } from "@/components/admin/staff-form";
+import {
+  StaffForm,
+  type StaffFormInitialData,
+} from "@/components/admin/staff-form";
 import {
   Dialog,
   DialogContent,
@@ -17,7 +20,8 @@ import {
 export default function StaffManagementPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [selectedStaff, setSelectedStaff] = useState(null);
+  const [selectedStaff, setSelectedStaff] =
+    useState<StaffFormInitialData | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const handleAddSuccess = () => {
@@ -31,7 +35,7 @@ export default function StaffManagementPage() {
     setRefreshKey((prev) => prev + 1);
   };
 
-  const handleEdit = useCallback((staff: any) => {
+  const handleEdit = useCallback((staff: StaffFormInitialData) => {
     setSelectedStaff(staff);
     setIsEditDialogOpen(true);
   }, []);
@@ -61,7 +65,13 @@ export default function StaffManagementPage() {
         </Button>
       </PageHeader>
 
-      <StaffTable key={refreshKey} onEdit={handleEdit} />
+      <StaffTable
+        key={refreshKey}
+        onEdit={(staff) => {
+          // staff sudah bertipe StaffFormInitialData
+          handleEdit(staff);
+        }}
+      />
 
       {/* Dialog Tambah Staff */}
       <Dialog open={isAddDialogOpen} onOpenChange={handleCloseAddDialog}>
@@ -88,7 +98,7 @@ export default function StaffManagementPage() {
               setIsEditDialogOpen(false);
               setSelectedStaff(null);
             }}
-            initialData={selectedStaff}
+            initialData={selectedStaff!} // Non-null assertion karena kita yakin ada data saat dialog terbuka
             isEdit={true}
           />
         </DialogContent>

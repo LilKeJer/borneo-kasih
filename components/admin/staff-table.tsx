@@ -28,22 +28,36 @@ import {
 } from "@/components/ui/select";
 import { MoreHorizontal, Search, Edit, Trash } from "lucide-react";
 import { toast } from "sonner";
+import {
+  type StaffFormInitialData,
+  type StaffDetails,
+} from "@/components/admin/staff-form";
 
-interface StaffMember {
-  id: string;
-  username: string;
-  role: string;
+interface StaffMember extends StaffFormInitialData {
   createdAt: string;
-  details: {
-    name: string;
-    email: string;
-    phone: string;
-    specialization?: string;
-  } | null;
+  details?: StaffDetails;
 }
 
 interface StaffTableProps {
-  onEdit: (staff: StaffMember) => void;
+  onEdit: (staff: StaffFormInitialData) => void;
+}
+
+interface ApiStaffResponse {
+  data: Array<{
+    id: string;
+    username: string;
+    role: "Doctor" | "Nurse" | "Receptionist" | "Pharmacist";
+    createdAt: string;
+    details: {
+      name?: string | null;
+      email?: string | null;
+      phone?: string | null;
+      specialization?: string | null;
+    } | null;
+  }>;
+  pagination: {
+    totalPages: number;
+  };
 }
 
 export function StaffTable({ onEdit }: StaffTableProps) {
@@ -71,8 +85,23 @@ export function StaffTable({ onEdit }: StaffTableProps) {
       const response = await fetch(`/api/staff?${params.toString()}`);
       if (!response.ok) throw new Error("Failed to fetch staff");
 
-      const data = await response.json();
-      setStaff(data.data);
+      const data = (await response.json()) as ApiStaffResponse;
+
+      // Transformasi data API ke tipe StaffMember
+      const transformedData: StaffMember[] = data.data.map((member) => ({
+        id: member.id,
+        username: member.username,
+        role: member.role,
+        createdAt: member.createdAt,
+        details: {
+          name: member.details?.name || undefined,
+          email: member.details?.email || undefined,
+          phone: member.details?.phone || undefined,
+          specialization: member.details?.specialization || undefined,
+        },
+      }));
+
+      setStaff(transformedData);
       setTotalPages(data.pagination.totalPages);
     } catch (error) {
       console.error("Error fetching staff:", error);
@@ -100,7 +129,7 @@ export function StaffTable({ onEdit }: StaffTableProps) {
     }
   };
 
-  const getRoleBadgeVariant = (role: string) => {
+  const getRoleBadgeVariant = (role: StaffFormInitialData["role"]) => {
     switch (role) {
       case "Doctor":
         return "secondary";
