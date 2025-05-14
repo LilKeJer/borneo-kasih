@@ -2,7 +2,7 @@
 import { ReactNode } from "react";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
-import { Pill, Home, Package, ClipboardList } from "lucide-react";
+import { Pill, Home, Package, ClipboardList, User } from "lucide-react";
 
 const navItems = [
   {
@@ -24,6 +24,11 @@ const navItems = [
     title: "Prescriptions",
     href: "/dashboard/pharmacist/prescriptions",
     icon: <ClipboardList className="h-4 w-4" />,
+  },
+  {
+    title: "Profile",
+    href: "/dashboard/profile",
+    icon: <User className="h-4 w-4" />,
   },
 ];
 

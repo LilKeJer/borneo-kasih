@@ -2,7 +2,7 @@
 import { ReactNode } from "react";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
-import { Users, Settings, Home } from "lucide-react";
+import { Users, Settings, Home, User } from "lucide-react";
 
 const navItems = [
   {
@@ -24,6 +24,11 @@ const navItems = [
     title: "Users",
     href: "/dashboard/admin/users",
     icon: <Users className="h-4 w-4" />,
+  },
+  {
+    title: "Profile",
+    href: "/dashboard/profile",
+    icon: <User className="h-4 w-4" />,
   },
 ];
 

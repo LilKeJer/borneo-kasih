@@ -9,6 +9,7 @@ import {
   Calendar,
   Home,
   ClipboardList,
+  User,
 } from "lucide-react";
 
 const navItems = [
@@ -41,6 +42,11 @@ const navItems = [
     title: "Schedule",
     href: "/dashboard/doctor/schedule",
     icon: <ClipboardList className="h-4 w-4" />,
+  },
+  {
+    title: "Profile",
+    href: "/dashboard/profile",
+    icon: <User className="h-4 w-4" />,
   },
 ];
 

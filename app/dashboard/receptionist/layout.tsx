@@ -2,7 +2,14 @@
 import { ReactNode } from "react";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
-import { Users, Calendar, Home, ClipboardList, CreditCard } from "lucide-react";
+import {
+  Users,
+  Calendar,
+  Home,
+  ClipboardList,
+  CreditCard,
+  User,
+} from "lucide-react";
 
 const navItems = [
   {
@@ -29,6 +36,11 @@ const navItems = [
     title: "Payments",
     href: "/dashboard/receptionist/payments",
     icon: <CreditCard className="h-4 w-4" />,
+  },
+  {
+    title: "Profile",
+    href: "/dashboard/profile",
+    icon: <User className="h-4 w-4" />,
   },
 ];
 

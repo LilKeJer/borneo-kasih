@@ -1,4 +1,7 @@
 // app/dashboard/profile/page.tsx
+"use client";
+
+import { useAuth } from "@/hooks/use-auth";
 import {
   Card,
   CardContent,
@@ -12,11 +15,32 @@ import { ProfileForm } from "@/components/profile/profile-form";
 import { SecurityForm } from "@/components/profile/security-form";
 
 export default function ProfilePage() {
+  const { user } = useAuth();
+
+  const getRoleDescription = (role: string) => {
+    switch (role) {
+      case "Admin":
+        return "Administrator sistem klinik";
+      case "Doctor":
+        return "Dokter praktik di klinik";
+      case "Nurse":
+        return "Perawat klinik";
+      case "Receptionist":
+        return "Resepsionis klinik";
+      case "Pharmacist":
+        return "Apoteker klinik";
+      case "Patient":
+        return "Pasien terdaftar";
+      default:
+        return "Pengguna sistem";
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Profile"
-        description="Kelola informasi akun dan preferensi"
+        description={getRoleDescription(user?.role || "")}
       />
 
       <Tabs defaultValue="profile" className="space-y-4">
@@ -30,7 +54,7 @@ export default function ProfilePage() {
             <CardHeader>
               <CardTitle>Informasi Profile</CardTitle>
               <CardDescription>
-                Update informasi personal dan kontak
+                Update informasi personal dan kontak Anda
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -44,7 +68,7 @@ export default function ProfilePage() {
             <CardHeader>
               <CardTitle>Keamanan</CardTitle>
               <CardDescription>
-                Kelola keamanan akun dan password
+                Kelola keamanan akun dan ubah password
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
