@@ -45,7 +45,7 @@ const navItems = [
   },
   {
     title: "Profile",
-    href: "/dashboard/patient/profile",
+    href: "/dashboard/profile",
     icon: <User className="h-4 w-4" />,
   },
 ];
