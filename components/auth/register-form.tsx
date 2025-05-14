@@ -15,6 +15,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -25,36 +26,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { registerPatientSchema } from "@/lib/validations/auth";
 
-const formSchema = z
-  .object({
-    username: z.string().min(3, "Username must be at least 3 characters"),
-    password: z.string().min(6, "Password must be at least 6 characters"),
-    confirmPassword: z.string(),
-    name: z.string().min(1, "Name is required"),
-    nik: z.string().length(16, "NIK must be 16 digits"),
-    email: z.string().email("Invalid email format"),
-    phone: z.string().min(10, "Phone number must be at least 10 digits"),
-    dateOfBirth: z.string().refine((value) => !isNaN(Date.parse(value)), {
-      message: "Invalid date format",
-    }),
-    address: z.string().min(1, "Address is required"),
-    gender: z.enum(["L", "P"], {
-      required_error: "Gender is required",
-    }),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords do not match",
-    path: ["confirmPassword"],
-  });
+type FormData = z.infer<typeof registerPatientSchema>;
 
 export function RegisterForm() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
+  const form = useForm<FormData>({
+    resolver: zodResolver(registerPatientSchema),
     defaultValues: {
       username: "",
       password: "",
@@ -69,12 +52,12 @@ export function RegisterForm() {
     },
   });
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  async function onSubmit(values: FormData) {
     setIsPending(true);
     setError(null);
+    setSuccess(null);
 
     try {
-      // Submit data to API
       const response = await fetch("/api/auth/register", {
         method: "POST",
         headers: {
@@ -93,14 +76,21 @@ export function RegisterForm() {
         }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || "Registration failed");
+        throw new Error(data.message || "Registrasi gagal");
       }
 
-      router.push("/auth/login?registered=true");
+      setSuccess(data.message);
+      // Tunggu 3 detik sebelum redirect
+      setTimeout(() => {
+        router.push("/auth/login?registered=true");
+      }, 3000);
     } catch (error) {
-      setError(`Something went wrong${error}`);
+      const message =
+        error instanceof Error ? error.message : "Terjadi kesalahan";
+      setError(message);
     } finally {
       setIsPending(false);
     }
@@ -109,13 +99,21 @@ export function RegisterForm() {
   return (
     <div className="w-full max-w-md space-y-4">
       <div className="text-center">
-        <h1 className="text-2xl font-bold">Register as Patient</h1>
-        <p className="text-muted-foreground">Create your patient account</p>
+        <h1 className="text-2xl font-bold">Registrasi Pasien Baru</h1>
+        <p className="text-muted-foreground">Buat akun pasien Anda</p>
       </div>
 
       {error && (
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {success && (
+        <Alert className="border-green-500 bg-green-50">
+          <AlertDescription className="text-green-900">
+            {success}
+          </AlertDescription>
         </Alert>
       )}
 
@@ -128,8 +126,11 @@ export function RegisterForm() {
               <FormItem>
                 <FormLabel>Username</FormLabel>
                 <FormControl>
-                  <Input placeholder="Create a username" {...field} />
+                  <Input placeholder="Buat username" {...field} />
                 </FormControl>
+                <FormDescription>
+                  Gunakan huruf, angka, atau underscore (min. 3 karakter)
+                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -145,6 +146,7 @@ export function RegisterForm() {
                   <FormControl>
                     <Input type="password" placeholder="••••••••" {...field} />
                   </FormControl>
+                  <FormDescription>Min. 6 karakter</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -155,7 +157,7 @@ export function RegisterForm() {
               name="confirmPassword"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Confirm Password</FormLabel>
+                  <FormLabel>Konfirmasi Password</FormLabel>
                   <FormControl>
                     <Input type="password" placeholder="••••••••" {...field} />
                   </FormControl>
@@ -170,10 +172,11 @@ export function RegisterForm() {
             name="name"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Full Name</FormLabel>
+                <FormLabel>Nama Lengkap</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter your full name" {...field} />
+                  <Input placeholder="Masukkan nama lengkap" {...field} />
                 </FormControl>
+                <FormDescription>Sesuai dengan KTP/Identitas</FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -186,8 +189,11 @@ export function RegisterForm() {
               <FormItem>
                 <FormLabel>NIK</FormLabel>
                 <FormControl>
-                  <Input placeholder="16-digit NIK" {...field} />
+                  <Input placeholder="16 digit NIK" maxLength={16} {...field} />
                 </FormControl>
+                <FormDescription>
+                  Nomor Induk Kependudukan (16 digit)
+                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -203,7 +209,7 @@ export function RegisterForm() {
                   <FormControl>
                     <Input
                       type="email"
-                      placeholder="your.email@example.com"
+                      placeholder="email@contoh.com"
                       {...field}
                     />
                   </FormControl>
@@ -217,9 +223,9 @@ export function RegisterForm() {
               name="phone"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Phone Number</FormLabel>
+                  <FormLabel>Nomor Telepon</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., 081234567890" {...field} />
+                    <Input placeholder="08123456789" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -233,7 +239,7 @@ export function RegisterForm() {
               name="dateOfBirth"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Date of Birth</FormLabel>
+                  <FormLabel>Tanggal Lahir</FormLabel>
                   <FormControl>
                     <Input type="date" {...field} />
                   </FormControl>
@@ -247,14 +253,14 @@ export function RegisterForm() {
               name="gender"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Gender</FormLabel>
+                  <FormLabel>Jenis Kelamin</FormLabel>
                   <Select
                     onValueChange={field.onChange}
                     defaultValue={field.value}
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select gender" />
+                        <SelectValue placeholder="Pilih" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -273,17 +279,28 @@ export function RegisterForm() {
             name="address"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Address</FormLabel>
+                <FormLabel>Alamat</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter your address" {...field} />
+                  <Input
+                    placeholder="Alamat lengkap sesuai domisili"
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
 
+          <Alert className="bg-blue-50 border-blue-200">
+            <AlertDescription className="text-blue-800">
+              <strong>Penting:</strong> Setelah registrasi, akun Anda akan
+              menunggu verifikasi dari admin klinik. Anda akan menerima
+              notifikasi setelah akun diverifikasi.
+            </AlertDescription>
+          </Alert>
+
           <Button type="submit" className="w-full" disabled={isPending}>
-            {isPending ? "Registering..." : "Register"}
+            {isPending ? "Mendaftar..." : "Daftar"}
           </Button>
         </form>
       </Form>

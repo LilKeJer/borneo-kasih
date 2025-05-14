@@ -8,33 +8,48 @@ export const loginSchema = z.object({
 
 export const registerPatientSchema = z
   .object({
-    username: z.string().min(3, "Username must be at least 3 characters"),
+    username: z
+      .string()
+      .min(3, "Username minimal 3 karakter")
+      .max(50, "Username maksimal 50 karakter")
+      .regex(
+        /^[a-zA-Z0-9_]+$/,
+        "Username hanya boleh huruf, angka, dan underscore"
+      ),
     password: z
       .string()
-      .min(6, "Password must be at least 6 characters")
-      .max(100, "Password must be less than 100 characters"),
+      .min(6, "Password minimal 6 karakter")
+      .max(100, "Password maksimal 100 karakter"),
     confirmPassword: z.string(),
-    name: z.string().min(1, "Name is required"),
-    nik: z.string().length(16, "NIK must be 16 digits"),
+    name: z
+      .string()
+      .min(1, "Nama wajib diisi")
+      .max(100, "Nama maksimal 100 karakter"),
+    nik: z
+      .string()
+      .length(16, "NIK harus 16 digit")
+      .regex(/^\d{16}$/, "NIK harus berupa angka"),
     email: z
       .string()
-      .email("Invalid email format")
-      .optional()
-      .or(z.literal("")),
+      .email("Format email tidak valid")
+      .max(100, "Email maksimal 100 karakter"),
     phone: z
       .string()
-      .min(10, "Phone number must be at least 10 digits")
-      .optional()
-      .or(z.literal("")),
+      .min(10, "Nomor telepon minimal 10 digit")
+      .max(20, "Nomor telepon maksimal 20 digit")
+      .regex(/^[0-9+\-\s()]+$/, "Format nomor telepon tidak valid"),
     dateOfBirth: z.string().refine((value) => !isNaN(Date.parse(value)), {
-      message: "Invalid date format",
+      message: "Format tanggal tidak valid",
     }),
-    address: z.string().min(1, "Address is required"),
+    address: z
+      .string()
+      .min(1, "Alamat wajib diisi")
+      .max(255, "Alamat maksimal 255 karakter"),
     gender: z.enum(["L", "P"], {
-      required_error: "Gender is required",
+      required_error: "Jenis kelamin wajib dipilih",
     }),
   })
   .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords do not match",
+    message: "Password tidak sama",
     path: ["confirmPassword"],
   });

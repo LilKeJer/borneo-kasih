@@ -6,6 +6,7 @@ import {
   integer,
   index,
   check,
+  AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { relations } from "drizzle-orm";
@@ -18,6 +19,9 @@ export const users = pgTable(
     username: varchar("username", { length: 50 }).notNull().unique(),
     password: varchar("password", { length: 255 }).notNull(),
     role: varchar("role", { length: 20 }).notNull(),
+    status: varchar("status", { length: 20 }).default("Active"),
+    verifiedAt: timestamp("verified_at"),
+    verifiedBy: integer("verified_by").references((): AnyPgColumn => users.id),
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
     deletedAt: timestamp("deleted_at"),
@@ -26,9 +30,14 @@ export const users = pgTable(
     return {
       usernameIdx: index("idx_username").on(table.username),
       roleIdx: index("idx_role").on(table.role),
+      statusIdx: index("idx_user_status").on(table.status),
       roleCheck: check(
         "check_role",
         sql`${table.role} IN ('Admin', 'Doctor', 'Nurse', 'Receptionist', 'Pharmacist', 'Patient')`
+      ),
+      statusCheck: check(
+        "check_user_status",
+        sql`${table.status} IN ('Active', 'Pending', 'Verified', 'Suspended', 'Inactive')`
       ),
     };
   }

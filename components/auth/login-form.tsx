@@ -6,7 +6,8 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -19,26 +20,32 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { loginSchema } from "@/lib/validations/auth";
 
-const formSchema = z.object({
-  username: z.string().min(1, "Username is required"),
-  password: z.string().min(1, "Password is required"),
-});
+type FormData = z.infer<typeof loginSchema>;
 
 export function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
+  const [registrationSuccess, setRegistrationSuccess] = useState(false);
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
+  useEffect(() => {
+    if (searchParams.get("registered") === "true") {
+      setRegistrationSuccess(true);
+    }
+  }, [searchParams]);
+
+  const form = useForm<FormData>({
+    resolver: zodResolver(loginSchema),
     defaultValues: {
       username: "",
       password: "",
     },
   });
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  async function onSubmit(values: FormData) {
     setIsPending(true);
     setError(null);
 
@@ -50,7 +57,7 @@ export function LoginForm() {
       });
 
       if (result?.error) {
-        setError("Invalid credentials");
+        setError("Username atau password salah");
         return;
       }
 
@@ -86,7 +93,7 @@ export function LoginForm() {
         router.push("/");
       }
     } catch (error) {
-      setError(`Something went wrong${error}`);
+      setError(`${error}Terjadi kesalahan, silakan coba lagi`);
     } finally {
       setIsPending(false);
     }
@@ -95,11 +102,18 @@ export function LoginForm() {
   return (
     <div className="w-full max-w-md space-y-4">
       <div className="text-center">
-        <h1 className="text-2xl font-bold">Login to Klinik Borneo Kasih</h1>
-        <p className="text-muted-foreground">
-          Enter your credentials to access your account
-        </p>
+        <h1 className="text-2xl font-bold">Login Klinik Borneo Kasih</h1>
+        <p className="text-muted-foreground">Masuk ke akun Anda</p>
       </div>
+
+      {registrationSuccess && (
+        <Alert className="border-green-500 bg-green-50">
+          <AlertDescription className="text-green-900">
+            Registrasi berhasil! Akun Anda sedang menunggu verifikasi admin.
+            Silakan coba login nanti setelah akun diverifikasi.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {error && (
         <Alert variant="destructive">
@@ -116,7 +130,7 @@ export function LoginForm() {
               <FormItem>
                 <FormLabel>Username</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter your username" {...field} />
+                  <Input placeholder="Masukkan username" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -136,7 +150,7 @@ export function LoginForm() {
             )}
           />
           <Button type="submit" className="w-full" disabled={isPending}>
-            {isPending ? "Logging in..." : "Login"}
+            {isPending ? "Masuk..." : "Login"}
           </Button>
         </form>
       </Form>

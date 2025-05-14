@@ -53,6 +53,18 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
+        // Check user status
+        if (foundUser.role === "Patient" && foundUser.status === "Pending") {
+          throw new Error("Akun Anda sedang menunggu verifikasi admin");
+        }
+
+        if (
+          foundUser.status === "Suspended" ||
+          foundUser.status === "Inactive"
+        ) {
+          throw new Error("Akun Anda tidak aktif");
+        }
+
         // Ambil data detail sesuai role
         let details;
         switch (foundUser.role) {
@@ -77,19 +89,18 @@ export const authOptions: NextAuthOptions = {
         }
 
         // Return user untuk dimasukkan ke JWT token
-        // Perbaikan pertama: konversi null ke undefined untuk email
         return {
           id: foundUser.id.toString(),
           username: foundUser.username,
           role: foundUser.role,
+          status: foundUser.status,
           name: details?.name || undefined,
-          email: details?.email || undefined, // Konversi null ke undefined
+          email: details?.email || undefined,
         };
       },
     }),
   ],
   callbacks: {
-    // Perbaikan kedua: rename parameter user menjadi authUser untuk menghindari konflik
     async jwt({ token, user: authUser }) {
       if (authUser) {
         token.id = authUser.id;
