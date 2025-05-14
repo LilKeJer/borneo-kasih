@@ -16,14 +16,15 @@ const navItems = [
     icon: <Users className="h-4 w-4" />,
   },
   {
+    title: "Pasien",
+    href: "/dashboard/admin/patients",
+    icon: <Users className="h-4 w-4" />,
+  },
+
+  {
     title: "Settings",
     href: "/dashboard/admin/settings",
     icon: <Settings className="h-4 w-4" />,
-  },
-  {
-    title: "Users",
-    href: "/dashboard/admin/users",
-    icon: <Users className="h-4 w-4" />,
   },
   {
     title: "Profile",
