@@ -43,11 +43,12 @@ export async function GET(req: NextRequest) {
       ...(searchConditions.length > 0 ? searchConditions : [])
     );
 
-    // Main query
+    // Main query - now includes status from users table
     const patientsQuery = db
       .select({
         id: users.id,
         username: users.username,
+        status: users.status, // <-- Ambil status dari tabel users
         createdAt: users.createdAt,
         name: patientDetails.name,
         nik: patientDetails.nik,
@@ -74,14 +75,8 @@ export async function GET(req: NextRequest) {
       totalCountQuery,
     ]);
 
-    // Add status field
-    const patientsWithStatus = patients.map((patient) => ({
-      ...patient,
-      status: "Verified",
-    }));
-
     return NextResponse.json({
-      data: patientsWithStatus,
+      data: patients, // <-- Sekarang setiap pasien memiliki status dari database
       pagination: {
         page,
         limit,

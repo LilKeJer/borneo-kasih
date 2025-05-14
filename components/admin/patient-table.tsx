@@ -110,7 +110,16 @@ export function PatientTable() {
   };
 
   const getStatusBadgeVariant = (status: string) => {
-    return status === "Verified" ? "secondary" : "outline";
+    switch (status) {
+      case "Verified":
+        return "secondary";
+      case "Pending":
+        return "outline";
+      case "Active":
+        return "secondary";
+      default:
+        return "destructive";
+    }
   };
 
   const getGenderLabel = (gender: string) => {

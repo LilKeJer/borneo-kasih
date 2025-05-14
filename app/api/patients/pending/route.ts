@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/db";
 import { users, patientDetails } from "@/db/schema";
-import { eq, and, isNull, or } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 
 // GET - List pending patients only
 export async function GET() {
@@ -15,11 +15,12 @@ export async function GET() {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    // For MVP, we'll simulate pending patients by checking if they have incomplete details
+    // Query patients dengan status "Pending"
     const patients = await db
       .select({
         id: users.id,
         username: users.username,
+        status: users.status,
         createdAt: users.createdAt,
         name: patientDetails.name,
         nik: patientDetails.nik,
@@ -34,20 +35,14 @@ export async function GET() {
       .where(
         and(
           eq(users.role, "Patient"),
-          isNull(users.deletedAt),
-          // Simulating pending status - patients without complete details
-          or(
-            isNull(patientDetails.email),
-            isNull(patientDetails.phone),
-            isNull(patientDetails.address)
-          )
+          eq(users.status, "Pending"), // <-- Filter by actual status
+          isNull(users.deletedAt)
         )
       );
 
-    // Add pending status
+    // Identifikasi field yang mungkin masih kosong
     const pendingPatients = patients.map((patient) => ({
       ...patient,
-      status: "Pending",
       missingFields: [
         !patient.email && "email",
         !patient.phone && "phone",

@@ -51,9 +51,15 @@ export async function PUT(
           .where(eq(patientDetails.userId, patientId));
       }
 
+      // Update user status to Verified
       await db
         .update(users)
-        .set({ updatedAt: new Date() })
+        .set({
+          status: "Verified", // <-- Update status menjadi Verified
+          verifiedAt: new Date(),
+          verifiedBy: parseInt(session.user.id),
+          updatedAt: new Date(),
+        })
         .where(eq(users.id, patientId));
 
       return NextResponse.json({
@@ -61,10 +67,13 @@ export async function PUT(
         status: "Verified",
       });
     } else if (action === "reject") {
-      // For MVP, rejection means deleting the user
+      // For MVP, rejection means soft deleting the user
       await db
         .update(users)
-        .set({ deletedAt: new Date() })
+        .set({
+          status: "Rejected", // <-- Update status menjadi Rejected
+          deletedAt: new Date(),
+        })
         .where(eq(users.id, patientId));
 
       return NextResponse.json({
