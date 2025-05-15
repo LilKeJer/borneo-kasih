@@ -1,114 +1,148 @@
-// app/(dashboard)/patient/page.tsx
-import { DashboardCard } from "@/components/dashboard/dashboard-card";
+// app/dashboard/patient/page.tsx
+"use client";
+
+import { useState, useEffect } from "react";
+import { useAuth } from "@/hooks/use-auth";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Calendar, Clock, FileText, Bell } from "lucide-react";
 import Link from "next/link";
+import { Calendar, Clock } from "lucide-react";
+
+interface DashboardData {
+  nextAppointment: {
+    date: string;
+    queueNumber: number;
+    status: string;
+  } | null;
+  lastVisit: {
+    date: string;
+  } | null;
+}
 
 export default function PatientDashboardPage() {
+  const { user } = useAuth();
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(
+    null
+  );
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      const response = await fetch("/api/patients/dashboard");
+      if (!response.ok) throw new Error("Failed to fetch dashboard data");
+      const data = await response.json();
+      setDashboardData(data);
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("id-ID", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  };
+
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString("id-ID", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <DashboardCard
-          title="Next Appointment"
-          value="May 15, 2025"
-          icon={<Calendar className="h-4 w-4" />}
-          description="10:30 AM with Dr. Borneo"
-        />
-        <DashboardCard
-          title="Queue Status"
-          value="Not in queue"
-          icon={<Clock className="h-4 w-4" />}
-          description="Book an appointment to join the queue"
-        />
-        <DashboardCard
-          title="Medical Records"
-          value="5"
-          icon={<FileText className="h-4 w-4" />}
-          description="Last updated April 20, 2025"
-        />
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card className="col-span-1">
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-            <CardDescription>
-              Common tasks you might want to perform
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-2">
-            <Button asChild className="w-full justify-start">
+      {/* Welcome Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Selamat Datang</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-gray-600">
+            Halo {user?.name || user?.username}, selamat datang di sistem rekam
+            medis Klinik Borneo Kasih.
+          </p>
+          <div className="mt-4 flex gap-4">
+            <Button asChild>
               <Link href="/dashboard/patient/appointments/new">
-                <Calendar className="mr-2 h-4 w-4" />
-                Book New Appointment
+                Buat Janji Temu
               </Link>
             </Button>
-            <Button asChild variant="outline" className="w-full justify-start">
+            <Button asChild variant="outline">
               <Link href="/dashboard/patient/medical-records">
-                <FileText className="mr-2 h-4 w-4" />
-                View Medical History
+                Lihat Riwayat
               </Link>
             </Button>
-            <Button asChild variant="outline" className="w-full justify-start">
-              <Link href="/dashboard/patient/prescriptions">
-                <Calendar className="mr-2 h-4 w-4" />
-                View Prescriptions
-              </Link>
-            </Button>
-            <Button asChild variant="outline" className="w-full justify-start">
-              <Link href="/dashboard/patient/payments">
-                <Calendar className="mr-2 h-4 w-4" />
-                Payment History
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </CardContent>
+      </Card>
 
-        <Card className="col-span-1">
-          <CardHeader>
-            <CardTitle>Notifications</CardTitle>
-            <CardDescription>
-              Important information about your health
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-start gap-4">
-                <Bell className="mt-0.5 h-5 w-5 text-primary" />
-                <div>
-                  <p className="font-medium">Appointment Reminder</p>
-                  <p className="text-sm text-muted-foreground">
-                    Your appointment with Dr. Borneo is scheduled for May 15,
-                    2025 at 10:30 AM.
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-4">
-                <Bell className="mt-0.5 h-5 w-5 text-primary" />
-                <div>
-                  <p className="font-medium">Prescription Ready</p>
-                  <p className="text-sm text-muted-foreground">
-                    Your prescription from your last visit is ready for pickup.
-                  </p>
-                </div>
-              </div>
+      {/* Next Appointment Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Janji Temu Berikutnya
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <p className="text-gray-500">Loading...</p>
+          ) : dashboardData?.nextAppointment ? (
+            <div className="space-y-2">
+              <p className="font-medium">
+                {formatDate(dashboardData.nextAppointment.date)}
+              </p>
+              <p className="text-gray-600">
+                Jam: {formatTime(dashboardData.nextAppointment.date)}
+              </p>
+              <p className="text-gray-600">
+                No. Antrian: {dashboardData.nextAppointment.queueNumber}
+              </p>
+              <p className="text-gray-600">
+                Status: {dashboardData.nextAppointment.status}
+              </p>
             </div>
-          </CardContent>
-          <CardFooter>
-            <Button variant="ghost" size="sm" className="w-full">
-              View All Notifications
-            </Button>
-          </CardFooter>
-        </Card>
-      </div>
+          ) : (
+            <p className="text-gray-500">
+              Tidak ada janji temu yang dijadwalkan
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Last Visit Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Clock className="h-5 w-5" />
+            Kunjungan Terakhir
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <p className="text-gray-500">Loading...</p>
+          ) : dashboardData?.lastVisit ? (
+            <div>
+              <p className="font-medium">
+                {formatDate(dashboardData.lastVisit.date)}
+              </p>
+            </div>
+          ) : (
+            <p className="text-gray-500">Belum ada riwayat kunjungan</p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
