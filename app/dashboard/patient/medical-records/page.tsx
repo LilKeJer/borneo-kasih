@@ -12,13 +12,29 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { formatDate } from "@/lib/utils/date";
+import {
+  FileText,
+  Calendar,
+  User,
+  Stethoscope,
+  FileX2,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Activity,
+  ClipboardList,
+  Pill,
+} from "lucide-react";
 
 interface MedicalRecord {
   id: string;
@@ -35,7 +51,6 @@ interface MedicalRecordDetail extends MedicalRecord {
 export default function PatientMedicalRecordsPage() {
   const [records, setRecords] = useState<MedicalRecord[]>([]);
   const [loading, setLoading] = useState(true);
-
   const [recordDetail, setRecordDetail] = useState<MedicalRecordDetail | null>(
     null
   );
@@ -93,123 +108,241 @@ export default function PatientMedicalRecordsPage() {
     }
   };
 
+  const getDiagnosisBadgeVariant = (diagnosis: string) => {
+    const lowerDiagnosis = diagnosis.toLowerCase();
+    if (
+      lowerDiagnosis.includes("check up") ||
+      lowerDiagnosis.includes("rutin")
+    ) {
+      return "secondary";
+    } else if (
+      lowerDiagnosis.includes("flu") ||
+      lowerDiagnosis.includes("batuk")
+    ) {
+      return "default";
+    } else if (
+      lowerDiagnosis.includes("hipertensi") ||
+      lowerDiagnosis.includes("diabetes")
+    ) {
+      return "destructive";
+    }
+    return "outline";
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Riwayat Medis"
-        description="Lihat riwayat pemeriksaan Anda"
+        description="Lihat riwayat pemeriksaan dan diagnosis Anda"
       />
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Tanggal</TableHead>
-              <TableHead>Dokter</TableHead>
-              <TableHead>Diagnosis</TableHead>
-              <TableHead>Aksi</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={4} className="text-center">
-                  Loading...
-                </TableCell>
-              </TableRow>
-            ) : records.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={4} className="text-center">
-                  Tidak ada riwayat medis
-                </TableCell>
-              </TableRow>
-            ) : (
-              records.map((record) => (
-                <TableRow
-                  key={record.id}
-                  className="cursor-pointer hover:bg-accent"
-                  onClick={() => handleRowClick(record)}
-                >
-                  <TableCell>{formatDate(record.date)}</TableCell>
-                  <TableCell>{record.doctor}</TableCell>
-                  <TableCell>{record.diagnosis}</TableCell>
-                  <TableCell>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRowClick(record);
-                      }}
-                    >
-                      Lihat Detail
-                    </Button>
-                  </TableCell>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Daftar Pemeriksaan
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[180px]">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      Tanggal
+                    </div>
+                  </TableHead>
+                  <TableHead>
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      Dokter
+                    </div>
+                  </TableHead>
+                  <TableHead>
+                    <div className="flex items-center gap-2">
+                      <Stethoscope className="h-4 w-4" />
+                      Diagnosis
+                    </div>
+                  </TableHead>
+                  <TableHead className="text-right">Aksi</TableHead>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center h-32">
+                      <div className="flex items-center justify-center gap-2">
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <span>Memuat data...</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : records.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center h-32">
+                      <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                        <FileX2 className="h-8 w-8" />
+                        <p>Tidak ada riwayat medis</p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  records.map((record) => (
+                    <TableRow
+                      key={record.id}
+                      className="cursor-pointer hover:bg-accent/50 transition-colors"
+                      onClick={() => handleRowClick(record)}
+                    >
+                      <TableCell className="font-medium">
+                        {formatDate(record.date)}
+                      </TableCell>
+                      <TableCell>{record.doctor}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={getDiagnosisBadgeVariant(record.diagnosis)}
+                        >
+                          {record.diagnosis}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRowClick(record);
+                          }}
+                        >
+                          Lihat Detail
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
 
-      {/* Pagination */}
-      <div className="flex items-center justify-between">
-        <Button
-          variant="outline"
-          onClick={() => setPage(page - 1)}
-          disabled={page === 1}
-        >
-          Sebelumnya
-        </Button>
-        <span>
-          Halaman {page} dari {totalPages}
-        </span>
-        <Button
-          variant="outline"
-          onClick={() => setPage(page + 1)}
-          disabled={page === totalPages}
-        >
-          Selanjutnya
-        </Button>
-      </div>
+          {/* Pagination */}
+          {!loading && records.length > 0 && (
+            <div className="flex items-center justify-between px-6 py-4">
+              <p className="text-sm text-muted-foreground">
+                Halaman {page} dari {totalPages}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(page - 1)}
+                  disabled={page === 1}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Sebelumnya
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(page + 1)}
+                  disabled={page === totalPages}
+                >
+                  Selanjutnya
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Detail Modal */}
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Detail Pemeriksaan</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Detail Pemeriksaan
+            </DialogTitle>
+            <DialogDescription>
+              Informasi lengkap hasil pemeriksaan medis
+            </DialogDescription>
           </DialogHeader>
+
           {loadingDetail ? (
-            <div className="text-center py-4">Loading detail...</div>
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin" />
+            </div>
           ) : recordDetail ? (
             <div className="space-y-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Tanggal</p>
-                <p className="font-medium">{formatDate(recordDetail.date)}</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Calendar className="h-4 w-4" />
+                    Tanggal Pemeriksaan
+                  </div>
+                  <p className="font-medium">{formatDate(recordDetail.date)}</p>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <User className="h-4 w-4" />
+                    Dokter Pemeriksa
+                  </div>
+                  <p className="font-medium">{recordDetail.doctor}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Dokter</p>
-                <p className="font-medium">{recordDetail.doctor}</p>
+
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Stethoscope className="h-4 w-4" />
+                  Diagnosis
+                </div>
+                <div>
+                  <Badge
+                    variant={getDiagnosisBadgeVariant(recordDetail.diagnosis)}
+                    className="mb-2"
+                  >
+                    {recordDetail.diagnosis}
+                  </Badge>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Diagnosis</p>
-                <p className="font-medium">{recordDetail.diagnosis}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Deskripsi</p>
-                <p className="font-medium">
-                  {recordDetail.description || "Tidak ada deskripsi"}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Penanganan</p>
-                <p className="font-medium">
-                  {recordDetail.treatment || "Tidak ada penanganan"}
-                </p>
-              </div>
+
+              {recordDetail.description && (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <ClipboardList className="h-4 w-4" />
+                    Deskripsi Pemeriksaan
+                  </div>
+                  <p className="text-sm leading-relaxed">
+                    {recordDetail.description}
+                  </p>
+                </div>
+              )}
+
+              {recordDetail.treatment && (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Pill className="h-4 w-4" />
+                    Penanganan & Pengobatan
+                  </div>
+                  <p className="text-sm leading-relaxed">
+                    {recordDetail.treatment}
+                  </p>
+                </div>
+              )}
+
+              {!recordDetail.description && !recordDetail.treatment && (
+                <div className="text-center py-4 text-muted-foreground">
+                  <Activity className="h-8 w-8 mx-auto mb-2" />
+                  <p className="text-sm">Detail pemeriksaan tidak tersedia</p>
+                </div>
+              )}
             </div>
           ) : (
-            <div>Tidak ada detail</div>
+            <div className="text-center py-8 text-muted-foreground">
+              <FileX2 className="h-8 w-8 mx-auto mb-2" />
+              <p>Tidak ada detail tersedia</p>
+            </div>
           )}
         </DialogContent>
       </Dialog>
