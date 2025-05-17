@@ -41,11 +41,22 @@ export async function PUT(
       );
     }
 
-    // Update status pemeriksaan
+    // Tentukan status reservasi berdasarkan examinationStatus
+    let reservationStatus = "";
+    if (examinationStatus === "Completed") {
+      reservationStatus = "Completed";
+    } else if (examinationStatus === "Cancelled") {
+      reservationStatus = "Cancelled";
+    } else {
+      reservationStatus = "Confirmed"; // Untuk "Waiting" dan "In Progress"
+    }
+
+    // Update kedua status
     await db
       .update(reservations)
       .set({
         examinationStatus,
+        status: reservationStatus,
         updatedAt: new Date(),
       })
       .where(eq(reservations.id, reservationId));
@@ -53,6 +64,7 @@ export async function PUT(
     return NextResponse.json({
       message: "Status antrian berhasil diperbarui",
       examinationStatus,
+      status: reservationStatus,
     });
   } catch (error) {
     console.error("Error updating queue status:", error);
