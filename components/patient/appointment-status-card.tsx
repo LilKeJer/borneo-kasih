@@ -5,7 +5,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import Link from "next/link";
-import { Clock, Calendar, User, CheckCircle } from "lucide-react";
+import { Clock, Calendar, User, CheckCircle, InfoIcon } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface Appointment {
   id: string;
@@ -19,23 +26,53 @@ interface Appointment {
 export function AppointmentStatusCard() {
   const [appointment, setAppointment] = useState<Appointment | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isAppointmentTime, setIsAppointmentTime] = useState(false);
 
   useEffect(() => {
     fetchTodayAppointment();
   }, []);
 
+  // Check if current time is within 1 hour of appointment time
+  useEffect(() => {
+    console.log("Show check-in:", showCheckInButton);
+    console.log("Appointment time valid:", isAppointmentTime);
+    console.log("Appointment data:", appointment);
+    if (!appointment?.date) return;
+
+    const checkAppointmentTime = () => {
+      const appointmentDate = new Date(appointment.date);
+      const now = new Date();
+
+      // Is appointment time within 1 hour (before or after)
+      const timeDifferenceMs = Math.abs(
+        appointmentDate.getTime() - now.getTime()
+      );
+      const oneHourInMs = 60 * 60 * 1000;
+
+      setIsAppointmentTime(timeDifferenceMs <= oneHourInMs);
+    };
+
+    checkAppointmentTime();
+
+    // Check every minute
+    const intervalId = setInterval(checkAppointmentTime, 60000);
+
+    return () => clearInterval(intervalId);
+  }, [appointment?.date]);
+
   const fetchTodayAppointment = async () => {
     try {
       setLoading(true);
-      // Menggunakan endpoint yang sudah ada untuk mendapatkan janji temu hari ini
       const response = await fetch("/api/patients/today-appointment");
       if (!response.ok) {
         throw new Error("Failed to fetch appointment");
       }
+
       const data = await response.json();
-      console.log(data);
-      // Jika ada janji temu hari ini (nextAppointment)
-      if (data.nextAppointment) {
+      console.log("Data janji temu hari ini:", data);
+
+      // Jika ada janji temu hari ini (nextAppointment) dan tidak dibatalkan
+      if (data.nextAppointment && data.nextAppointment.status !== "Cancelled") {
         setAppointment({
           id: data.nextAppointment.id || "",
           date: data.nextAppointment.date || "",
@@ -50,6 +87,7 @@ export function AppointmentStatusCard() {
       }
     } catch (error) {
       console.error("Error fetching today's appointment:", error);
+      toast.error("Gagal memuat data janji temu hari ini");
     } finally {
       setLoading(false);
     }
@@ -70,14 +108,17 @@ export function AppointmentStatusCard() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to check in");
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to check in");
       }
 
       toast.success("Check-in berhasil");
       fetchTodayAppointment(); // Refresh data
     } catch (error) {
       console.error("Error checking in:", error);
-      toast.error("Gagal melakukan check-in");
+      toast.error(
+        error instanceof Error ? error.message : "Gagal melakukan check-in"
+      );
     }
   };
 
@@ -99,11 +140,34 @@ export function AppointmentStatusCard() {
   };
 
   const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString("id-ID", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    if (!dateString) return "-";
+
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleTimeString("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch (e) {
+      console.error("Error formatting date:", e);
+      return "-";
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return "-";
+
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString("id-ID", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      });
+    } catch (e) {
+      console.error("Error formatting date:", e);
+      return "-";
+    }
   };
 
   const showCheckInButton =
@@ -162,9 +226,12 @@ export function AppointmentStatusCard() {
           <div className="space-y-1">
             <p className="text-sm text-muted-foreground flex items-center gap-1">
               <Calendar className="h-3.5 w-3.5" />
-              Waktu
+              Tanggal & Waktu
             </p>
-            <p>{formatTime(appointment.date)}</p>
+            <p>
+              {formatDate(appointment.date)} <br />{" "}
+              {formatTime(appointment.date)}
+            </p>
           </div>
           <div className="space-y-1">
             <p className="text-sm text-muted-foreground flex items-center gap-1">
@@ -273,6 +340,18 @@ export function AppointmentStatusCard() {
           </div>
         </div>
 
+        {/* Tambahkan Alert untuk petunjuk check-in */}
+        {showCheckInButton && (
+          <Alert variant="default" className="bg-blue-50 border-blue-200">
+            <InfoIcon className="h-4 w-4 text-blue-500" />
+            <AlertDescription className="text-sm text-blue-700">
+              {isAppointmentTime
+                ? "Sudah saatnya check-in! Silakan tekan tombol check-in ketika Anda sudah tiba di klinik."
+                : "Ingat untuk melakukan check-in saat Anda tiba di klinik sesuai waktu janji temu."}
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className="flex items-center justify-between mt-2">
           <Button asChild variant="outline" size="sm">
             <Link href={`/dashboard/patient/appointments/${appointment.id}`}>
@@ -281,10 +360,23 @@ export function AppointmentStatusCard() {
           </Button>
 
           {showCheckInButton && (
-            <Button size="sm" onClick={handleCheckIn}>
-              <CheckCircle className="mr-1 h-4 w-4" />
-              Check-in
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm"
+                    onClick={handleCheckIn}
+                    className={isAppointmentTime ? "animate-pulse" : ""}
+                  >
+                    <CheckCircle className="mr-1 h-4 w-4" />
+                    Check-in
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Tekan tombol ini saat Anda sudah tiba di klinik</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
         </div>
       </CardContent>

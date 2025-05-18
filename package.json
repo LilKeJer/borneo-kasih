@@ -29,6 +29,7 @@
     "@radix-ui/react-slot": "^1.2.2",
     "@radix-ui/react-switch": "^1.2.4",
     "@radix-ui/react-tabs": "^1.1.11",
+    "@radix-ui/react-tooltip": "^1.2.6",
     "@tanstack/react-table": "^8.21.3",
     "@types/dotenv": "^6.1.1",
     "bcrypt": "^5.1.1",

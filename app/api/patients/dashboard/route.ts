@@ -1,10 +1,10 @@
-// app/api/patient/dashboard/route.ts
+// app/api/patients/dashboard/route.ts
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/db";
 import { reservations } from "@/db/schema";
-import { eq, desc, gte, and, sql } from "drizzle-orm";
+import { eq, desc, gte, and, not, isNull } from "drizzle-orm";
 
 export async function GET() {
   try {
@@ -17,7 +17,7 @@ export async function GET() {
     const patientId = parseInt(session.user.id);
     const now = new Date();
 
-    // Get next appointment
+    // Get next appointment (yang belum selesai dan tidak dibatalkan)
     const nextAppointment = await db
       .select({
         id: reservations.id,
@@ -25,13 +25,16 @@ export async function GET() {
         reservationDate: reservations.reservationDate,
         queueNumber: reservations.queueNumber,
         status: reservations.status,
+        examinationStatus: reservations.examinationStatus,
       })
       .from(reservations)
       .where(
         and(
           eq(reservations.patientId, patientId),
           gte(reservations.reservationDate, now),
-          sql`${reservations.status} IN ('Pending', 'Confirmed')`
+          not(eq(reservations.status, "Cancelled")), // Tambahkan filter ini untuk menghindari appointment yang dibatalkan
+          not(eq(reservations.status, "Completed")), // Tambahkan filter ini untuk menghindari appointment yang sudah selesai
+          isNull(reservations.deletedAt)
         )
       )
       .orderBy(reservations.reservationDate)
@@ -58,13 +61,17 @@ export async function GET() {
     const dashboardData = {
       nextAppointment: nextAppointment[0]
         ? {
+            id: nextAppointment[0].id,
             date: nextAppointment[0].reservationDate,
             queueNumber: nextAppointment[0].queueNumber,
             status: nextAppointment[0].status,
+            examinationStatus:
+              nextAppointment[0].examinationStatus || "Not Started",
           }
         : null,
       lastVisit: lastVisit[0]
         ? {
+            id: lastVisit[0].id,
             date: lastVisit[0].reservationDate,
           }
         : null,

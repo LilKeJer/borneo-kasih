@@ -1,4 +1,4 @@
-// app/(dashboard)/doctor/layout.tsx
+// app/dashboard/doctor/layout.tsx (update)
 import { ReactNode } from "react";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
@@ -10,6 +10,7 @@ import {
   Home,
   ClipboardList,
   User,
+  Clock,
 } from "lucide-react";
 
 const navItems = [
@@ -17,6 +18,11 @@ const navItems = [
     title: "Dashboard",
     href: "/dashboard/doctor",
     icon: <Home className="h-4 w-4" />,
+  },
+  {
+    title: "Antrian",
+    href: "/dashboard/doctor/queue", // Menambahkan link ke antrian
+    icon: <Clock className="h-4 w-4" />,
   },
   {
     title: "Appointments",
