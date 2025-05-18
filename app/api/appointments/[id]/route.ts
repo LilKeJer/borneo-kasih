@@ -30,6 +30,7 @@ export async function GET(
         reservationDate: reservations.reservationDate,
         queueNumber: reservations.queueNumber,
         status: reservations.status,
+        examinationStatus: reservations.examinationStatus,
         doctorName: doctorDetails.name,
       })
       .from(reservations)
@@ -59,6 +60,7 @@ export async function GET(
       date: appointment[0].reservationDate,
       queueNumber: appointment[0].queueNumber,
       status: appointment[0].status,
+      examinationStatus: appointment[0].examinationStatus || "Not Started", // Tambahkan ini jika belum ada
       doctor: appointment[0].doctorName || "Unknown Doctor",
     });
   } catch (error) {

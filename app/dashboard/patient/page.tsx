@@ -1,4 +1,4 @@
-// app/dashboard/patient/page.tsx
+// app/dashboard/patient/page.tsx (Modifikasi)
 "use client";
 
 import { useState, useEffect } from "react";
@@ -6,7 +6,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Calendar, Clock } from "lucide-react";
+import { Clock } from "lucide-react";
+import { AppointmentStatusCard } from "@/components/patient/appointment-status-card";
 
 interface DashboardData {
   nextAppointment: {
@@ -52,14 +53,6 @@ export default function PatientDashboardPage() {
     });
   };
 
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString("id-ID", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
   return (
     <div className="space-y-6">
       {/* Welcome Card */}
@@ -73,11 +66,6 @@ export default function PatientDashboardPage() {
             medis Klinik Borneo Kasih.
           </p>
           <div className="mt-4 flex gap-4">
-            <Button asChild>
-              <Link href="/dashboard/patient/appointments/new">
-                Buat Janji Temu
-              </Link>
-            </Button>
             <Button asChild variant="outline">
               <Link href="/dashboard/patient/medical-records">
                 Lihat Riwayat
@@ -87,39 +75,8 @@ export default function PatientDashboardPage() {
         </CardContent>
       </Card>
 
-      {/* Next Appointment Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            Janji Temu Berikutnya
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <p className="text-gray-500">Loading...</p>
-          ) : dashboardData?.nextAppointment ? (
-            <div className="space-y-2">
-              <p className="font-medium">
-                {formatDate(dashboardData.nextAppointment.date)}
-              </p>
-              <p className="text-gray-600">
-                Jam: {formatTime(dashboardData.nextAppointment.date)}
-              </p>
-              <p className="text-gray-600">
-                No. Antrian: {dashboardData.nextAppointment.queueNumber}
-              </p>
-              <p className="text-gray-600">
-                Status: {dashboardData.nextAppointment.status}
-              </p>
-            </div>
-          ) : (
-            <p className="text-gray-500">
-              Tidak ada janji temu yang dijadwalkan
-            </p>
-          )}
-        </CardContent>
-      </Card>
+      {/* Current Queue Status Card */}
+      <AppointmentStatusCard />
 
       {/* Last Visit Card */}
       <Card>
