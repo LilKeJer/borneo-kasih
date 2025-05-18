@@ -23,8 +23,8 @@ const navItems = [
     icon: <Calendar className="h-4 w-4" />,
   },
   {
-    title: "Queue",
-    href: "/dashboard/receptionist/queue",
+    title: "Antrian",
+    href: "/queue-display",
     icon: <ClipboardList className="h-4 w-4" />,
   },
   {

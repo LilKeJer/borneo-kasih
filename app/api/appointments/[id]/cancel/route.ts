@@ -52,6 +52,7 @@ export async function PUT(
       .update(reservations)
       .set({
         status: "Cancelled",
+        examinationStatus: "Cancelled",
         updatedAt: new Date(),
       })
       .where(eq(reservations.id, appointmentId));

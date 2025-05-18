@@ -24,8 +24,8 @@ const navItems = [
     icon: <Calendar className="h-4 w-4" />,
   },
   {
-    title: "Queue Status",
-    href: "/dashboard/patient/queue",
+    title: "Antrian",
+    href: "/queue-display",
     icon: <Clock className="h-4 w-4" />,
   },
   {

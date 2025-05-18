@@ -16,8 +16,8 @@ const navItems = [
     icon: <Users className="h-4 w-4" />,
   },
   {
-    title: "Queue",
-    href: "/dashboard/nurse/queue",
+    title: "Antrian",
+    href: "/queue-display",
     icon: <ClipboardList className="h-4 w-4" />,
   },
   {
