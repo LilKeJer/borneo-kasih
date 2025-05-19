@@ -59,7 +59,15 @@ export function QuickMedicalRecordForm({
         throw new Error(error.message || "Failed to create medical record");
       }
 
-      toast.success("Catatan medis berhasil dibuat");
+      const result = await response.json();
+
+      // Pesan yang lebih informatif tergantung apakah reservasi berhasil diperbarui
+      if (result.reservationUpdated) {
+        toast.success("Rekam medis berhasil dibuat dan pemeriksaan selesai");
+      } else {
+        toast.success("Rekam medis berhasil dibuat");
+      }
+
       form.reset();
 
       if (onSuccess) {
