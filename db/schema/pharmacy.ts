@@ -9,6 +9,7 @@ import {
   date,
   decimal,
   check,
+  boolean,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { users } from "./auth";
@@ -47,6 +48,11 @@ export const medicines = pgTable(
       .notNull()
       .references(() => users.id),
     price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+    // Field baru untuk threshold
+    minimumStock: integer("minimum_stock").default(5), // Default minimum stok
+    reorderThresholdPercentage: integer("reorder_threshold_percentage").default(
+      20
+    ), // Default persentase batas pesan ulang
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
     deletedAt: timestamp("deleted_at"),
@@ -56,6 +62,14 @@ export const medicines = pgTable(
       nameIdx: index("idx_medicine_name").on(table.name),
       pharmacistIdx: index("idx_medicine_pharmacist").on(table.pharmacistId),
       priceCheck: check("check_price", sql`${table.price} > 0`),
+      minimumStockCheck: check(
+        "check_minimum_stock",
+        sql`${table.minimumStock} >= 0`
+      ),
+      thresholdPercentageCheck: check(
+        "check_threshold_percentage",
+        sql`${table.reorderThresholdPercentage} BETWEEN 0 AND 100`
+      ),
     };
   }
 );
@@ -70,8 +84,10 @@ export const medicineStocks = pgTable(
       .references(() => medicines.id),
     quantity: integer("quantity").notNull(),
     remainingQuantity: integer("remaining_quantity").notNull(),
+    batchNumber: varchar("batch_number", { length: 50 }), // Menambahkan nomor batch
     expiryDate: date("expiry_date"),
     addedAt: timestamp("added_at").defaultNow(),
+    isBelowThreshold: boolean("is_below_threshold").default(false),
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
     deletedAt: timestamp("deleted_at"),

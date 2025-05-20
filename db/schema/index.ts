@@ -3,3 +3,4 @@ export * from "./auth";
 export * from "./medical";
 export * from "./pharmacy";
 export * from "./reservation";
+export * from "./payment";

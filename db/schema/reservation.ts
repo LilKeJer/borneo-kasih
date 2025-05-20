@@ -14,7 +14,7 @@ import { relations } from "drizzle-orm";
 import { users } from "./auth";
 import { doctorSchedules } from "./medical";
 import { prescriptions } from "./pharmacy";
-
+import { paymentDetails } from "./payment";
 // Reservation
 export const reservations = pgTable(
   "Reservation",
@@ -127,7 +127,7 @@ export const reservationsRelations = relations(
   })
 );
 
-export const paymentsRelations = relations(payments, ({ one }) => ({
+export const paymentsRelations = relations(payments, ({ one, many }) => ({
   patient: one(users, {
     fields: [payments.patientId],
     references: [users.id],
@@ -144,4 +144,5 @@ export const paymentsRelations = relations(payments, ({ one }) => ({
     fields: [payments.prescriptionId],
     references: [prescriptions.id],
   }),
+  details: many(paymentDetails), // Relasi baru ke payment details
 }));

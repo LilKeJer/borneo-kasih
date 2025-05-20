@@ -9,6 +9,7 @@ import * as authSchema from "./schema/auth";
 import * as medicalSchema from "./schema/medical";
 import * as pharmacySchema from "./schema/pharmacy";
 import * as reservationSchema from "./schema/reservation";
+import * as paymentSchema from "./schema/payment";
 
 // Combine schemas
 const schema = {
@@ -16,6 +17,7 @@ const schema = {
   ...medicalSchema,
   ...pharmacySchema,
   ...reservationSchema,
+  ...paymentSchema,
 };
 
 // Konfigurasi untuk Vercel serverless
@@ -32,3 +34,4 @@ export * from "./schema/auth";
 export * from "./schema/medical";
 export * from "./schema/pharmacy";
 export * from "./schema/reservation";
+export * from "./schema/payment";
