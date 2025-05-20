@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -86,6 +87,11 @@ interface DoctorSchedule {
   isActive: boolean;
 }
 
+interface SessionChoice {
+  id: number;
+  checked: boolean;
+}
+
 export default function DoctorSchedulesPage() {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [practiceSessions, setPracticeSessions] = useState<PracticeSession[]>(
@@ -109,12 +115,19 @@ export default function DoctorSchedulesPage() {
   const [selectedSession, setSelectedSession] =
     useState<PracticeSession | null>(null);
 
-  // Form state
-  const [newSchedule, setNewSchedule] = useState({
+  // Enhanced form state for multiple selections
+  const [newScheduleForm, setNewScheduleForm] = useState({
     doctorId: "",
-    sessionId: "",
-    dayOfWeek: "",
-    maxPatients: "30",
+    days: [
+      { day: 0, checked: false, maxPatients: "30" }, // Minggu
+      { day: 1, checked: false, maxPatients: "30" }, // Senin
+      { day: 2, checked: false, maxPatients: "30" }, // Selasa
+      { day: 3, checked: false, maxPatients: "30" }, // Rabu
+      { day: 4, checked: false, maxPatients: "30" }, // Kamis
+      { day: 5, checked: false, maxPatients: "30" }, // Jumat
+      { day: 6, checked: false, maxPatients: "30" }, // Sabtu
+    ],
+    sessions: [] as SessionChoice[],
   });
 
   const [editSchedule, setEditSchedule] = useState({
@@ -138,6 +151,19 @@ export default function DoctorSchedulesPage() {
     fetchPracticeSessions();
     fetchSchedules();
   }, []);
+
+  // Initialize sessions when they are fetched
+  useEffect(() => {
+    if (practiceSessions.length > 0) {
+      setNewScheduleForm((prev) => ({
+        ...prev,
+        sessions: practiceSessions.map((session) => ({
+          id: session.id,
+          checked: false,
+        })),
+      }));
+    }
+  }, [practiceSessions]);
 
   const fetchDoctors = async () => {
     try {
@@ -178,49 +204,131 @@ export default function DoctorSchedulesPage() {
     }
   };
 
-  // Fungsi untuk jadwal dokter
+  // Handle checkbox changes for days
+  const handleDayCheckboxChange = (dayIndex: number, checked: boolean) => {
+    setNewScheduleForm((prev) => ({
+      ...prev,
+      days: prev.days.map((day, index) =>
+        index === dayIndex ? { ...day, checked } : day
+      ),
+    }));
+  };
+
+  // Handle capacity change for specific day
+  const handleCapacityChange = (dayIndex: number, value: string) => {
+    setNewScheduleForm((prev) => ({
+      ...prev,
+      days: prev.days.map((day, index) =>
+        index === dayIndex ? { ...day, maxPatients: value } : day
+      ),
+    }));
+  };
+
+  // Handle checkbox changes for sessions
+  const handleSessionCheckboxChange = (sessionId: number, checked: boolean) => {
+    setNewScheduleForm((prev) => ({
+      ...prev,
+      sessions: prev.sessions.map((session) =>
+        session.id === sessionId ? { ...session, checked } : session
+      ),
+    }));
+  };
+
+  // Enhanced add schedule function to handle multiple selections
   const handleAddSchedule = async () => {
-    if (
-      !newSchedule.doctorId ||
-      !newSchedule.sessionId ||
-      !newSchedule.dayOfWeek
-    ) {
-      toast.error("Dokter, sesi, dan hari wajib diisi");
+    if (!newScheduleForm.doctorId) {
+      toast.error("Silakan pilih dokter terlebih dahulu");
+      return;
+    }
+
+    // Check if at least one day and one session is selected
+    const selectedDays = newScheduleForm.days.filter((day) => day.checked);
+    const selectedSessions = newScheduleForm.sessions.filter(
+      (session) => session.checked
+    );
+
+    if (selectedDays.length === 0) {
+      toast.error("Silakan pilih minimal satu hari");
+      return;
+    }
+
+    if (selectedSessions.length === 0) {
+      toast.error("Silakan pilih minimal satu sesi");
       return;
     }
 
     try {
       setIsProcessing(true);
+
+      // Format data to match API expectations
+      const sessionIds = selectedSessions.map((session) => session.id);
+      const formattedDays = selectedDays.map((day) => ({
+        dayOfWeek: day.day,
+        maxPatients: parseInt(day.maxPatients) || 30,
+      }));
+
+      // Debug data being sent
+      const requestData = {
+        doctorId: parseInt(newScheduleForm.doctorId),
+        sessions: sessionIds,
+        days: formattedDays,
+      };
+
+      console.log("Sending data to API:", requestData);
+
+      // Make a single request with arrays for sessions and days
       const response = await fetch("/api/doctor-schedules", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          doctorId: parseInt(newSchedule.doctorId),
-          sessionId: parseInt(newSchedule.sessionId),
-          dayOfWeek: parseInt(newSchedule.dayOfWeek),
-          maxPatients: parseInt(newSchedule.maxPatients) || 30,
-        }),
+        body: JSON.stringify(requestData),
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Gagal menambahkan jadwal");
+      // For 500 errors, we may not get a valid JSON response
+      let data;
+      try {
+        data = await response.json();
+        console.log(data);
+      } catch (e) {
+        console.error("Failed to parse response:", e);
+        data = { message: "Internal server error (failed to parse response)" };
       }
 
-      toast.success("Jadwal berhasil ditambahkan");
-      fetchSchedules();
-      setIsAddDialogOpen(false);
-      // Reset form
-      setNewSchedule({
-        doctorId: "",
-        sessionId: "",
-        dayOfWeek: "",
-        maxPatients: "30",
-      });
+      console.log("API response:", response.status, data);
+
+      if (response.ok) {
+        toast.success(data.message || "Jadwal berhasil ditambahkan");
+        fetchSchedules();
+        setIsAddDialogOpen(false);
+
+        // Reset form
+        setNewScheduleForm({
+          doctorId: "",
+          days: newScheduleForm.days.map((day) => ({
+            ...day,
+            checked: false,
+            maxPatients: "30",
+          })),
+          sessions: newScheduleForm.sessions.map((session) => ({
+            ...session,
+            checked: false,
+          })),
+        });
+      } else {
+        toast.error(
+          data.message || `Error ${response.status}: Gagal menambahkan jadwal`
+        );
+
+        // Display specific errors if they exist
+        if (data.errors && Array.isArray(data.errors)) {
+          data.errors.forEach((error: { message: string }) => {
+            toast.error(error.message);
+          });
+        }
+      }
     } catch (error) {
-      console.error("Error adding schedule:", error);
+      console.error("Error adding schedules:", error);
       toast.error(
         error instanceof Error ? error.message : "Gagal menambahkan jadwal"
       );
@@ -701,19 +809,25 @@ export default function DoctorSchedulesPage() {
       </Tabs>
 
       {/* Dialog untuk Jadwal Dokter */}
-      {/* Add Schedule Dialog */}
+      {/* Improved Add Schedule Dialog with checkboxes */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent>
+        <DialogContent
+          className={"lg:max-w-screen-lg overflow-y-scroll max-h-screen"}
+        >
           <DialogHeader>
             <DialogTitle>Tambah Jadwal Dokter</DialogTitle>
+            <DialogDescription>
+              Pilih sesi praktik dan hari-hari yang tersedia beserta kapasitas
+              pasien
+            </DialogDescription>
           </DialogHeader>
-          <div className="py-4 space-y-4">
+          <div className="py-4 space-y-6">
             <div className="space-y-2">
               <Label htmlFor="doctor">Dokter</Label>
               <Select
-                value={newSchedule.doctorId}
+                value={newScheduleForm.doctorId}
                 onValueChange={(value) =>
-                  setNewSchedule({ ...newSchedule, doctorId: value })
+                  setNewScheduleForm({ ...newScheduleForm, doctorId: value })
                 }
               >
                 <SelectTrigger id="doctor">
@@ -732,65 +846,87 @@ export default function DoctorSchedulesPage() {
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="session">Sesi Praktik</Label>
-              <Select
-                value={newSchedule.sessionId}
-                onValueChange={(value) =>
-                  setNewSchedule({ ...newSchedule, sessionId: value })
-                }
-              >
-                <SelectTrigger id="session">
-                  <SelectValue placeholder="Pilih sesi" />
-                </SelectTrigger>
-                <SelectContent>
-                  {practiceSessions.map((session) => (
-                    <SelectItem key={session.id} value={session.id.toString()}>
-                      {session.name} ({formatTime(session.startTime)} -{" "}
-                      {formatTime(session.endTime)})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="space-y-3">
+              <Label>Sesi Praktik</Label>
+              <div className="grid grid-cols-2 gap-4">
+                {practiceSessions.map((session) => (
+                  <div
+                    key={session.id}
+                    className="flex items-start space-x-2 border p-3 rounded-md"
+                  >
+                    <Checkbox
+                      id={`session-${session.id}`}
+                      checked={
+                        newScheduleForm.sessions.find(
+                          (s) => s.id === session.id
+                        )?.checked || false
+                      }
+                      onCheckedChange={(checked) =>
+                        handleSessionCheckboxChange(
+                          session.id,
+                          checked === true
+                        )
+                      }
+                    />
+                    <div className="space-y-1">
+                      <Label
+                        htmlFor={`session-${session.id}`}
+                        className="font-medium"
+                      >
+                        {session.name}
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        {formatTime(session.startTime)} -{" "}
+                        {formatTime(session.endTime)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="day">Hari</Label>
-              <Select
-                value={newSchedule.dayOfWeek}
-                onValueChange={(value) =>
-                  setNewSchedule({ ...newSchedule, dayOfWeek: value })
-                }
-              >
-                <SelectTrigger id="day">
-                  <SelectValue placeholder="Pilih hari" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="0">Minggu</SelectItem>
-                  <SelectItem value="1">Senin</SelectItem>
-                  <SelectItem value="2">Selasa</SelectItem>
-                  <SelectItem value="3">Rabu</SelectItem>
-                  <SelectItem value="4">Kamis</SelectItem>
-                  <SelectItem value="5">Jumat</SelectItem>
-                  <SelectItem value="6">Sabtu</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="max-patients">Kapasitas Maksimal</Label>
-              <Input
-                id="max-patients"
-                type="number"
-                value={newSchedule.maxPatients}
-                onChange={(e) =>
-                  setNewSchedule({
-                    ...newSchedule,
-                    maxPatients: e.target.value,
-                  })
-                }
-                min="1"
-              />
+            <div className="space-y-3">
+              <Label>Hari Praktik</Label>
+              <div className="space-y-3">
+                {newScheduleForm.days.map((day, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center border p-3 rounded-md"
+                  >
+                    <div className="flex items-center space-x-2 flex-1">
+                      <Checkbox
+                        id={`day-${index}`}
+                        checked={day.checked}
+                        onCheckedChange={(checked) =>
+                          handleDayCheckboxChange(index, checked === true)
+                        }
+                      />
+                      <Label htmlFor={`day-${index}`} className="font-medium">
+                        {getDayName(day.day)}
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2 w-1/3">
+                      <Label
+                        htmlFor={`capacity-${index}`}
+                        className="text-sm whitespace-nowrap"
+                      >
+                        Kapasitas:
+                      </Label>
+                      <Input
+                        id={`capacity-${index}`}
+                        type="number"
+                        value={day.maxPatients}
+                        onChange={(e) =>
+                          handleCapacityChange(index, e.target.value)
+                        }
+                        className="w-20"
+                        min="1"
+                        disabled={!day.checked}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
           <DialogFooter>

@@ -86,7 +86,7 @@ export default function DoctorQueuePage() {
         throw new Error("Failed to fetch queue data");
       }
       const data = await response.json();
-
+      console.log(data);
       setQueuePatients(data.waitingPatients || []);
       setCurrentPatient(data.currentPatient || null);
     } catch (error) {
