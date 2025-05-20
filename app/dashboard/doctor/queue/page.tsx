@@ -2,6 +2,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { cn } from "@/lib/utils";
+import { useEmergencyPolling } from "@/hooks/use-emergency-polling";
+import { EmergencyNotification } from "@/components/receptionist/emergency-notification";
 
 import { PageHeader } from "@/components/dashboard/page-header";
 import {
@@ -38,6 +41,7 @@ import {
   Loader2,
   PlayCircle,
   CheckSquare,
+  AlertTriangle,
 } from "lucide-react";
 
 interface Patient {
@@ -48,6 +52,8 @@ interface Patient {
   reservationDate: string;
   status: string;
   examinationStatus: string;
+  isPriority: boolean;
+  priorityReason: string;
   checkedInAt: string | null;
   complaint?: string;
   lastVisitDate?: string | null;
@@ -59,6 +65,7 @@ export default function DoctorQueuePage() {
   const [currentPatient, setCurrentPatient] = useState<Patient | null>(null);
   const [isPatientDetailOpen, setIsPatientDetailOpen] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const { lastEmergency, dismissLatest } = useEmergencyPolling();
 
   useEffect(() => {
     fetchQueueData();
@@ -160,6 +167,14 @@ export default function DoctorQueuePage() {
 
   return (
     <div className="space-y-6">
+      {lastEmergency && (
+        <EmergencyNotification
+          show={true}
+          patientName={lastEmergency.patientName}
+          queueNumber={lastEmergency.queueNumber}
+          onClose={dismissLatest}
+        />
+      )}
       <PageHeader
         title="Antrian Pasien"
         description="Kelola antrian pasien hari ini"
@@ -178,7 +193,21 @@ export default function DoctorQueuePage() {
               {formatTime(currentPatient.reservationDate)}
             </CardDescription>
           )}
+          {currentPatient && currentPatient.isPriority && (
+            <div className="bg-red-50 border border-red-300 rounded-md p-3 mb-4 animate-pulse">
+              <div className="flex items-center gap-2 text-red-800">
+                <AlertTriangle className="h-5 w-5" />
+                <div className="font-medium">Kasus Darurat!</div>
+              </div>
+              {currentPatient.priorityReason && (
+                <p className="text-sm text-red-700 mt-1">
+                  Alasan: {currentPatient.priorityReason}
+                </p>
+              )}
+            </div>
+          )}
         </CardHeader>
+
         <CardContent>
           {currentPatient ? (
             <div className="space-y-4">
@@ -272,9 +301,24 @@ export default function DoctorQueuePage() {
                 </TableRow>
               ) : (
                 queuePatients.map((patient) => (
-                  <TableRow key={patient.id}>
+                  <TableRow
+                    key={patient.id}
+                    className={cn(
+                      patient.isPriority
+                        ? "bg-red-50 border-l-4 border-l-red-500"
+                        : ""
+                    )}
+                  >
                     <TableCell className="font-medium">
                       {patient.queueNumber}
+                      {patient.isPriority && (
+                        <Badge
+                          variant="destructive"
+                          className="ml-2 animate-pulse"
+                        >
+                          Darurat
+                        </Badge>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div>{patient.patientName}</div>

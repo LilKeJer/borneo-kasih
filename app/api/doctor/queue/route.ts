@@ -34,6 +34,8 @@ export async function GET() {
         reservationDate: reservations.reservationDate,
         status: reservations.status,
         examinationStatus: reservations.examinationStatus,
+        isPriority: reservations.isPriority,
+        priorityReason: reservations.priorityReason,
         // Tambahan informasi dari reservasi (jika ada)
         complaint: sql<string>`null`, // Placeholder, kita bisa tambahkan nantinya
       })
@@ -63,6 +65,8 @@ export async function GET() {
         reservationDate: reservations.reservationDate,
         status: reservations.status,
         examinationStatus: reservations.examinationStatus,
+        isPriority: reservations.isPriority,
+        priorityReason: reservations.priorityReason,
         checkedInAt: sql<string>`CASE WHEN ${reservations.examinationStatus} = 'Waiting' THEN ${reservations.updatedAt}::text ELSE NULL END`,
         // Placeholder untuk keluhan
         complaint: sql<string>`null`,

@@ -71,6 +71,8 @@ export async function GET(req: NextRequest) {
         queueNumber: reservations.queueNumber,
         status: reservations.status,
         examinationStatus: reservations.examinationStatus,
+        isPriority: reservations.isPriority,
+        priorityReason: reservations.priorityReason,
         checkedInAt: sql<
           string | null
         >`CASE WHEN ${reservations.examinationStatus} = 'Waiting' THEN ${reservations.updatedAt}::text ELSE NULL END`,

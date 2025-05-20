@@ -9,6 +9,7 @@ interface QueueItem {
   queueNumber: number;
   status: string;
   reservationStatus: string; // Tambahkan ini
+  isPriority: boolean;
 }
 
 interface DoctorSessionQueue {
@@ -160,11 +161,18 @@ export default function QueueDisplayPage() {
                                 "border-b border-gray-100",
                                 isCurrentlyExamined(queue.status)
                                   ? "bg-green-50"
+                                  : queue.isPriority
+                                  ? "bg-red-50 animate-pulse border-l-4 border-l-red-500"
                                   : ""
                               )}
                             >
                               <td className="py-4 text-2xl font-bold">
                                 {queue.queueNumber}
+                                {queue.isPriority && (
+                                  <span className="ml-2 bg-red-100 text-red-800 text-xs font-semibold px-2 py-1 rounded-full">
+                                    DARURAT
+                                  </span>
+                                )}
                               </td>
                               <td className="py-4 text-right">
                                 <span
@@ -172,6 +180,8 @@ export default function QueueDisplayPage() {
                                     "inline-block rounded-full px-4 py-1 text-lg font-semibold",
                                     isCurrentlyExamined(queue.status)
                                       ? "bg-green-100 text-green-800"
+                                      : queue.isPriority
+                                      ? "bg-red-100 text-red-800"
                                       : "bg-blue-100 text-blue-800"
                                   )}
                                 >

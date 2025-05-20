@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-
+import { cn } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -42,7 +42,12 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-
+import Link from "next/link";
+import { UserPlus, AlertTriangle } from "lucide-react";
+import { PriorityToggle } from "@/components/receptionist/priority-toggle";
+import { useEmergencyPolling } from "@/hooks/use-emergency-polling";
+import { EmergencyNotification } from "@/components/receptionist/emergency-notification";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 interface Patient {
   id: number;
   patientId: number;
@@ -51,6 +56,8 @@ interface Patient {
   reservationDate: string;
   status: string;
   examinationStatus: string;
+  isPriority: boolean;
+  priorityReason: string;
   checkedInAt: string | null;
 }
 
@@ -71,6 +78,8 @@ export default function QueueManagementPage() {
     new Date().toISOString().split("T")[0]
   );
 
+  const { emergencyPatients, lastEmergency, dismissLatest } =
+    useEmergencyPolling();
   useEffect(() => {
     fetchQueueData();
   }, [selectedDate]);
@@ -239,11 +248,28 @@ export default function QueueManagementPage() {
 
   return (
     <div className="space-y-6">
+      {lastEmergency && (
+        <EmergencyNotification
+          show={true}
+          patientName={lastEmergency.patientName}
+          queueNumber={lastEmergency.queueNumber}
+          onClose={dismissLatest}
+        />
+      )}
+
       <PageHeader title="Manajemen Antrian" description="Kelola antrian pasien">
-        <Button onClick={() => setIsCheckInDialogOpen(true)}>
-          <UserCheck className="mr-2 h-4 w-4" />
-          Check-in Pasien
-        </Button>
+        <div className="flex gap-2">
+          <Button asChild>
+            <Link href="/dashboard/receptionist/walk-in">
+              <UserPlus className="mr-2 h-4 w-4" />
+              Pendaftaran Walk-in
+            </Link>
+          </Button>
+          <Button onClick={() => setIsCheckInDialogOpen(true)}>
+            <UserCheck className="mr-2 h-4 w-4" />
+            Check-in Pasien
+          </Button>
+        </div>
       </PageHeader>
 
       {/* Date Selector */}
@@ -299,116 +325,211 @@ export default function QueueManagementPage() {
           Refresh
         </Button>
       </div>
+      <Tabs defaultValue="all" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="all">Semua Antrian</TabsTrigger>
+          <TabsTrigger value="emergency" className="relative">
+            Kasus Darurat
+            {emergencyPatients.length > 0 && (
+              <Badge variant="destructive" className="ml-2">
+                {emergencyPatients.length}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
 
-      <div className="grid grid-cols-1 gap-6">
-        {filteredQueues.length === 0 ? (
-          <Card>
-            <CardContent className="py-10 text-center">
-              <ClipboardList className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-              <p className="text-muted-foreground">
-                Tidak ada antrian yang tersedia untuk tanggal{" "}
-                {formatDate(selectedDate)}
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          filteredQueues.map((doctorQueue) => (
-            <Card key={doctorQueue.doctorId}>
-              <CardHeader>
-                <CardTitle>{doctorQueue.doctorName}</CardTitle>
-                <CardDescription>
-                  {doctorQueue.queues.length} pasien dalam antrian
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-20">No.</TableHead>
-                      <TableHead>Pasien</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Check-in</TableHead>
-                      <TableHead className="text-right">Aksi</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {doctorQueue.queues.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={5} className="text-center h-24">
-                          Tidak ada pasien dalam antrian
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      doctorQueue.queues.map((patient) => (
-                        <TableRow key={patient.id}>
-                          <TableCell className="font-medium">
-                            {patient.queueNumber}
-                          </TableCell>
-                          <TableCell>{patient.patientName}</TableCell>
-                          <TableCell>
-                            {getStatusBadge(patient.examinationStatus)}
-                          </TableCell>
-                          <TableCell>
-                            {patient.checkedInAt
-                              ? formatTime(patient.checkedInAt)
-                              : "-"}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              {patient.examinationStatus === "Not Started" && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    setReservationIdToCheckIn(
-                                      patient.id.toString()
-                                    );
-                                    setIsCheckInDialogOpen(true);
-                                  }}
-                                >
-                                  <UserCheck className="h-4 w-4 mr-1" />
-                                  Check-in
-                                </Button>
-                              )}
-                              {patient.examinationStatus === "Waiting" && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleUpdateStatus(
-                                      patient.id,
-                                      "In Progress"
-                                    )
-                                  }
-                                >
-                                  <PlayCircle className="h-4 w-4 mr-1" />
-                                  Mulai Periksa
-                                </Button>
-                              )}
-                              {patient.examinationStatus === "In Progress" && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleUpdateStatus(patient.id, "Completed")
-                                  }
-                                >
-                                  <CheckSquare className="h-4 w-4 mr-1" />
-                                  Selesai
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
+        <TabsContent value="all">
+          <div className="grid grid-cols-1 gap-6">
+            {filteredQueues.length === 0 ? (
+              <Card>
+                <CardContent className="py-10 text-center">
+                  <ClipboardList className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-muted-foreground">
+                    Tidak ada antrian yang tersedia untuk tanggal{" "}
+                    {formatDate(selectedDate)}
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              filteredQueues.map((doctorQueue) => (
+                <Card key={doctorQueue.doctorId}>
+                  <CardHeader>
+                    <CardTitle>{doctorQueue.doctorName}</CardTitle>
+                    <CardDescription>
+                      {doctorQueue.queues.length} pasien dalam antrian
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-20">No.</TableHead>
+                          <TableHead>Pasien</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Check-in</TableHead>
+                          <TableHead className="text-right">Aksi</TableHead>
                         </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {doctorQueue.queues.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center h-24">
+                              Tidak ada pasien dalam antrian
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          doctorQueue.queues.map((patient) => (
+                            <TableRow
+                              key={patient.id}
+                              className={cn(
+                                "border-b border-gray-100",
+                                patient.isPriority
+                                  ? "bg-red-50 border-l-4 border-l-red-500"
+                                  : ""
+                              )}
+                            >
+                              <TableCell className="font-medium">
+                                {patient.queueNumber}
+                                {patient.isPriority && (
+                                  <Badge variant="destructive" className="ml-2">
+                                    Darurat
+                                  </Badge>
+                                )}
+                              </TableCell>
+                              <TableCell>{patient.patientName}</TableCell>
+                              <TableCell>
+                                {getStatusBadge(patient.examinationStatus)}
+                              </TableCell>
+                              <TableCell>
+                                {patient.checkedInAt
+                                  ? formatTime(patient.checkedInAt)
+                                  : "-"}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex justify-end gap-2">
+                                  {patient.examinationStatus ===
+                                    "Not Started" && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        setReservationIdToCheckIn(
+                                          patient.id.toString()
+                                        );
+                                        setIsCheckInDialogOpen(true);
+                                      }}
+                                    >
+                                      <UserCheck className="h-4 w-4 mr-1" />
+                                      Check-in
+                                    </Button>
+                                  )}
+                                  {patient.examinationStatus === "Waiting" && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() =>
+                                        handleUpdateStatus(
+                                          patient.id,
+                                          "In Progress"
+                                        )
+                                      }
+                                    >
+                                      <PlayCircle className="h-4 w-4 mr-1" />
+                                      Mulai Periksa
+                                    </Button>
+                                  )}
+                                  {patient.examinationStatus ===
+                                    "In Progress" && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() =>
+                                        handleUpdateStatus(
+                                          patient.id,
+                                          "Completed"
+                                        )
+                                      }
+                                    >
+                                      <CheckSquare className="h-4 w-4 mr-1" />
+                                      Selesai
+                                    </Button>
+                                  )}
+                                  <PriorityToggle
+                                    reservationId={patient.id.toString()}
+                                    isPriority={patient.isPriority}
+                                    onStatusChange={() => fetchQueueData()}
+                                  />
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+        </TabsContent>
+        <TabsContent value="emergency">
+          {emergencyPatients.length === 0 ? (
+            <Card>
+              <CardContent className="text-center py-12">
+                <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">
+                  Tidak ada kasus darurat saat ini
+                </p>
               </CardContent>
             </Card>
-          ))
-        )}
-      </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4">
+              {emergencyPatients.map((patient) => (
+                <Card key={patient.id} className="border-red-500 bg-red-50">
+                  <CardHeader className="bg-red-100">
+                    <CardTitle className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="h-5 w-5 text-red-600" />
+                        <span>Kasus Darurat</span>
+                      </div>
+                      <Badge variant="destructive" className="animate-pulse">
+                        Prioritas
+                      </Badge>
+                    </CardTitle>
+                    {patient.priorityReason && (
+                      <CardDescription className="text-red-700">
+                        Alasan: {patient.priorityReason}
+                      </CardDescription>
+                    )}
+                  </CardHeader>
+                  <CardContent className="p-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Pasien</p>
+                        <p className="font-medium">{patient.patientName}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">
+                          Nomor Antrian
+                        </p>
+                        <p className="font-medium">{patient.queueNumber}</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex justify-end">
+                      <PriorityToggle
+                        reservationId={patient.id.toString()}
+                        isPriority={true}
+                        onStatusChange={() => fetchQueueData()}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
 
       {/* Check-in Dialog */}
       <Dialog open={isCheckInDialogOpen} onOpenChange={setIsCheckInDialogOpen}>

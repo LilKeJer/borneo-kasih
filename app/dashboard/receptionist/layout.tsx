@@ -9,6 +9,7 @@ import {
   ClipboardList,
   CreditCard,
   User,
+  UserPlus,
 } from "lucide-react";
 
 const navItems = [
@@ -24,8 +25,13 @@ const navItems = [
   },
   {
     title: "Antrian",
-    href: "/queue-display",
+    href: "/dashboard/receptionist/queue",
     icon: <ClipboardList className="h-4 w-4" />,
+  },
+  {
+    title: "Walk-in", // Tambahkan item ini
+    href: "/dashboard/receptionist/walk-in",
+    icon: <UserPlus className="h-4 w-4" />,
   },
   {
     title: "Patients",

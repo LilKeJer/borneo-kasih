@@ -7,6 +7,7 @@ import {
   index,
   decimal,
   check,
+  boolean,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { relations } from "drizzle-orm";
@@ -32,6 +33,8 @@ export const reservations = pgTable(
     queueNumber: integer("queue_number"),
     status: varchar("status", { length: 20 }).notNull(),
     examinationStatus: varchar("examination_status", { length: 20 }),
+    isPriority: boolean("is_priority").default(false),
+    priorityReason: varchar("priority_reason", { length: 255 }),
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
     deletedAt: timestamp("deleted_at"),
