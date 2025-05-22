@@ -70,7 +70,7 @@ export async function GET(
 // PUT - Mengupdate layanan
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Autentikasi
@@ -78,9 +78,10 @@ export async function PUT(
     if (!session?.user || session.user.role !== "Admin") {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
+    const resolvedParams = await params;
 
     // Validasi ID
-    const serviceId = parseInt(params.id, 10);
+    const serviceId = parseInt(resolvedParams.id, 10);
     if (isNaN(serviceId)) {
       return NextResponse.json(
         { message: "ID layanan tidak valid" },

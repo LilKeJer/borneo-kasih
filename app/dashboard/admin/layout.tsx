@@ -2,7 +2,7 @@
 import { ReactNode } from "react";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
-import { Users, Settings, Home, User, Calendar } from "lucide-react";
+import { Users, Settings, Home, User, Calendar, Tag } from "lucide-react";
 
 const navItems = [
   {
@@ -21,9 +21,14 @@ const navItems = [
     icon: <Users className="h-4 w-4" />,
   },
   {
-    title: "Jadwal Dokter", // Tambahkan item menu ini
+    title: "Jadwal Dokter",
     href: "/dashboard/admin/schedules",
     icon: <Calendar className="h-4 w-4" />,
+  },
+  {
+    title: "Layanan Medis", // Menambahkan menu baru
+    href: "/dashboard/admin/services",
+    icon: <Tag className="h-4 w-4" />,
   },
   {
     title: "Settings",
@@ -36,6 +41,7 @@ const navItems = [
     icon: <User className="h-4 w-4" />,
   },
 ];
+
 export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col">

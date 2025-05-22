@@ -1,7 +1,7 @@
 // app/dashboard/doctor/medical-records/create/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -17,7 +17,8 @@ interface Patient {
   // informasi lain jika diperlukan
 }
 
-export default function CreateMedicalRecordPage() {
+// Component yang menggunakan useSearchParams
+function CreateMedicalRecordContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const patientId = searchParams.get("patientId");
@@ -145,5 +146,23 @@ export default function CreateMedicalRecordPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// Loading component untuk Suspense fallback
+function LoadingFallback() {
+  return (
+    <div className="flex items-center justify-center h-full">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+  );
+}
+
+// Main component yang dibungkus dengan Suspense
+export default function CreateMedicalRecordPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <CreateMedicalRecordContent />
+    </Suspense>
   );
 }
