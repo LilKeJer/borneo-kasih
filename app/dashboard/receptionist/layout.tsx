@@ -1,4 +1,4 @@
-// app/(dashboard)/receptionist/layout.tsx
+// app/dashboard/receptionist/layout.tsx (Updated)
 import { ReactNode } from "react";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
@@ -29,7 +29,7 @@ const navItems = [
     icon: <ClipboardList className="h-4 w-4" />,
   },
   {
-    title: "Walk-in", // Tambahkan item ini
+    title: "Walk-in",
     href: "/dashboard/receptionist/walk-in",
     icon: <UserPlus className="h-4 w-4" />,
   },
@@ -39,7 +39,7 @@ const navItems = [
     icon: <Users className="h-4 w-4" />,
   },
   {
-    title: "Payments",
+    title: "Payments", // Menu baru
     href: "/dashboard/receptionist/payments",
     icon: <CreditCard className="h-4 w-4" />,
   },
@@ -59,7 +59,7 @@ export default function ReceptionistLayout({
     <div className="flex min-h-screen flex-col">
       <DashboardHeader
         title="Receptionist Dashboard"
-        description="Manage appointments, queue, and payments"
+        description="Manage appointments, queue, payments and walk-ins"
         navItems={navItems}
       />
       <div className="flex flex-1">

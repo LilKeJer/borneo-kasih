@@ -47,8 +47,8 @@ export default function ServiceCatalogPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<ServiceCategory | "">(
-    ""
+  const [categoryFilter, setCategoryFilter] = useState<ServiceCategory | "all">(
+    "all"
   );
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>("all");
   const [refreshKey, setRefreshKey] = useState(0);
@@ -134,7 +134,7 @@ export default function ServiceCatalogPage() {
 
           <Select
             value={categoryFilter}
-            onValueChange={(value: ServiceCategory | "") =>
+            onValueChange={(value: ServiceCategory | "all") =>
               setCategoryFilter(value)
             }
           >
@@ -142,7 +142,7 @@ export default function ServiceCatalogPage() {
               <SelectValue placeholder="Semua Kategori" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Semua Kategori</SelectItem>
+              <SelectItem value="all">Semua Kategori</SelectItem>
               {categories.map((category) => (
                 <SelectItem key={category.id} value={category.id}>
                   {category.name}
@@ -175,7 +175,7 @@ export default function ServiceCatalogPage() {
       <ServiceCatalogTable
         key={refreshKey}
         searchTerm={searchTerm}
-        categoryFilter={categoryFilter}
+        categoryFilter={categoryFilter === "all" ? "" : categoryFilter}
         activeFilter={activeFilter}
         onEdit={handleEdit}
       />

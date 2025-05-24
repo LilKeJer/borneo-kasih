@@ -1,4 +1,4 @@
-// lib/utils.ts
+// lib/utils.ts (Updated dengan fungsi formatDateTime)
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -14,6 +14,24 @@ export function formatRupiah(amount: number): string {
     currency: "IDR",
     minimumFractionDigits: 0,
   }).format(amount);
+}
+
+// Format date dan time untuk tampilan yang lebih lengkap
+export function formatDateTime(date: Date | string): string {
+  if (!date) return "";
+
+  const d = typeof date === "string" ? new Date(date) : date;
+
+  // Check if date is valid
+  if (isNaN(d.getTime())) return "";
+
+  return new Intl.DateTimeFormat("id-ID", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(d);
 }
 
 // Truncate text with ellipsis
