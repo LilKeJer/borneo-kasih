@@ -2,119 +2,152 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
+import { toast } from "sonner";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/dashboard/page-header";
-import { Card, CardContent } from "@/components/ui/card";
-import { QuickMedicalRecordForm } from "@/components/doctor/quick-medical-record-form";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { FullMedicalRecordForm } from "@/components/doctor/full-medical-record-form"; // Komponen form baru
+import { ArrowLeft, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { type Service as ApiServiceType } from "@/types/payment";
+import { type Medicine as ApiMedicineType } from "@/types/pharmacy";
 
-interface Patient {
+interface PatientData {
   id: string;
   name: string;
-  dateOfBirth?: string;
-  gender?: string;
-  // informasi lain jika diperlukan
+  // Tambahkan field lain jika perlu ditampilkan
 }
 
-// Component yang menggunakan useSearchParams
 function CreateMedicalRecordContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const patientId = searchParams.get("patientId");
+  const patientIdParam = searchParams.get("patientId");
+  const reservationIdParam = searchParams.get("reservationId");
 
-  const [patient, setPatient] = useState<Patient | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [patient, setPatient] = useState<PatientData | null>(null);
+  const [availableServices, setAvailableServices] = useState<ApiServiceType[]>(
+    []
+  );
+  const [availableMedicines, setAvailableMedicines] = useState<
+    ApiMedicineType[]
+  >([]);
+
+  const [loadingPatient, setLoadingPatient] = useState(true);
+  const [loadingServices, setLoadingServices] = useState(true);
+  const [loadingMedicines, setLoadingMedicines] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!patientId) {
-      setError("ID Pasien tidak ditemukan");
-      setLoading(false);
+    if (!patientIdParam) {
+      setError("ID Pasien tidak ditemukan di URL.");
+      setLoadingPatient(false);
+      setLoadingServices(false);
+      setLoadingMedicines(false);
       return;
     }
 
-    const fetchPatient = async () => {
+    async function fetchData() {
       try {
-        const response = await fetch(`/api/patients/${patientId}`);
-        if (!response.ok) {
-          throw new Error("Failed to fetch patient");
-        }
-        const data = await response.json();
-        setPatient(data);
-        setError(null);
-      } catch (error) {
-        console.error("Error fetching patient:", error);
-        setError("Gagal memuat data pasien");
-      } finally {
-        setLoading(false);
+        // Fetch Patient Data
+        setLoadingPatient(true);
+        const patientRes = await fetch(`/api/patients/${patientIdParam}`);
+        if (!patientRes.ok) throw new Error("Gagal memuat data pasien.");
+        const patientData = await patientRes.json();
+        setPatient(patientData);
+        setLoadingPatient(false);
+
+        // Fetch Available Services
+        setLoadingServices(true);
+        const servicesRes = await fetch("/api/services?limit=1000"); // Ambil semua layanan
+        if (!servicesRes.ok) throw new Error("Gagal memuat daftar layanan.");
+        const servicesData = await servicesRes.json();
+        setAvailableServices(servicesData.data || []);
+        setLoadingServices(false);
+
+        // Fetch Available Medicines
+        setLoadingMedicines(true);
+        const medicinesRes = await fetch("/api/medicines?limit=1000"); // Ambil semua obat
+        if (!medicinesRes.ok) throw new Error("Gagal memuat daftar obat.");
+        const medicinesData = await medicinesRes.json();
+        setAvailableMedicines(medicinesData.data || []);
+        setLoadingMedicines(false);
+      } catch (err) {
+        console.error("Fetch data error:", err);
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Terjadi kesalahan saat memuat data."
+        );
+        setLoadingPatient(false);
+        setLoadingServices(false);
+        setLoadingMedicines(false);
       }
-    };
+    }
+    fetchData();
+  }, [patientIdParam]);
 
-    fetchPatient();
-  }, [patientId]);
-
-  const handleSuccess = () => {
-    // Update antrian jika berhasil dibuat
-    const updateQueueStatus = async () => {
-      try {
-        if (!patientId) return;
-
-        const response = await fetch(`/api/queue/${patientId}/status`, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            examinationStatus: "Completed",
-          }),
-        });
-
-        if (!response.ok) {
-          console.error("Failed to update queue status");
-        }
-      } catch (error) {
-        console.error("Error updating queue status:", error);
-      }
-    };
-
-    updateQueueStatus();
-
-    // Redirect kembali ke halaman antrian
+  const handleSuccess = (medicalRecordId: number, prescriptionId?: number) => {
+    // Tampilkan notifikasi sukses
+    toast.success(
+      `Rekam medis berhasil dibuat. ID: ${medicalRecordId}${
+        prescriptionId ? `, Resep ID: ${prescriptionId}` : ""
+      }`
+    );
+    // Jika ada ID resep, bisa juga menampilkan notifikasi khusus
+    // Notifikasi sudah ditangani di dalam form
+    // Redirect kembali ke halaman antrian dokter atau halaman detail pasien
     router.push("/dashboard/doctor/queue");
   };
 
-  if (loading) {
+  const isLoadingInitialData =
+    loadingPatient || loadingServices || loadingMedicines;
+
+  if (isLoadingInitialData) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="ml-2 text-muted-foreground">Memuat data pendukung...</p>
       </div>
     );
   }
 
-  if (error || !patient) {
+  if (error || !patientIdParam) {
     return (
       <div className="space-y-6">
-        <PageHeader
-          title="Buat Rekam Medis"
-          description="Tambahkan rekam medis baru untuk pasien"
-        />
-        <Card>
-          <CardContent className="py-6">
-            <div className="text-center text-muted-foreground">
-              {error || "Pasien tidak ditemukan"}
-            </div>
-            <div className="mt-4 flex justify-center">
-              <Button
-                variant="outline"
-                onClick={() => router.push("/dashboard/doctor/queue")}
-              >
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Kembali ke Antrian
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <PageHeader title="Buat Rekam Medis" />
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            {error || "Parameter tidak lengkap."}
+          </AlertDescription>
+        </Alert>
+        <Button variant="outline" onClick={() => router.back()}>
+          <ArrowLeft className="mr-2 h-4 w-4" /> Kembali
+        </Button>
+      </div>
+    );
+  }
+
+  if (!patient && !loadingPatient) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Buat Rekam Medis" />
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Data pasien dengan ID {patientIdParam} tidak ditemukan.
+          </AlertDescription>
+        </Alert>
+        <Button variant="outline" onClick={() => router.back()}>
+          <ArrowLeft className="mr-2 h-4 w-4" /> Kembali
+        </Button>
       </div>
     );
   }
@@ -122,46 +155,50 @@ function CreateMedicalRecordContent() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Buat Rekam Medis"
-        description={`Tambahkan rekam medis untuk ${patient.name}`}
-      />
+        title="Buat Rekam Medis Baru"
+        description={`Untuk pasien: ${patient?.name || "Loading..."}`}
+      >
+        <Button variant="outline" onClick={() => router.back()} size="sm">
+          <ArrowLeft className="mr-2 h-4 w-4" /> Kembali ke Antrian
+        </Button>
+      </PageHeader>
 
       <Card>
-        <CardContent className="py-6">
-          <div className="mb-6">
-            <div className="text-lg font-semibold">{patient.name}</div>
-            {patient.gender && patient.dateOfBirth && (
-              <div className="text-sm text-muted-foreground">
-                {patient.gender === "L" ? "Laki-laki" : "Perempuan"},{" "}
-                {new Date(patient.dateOfBirth).toLocaleDateString("id-ID")}
-              </div>
-            )}
-          </div>
-
-          <QuickMedicalRecordForm
-            patientId={patientId || ""}
-            onSuccess={handleSuccess}
-            onCancel={() => router.push("/dashboard/doctor/queue")}
-          />
+        <CardHeader>
+          <CardTitle>Form Pemeriksaan Dokter</CardTitle>
+          <CardDescription>
+            Lengkapi detail pemeriksaan, layanan, dan resep jika diperlukan.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {patient && (
+            <FullMedicalRecordForm
+              patientId={patientIdParam}
+              reservationId={
+                reservationIdParam ? parseInt(reservationIdParam) : undefined
+              }
+              availableServices={availableServices}
+              availableMedicines={availableMedicines}
+              onSuccess={handleSuccess}
+              onCancel={() => router.back()}
+            />
+          )}
         </CardContent>
       </Card>
     </div>
   );
 }
 
-// Loading component untuk Suspense fallback
-function LoadingFallback() {
-  return (
-    <div className="flex items-center justify-center h-full">
-      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-    </div>
-  );
-}
-
-// Main component yang dibungkus dengan Suspense
 export default function CreateMedicalRecordPage() {
   return (
-    <Suspense fallback={<LoadingFallback />}>
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="ml-2 text-muted-foreground">Memuat halaman...</p>
+        </div>
+      }
+    >
       <CreateMedicalRecordContent />
     </Suspense>
   );
