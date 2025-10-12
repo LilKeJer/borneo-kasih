@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -33,11 +34,28 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { formatRupiah } from "@/lib/utils";
-import { Trash2, Plus, Calculator } from "lucide-react";
+import {
+  Trash2,
+  Plus,
+  Calculator,
+  Loader2,
+  AlertCircle,
+  CheckCircle,
+} from "lucide-react";
 import {
   type Service,
   type PrescriptionData,
@@ -75,6 +93,7 @@ export function PaymentForm({
   onSuccess,
   onCancel,
 }: PaymentFormProps) {
+  const router = useRouter();
   const [paymentItems, setPaymentItems] = useState<PaymentItem[]>([]);
   const [selectedServiceId, setSelectedServiceId] = useState<string>("");
   const [serviceQuantity, setServiceQuantity] = useState<number>(1);
@@ -85,6 +104,9 @@ export function PaymentForm({
   >(new Set());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [totalAmount, setTotalAmount] = useState<number>(0);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [pendingPaymentData, setPendingPaymentData] =
+    useState<PaymentFormValues | null>(null);
 
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentSchema),
@@ -203,19 +225,28 @@ export function PaymentForm({
     );
   };
 
-  // Submit payment
+  // Handle form submit - show confirmation dialog
   const onSubmit = async (values: PaymentFormValues) => {
     if (paymentItems.length === 0) {
       toast.error("Tambahkan minimal satu item pembayaran");
       return;
     }
 
+    setPendingPaymentData(values);
+    setShowConfirmDialog(true);
+  };
+
+  // Process payment after confirmation
+  const processPayment = async () => {
+    if (!pendingPaymentData) return;
+
     setIsSubmitting(true);
+    setShowConfirmDialog(false);
 
     try {
       const paymentData: CreatePaymentRequest = {
         reservationId: reservationId,
-        paymentMethod: values.paymentMethod,
+        paymentMethod: pendingPaymentData.paymentMethod,
         items: paymentItems.map((item) => ({
           itemType: item.itemType,
           serviceId: item.serviceId,
@@ -225,7 +256,7 @@ export function PaymentForm({
           subtotal: item.subtotal,
           notes: item.notes,
         })),
-        notes: values.notes,
+        notes: pendingPaymentData.notes,
       };
 
       const response = await fetch("/api/payment", {
@@ -241,19 +272,38 @@ export function PaymentForm({
         throw new Error(error.message || "Gagal memproses pembayaran");
       }
 
-      const result = await response.json();
-      console.log(result);
+      await response.json();
+
       toast.success(
-        `Pembayaran berhasil diproses. Total: ${formatRupiah(totalAmount)}`
+        <div className="flex items-center gap-2">
+          <CheckCircle className="h-5 w-5" />
+          <div>
+            <p className="font-semibold">Pembayaran Berhasil!</p>
+            <p className="text-sm">Total: {formatRupiah(totalAmount)}</p>
+          </div>
+        </div>
       );
 
-      if (onSuccess) {
-        onSuccess();
-      }
+      // Redirect ke halaman payment list setelah sukses
+      setTimeout(() => {
+        if (onSuccess) {
+          onSuccess();
+        } else {
+          router.push("/dashboard/receptionist/payments");
+        }
+      }, 1500);
     } catch (error) {
       console.error("Error processing payment:", error);
       toast.error(
-        error instanceof Error ? error.message : "Gagal memproses pembayaran"
+        <div className="flex items-center gap-2">
+          <AlertCircle className="h-5 w-5" />
+          <div>
+            <p className="font-semibold">Pembayaran Gagal</p>
+            <p className="text-sm">
+              {error instanceof Error ? error.message : "Terjadi kesalahan"}
+            </p>
+          </div>
+        </div>
       );
     } finally {
       setIsSubmitting(false);
@@ -285,19 +335,27 @@ export function PaymentForm({
             </div>
             <div>
               <Label className="text-sm text-muted-foreground">Status</Label>
-              <Badge variant="secondary">{reservationData.status}</Badge>
+              <Badge
+                variant={
+                  reservationData.examinationStatus === "Completed"
+                    ? "default"
+                    : "secondary"
+                }
+              >
+                {reservationData.examinationStatus}
+              </Badge>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Tambah Layanan */}
+      {/* Tambah Item Layanan */}
       <Card>
         <CardHeader>
           <CardTitle>Tambah Layanan</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="md:col-span-2">
               <Label>Pilih Layanan</Label>
               <Select
@@ -305,132 +363,97 @@ export function PaymentForm({
                 onValueChange={setSelectedServiceId}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Pilih layanan" />
+                  <SelectValue placeholder="Pilih layanan..." />
                 </SelectTrigger>
                 <SelectContent>
                   {availableServices.map((service) => (
                     <SelectItem key={service.id} value={service.id.toString()}>
-                      <div className="flex justify-between items-center w-full">
-                        <span>{service.name}</span>
-                        <span className="text-muted-foreground ml-2">
-                          {formatRupiah(parseFloat(service.basePrice))}
-                        </span>
-                      </div>
+                      {service.name} -{" "}
+                      {formatRupiah(parseFloat(service.basePrice))}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label>Jumlah</Label>
-              <div className="flex gap-2">
-                <Input
-                  type="number"
-                  min="1"
-                  value={serviceQuantity}
-                  onChange={(e) =>
-                    setServiceQuantity(parseInt(e.target.value) || 1)
-                  }
-                />
-                <Button onClick={addServiceItem} disabled={!selectedServiceId}>
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
+              <Label>Quantity</Label>
+              <Input
+                type="number"
+                min="1"
+                value={serviceQuantity}
+                onChange={(e) =>
+                  setServiceQuantity(parseInt(e.target.value) || 1)
+                }
+              />
+            </div>
+            <div className="flex items-end">
+              <Button onClick={addServiceItem} className="w-full">
+                <Plus className="h-4 w-4 mr-2" />
+                Tambah
+              </Button>
             </div>
           </div>
+
+          {/* Resep Obat */}
+          {prescriptions.length > 0 && (
+            <div className="mt-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Checkbox
+                  checked={includePrescriptions}
+                  onCheckedChange={(checked) =>
+                    setIncludePrescriptions(checked as boolean)
+                  }
+                />
+                <Label>Sertakan Resep Obat</Label>
+              </div>
+
+              {includePrescriptions && (
+                <div className="space-y-2 p-4 border rounded-lg">
+                  {prescriptions.map((prescription) => (
+                    <div
+                      key={prescription.prescriptionId}
+                      className="flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          checked={selectedPrescriptions.has(
+                            prescription.prescriptionId
+                          )}
+                          onCheckedChange={() =>
+                            togglePrescription(prescription.prescriptionId)
+                          }
+                        />
+                        <span>{prescription.medicineName}</span>
+                        <Badge variant="outline">
+                          {prescription.quantityUsed} unit
+                        </Badge>
+                      </div>
+                      <span className="font-medium">
+                        {formatRupiah(
+                          parseFloat(prescription.medicinePrice) *
+                            prescription.quantityUsed
+                        )}
+                      </span>
+                    </div>
+                  ))}
+                  <Button
+                    onClick={addPrescriptionItems}
+                    disabled={selectedPrescriptions.size === 0}
+                    className="mt-4 w-full"
+                  >
+                    Tambahkan Resep Terpilih
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
-
-      {/* Tambah Resep Obat */}
-      {prescriptions.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Resep Obat</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="include-prescriptions"
-                checked={includePrescriptions}
-                onCheckedChange={(checked) => setIncludePrescriptions(!checked)}
-              />
-              <Label htmlFor="include-prescriptions">
-                Sertakan resep obat dalam pembayaran
-              </Label>
-            </div>
-
-            {includePrescriptions && (
-              <div className="space-y-4">
-                <div className="border rounded-md">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-12"></TableHead>
-                        <TableHead>Obat</TableHead>
-                        <TableHead>Jumlah</TableHead>
-                        <TableHead>Harga Satuan</TableHead>
-                        <TableHead>Total</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {prescriptions.map((prescription) => (
-                        <TableRow key={prescription.prescriptionId}>
-                          <TableCell>
-                            <Checkbox
-                              checked={selectedPrescriptions.has(
-                                prescription.prescriptionId
-                              )}
-                              onCheckedChange={() =>
-                                togglePrescription(prescription.prescriptionId)
-                              }
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <div>
-                              <p className="font-medium">
-                                {prescription.medicineName}
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                {prescription.dosage} - {prescription.frequency}
-                              </p>
-                            </div>
-                          </TableCell>
-                          <TableCell>{prescription.quantityUsed}</TableCell>
-                          <TableCell>
-                            {formatRupiah(
-                              parseFloat(prescription.medicinePrice)
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {formatRupiah(
-                              parseFloat(prescription.medicinePrice) *
-                                prescription.quantityUsed
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-
-                {selectedPrescriptions.size > 0 && (
-                  <Button onClick={addPrescriptionItems} className="w-full">
-                    Tambahkan {selectedPrescriptions.size} Resep Obat Terpilih
-                  </Button>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
       {/* Daftar Item Pembayaran */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calculator className="h-5 w-5" />
-            Detail Pembayaran
-          </CardTitle>
+          <CardTitle>Item Pembayaran</CardTitle>
         </CardHeader>
         <CardContent>
           {paymentItems.length === 0 ? (
@@ -438,77 +461,68 @@ export function PaymentForm({
               Belum ada item pembayaran
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className="border rounded-md">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Item</TableHead>
-                      <TableHead>Jumlah</TableHead>
-                      <TableHead>Harga Satuan</TableHead>
-                      <TableHead>Subtotal</TableHead>
-                      <TableHead className="w-12"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paymentItems.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">
-                              {item.serviceName || item.medicineName}
-                            </p>
-                            <Badge variant="outline" className="text-xs">
-                              {item.itemType === "Service" ? "Layanan" : "Obat"}
-                            </Badge>
-                            {item.notes && (
-                              <p className="text-sm text-muted-foreground mt-1">
-                                {item.notes}
-                              </p>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            min="1"
-                            value={item.quantity}
-                            onChange={(e) =>
-                              updateItemQuantity(
-                                item.id,
-                                parseInt(e.target.value) || 1
-                              )
-                            }
-                            className="w-20"
-                          />
-                        </TableCell>
-                        <TableCell>{formatRupiah(item.unitPrice)}</TableCell>
-                        <TableCell className="font-medium">
-                          {formatRupiah(item.subtotal)}
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removePaymentItem(item.id)}
-                            className="text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Item</TableHead>
+                  <TableHead>Tipe</TableHead>
+                  <TableHead className="text-center">Qty</TableHead>
+                  <TableHead className="text-right">Harga Satuan</TableHead>
+                  <TableHead className="text-right">Subtotal</TableHead>
+                  <TableHead className="text-right">Aksi</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paymentItems.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell>
+                      {item.serviceName || item.medicineName || "Item"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{item.itemType}</Badge>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Input
+                        type="number"
+                        min="1"
+                        value={item.quantity}
+                        onChange={(e) =>
+                          updateItemQuantity(
+                            item.id,
+                            parseInt(e.target.value) || 1
+                          )
+                        }
+                        className="w-16 text-center"
+                        disabled={item.itemType === "Prescription"}
+                      />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {formatRupiah(item.unitPrice)}
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {formatRupiah(item.subtotal)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => removePaymentItem(item.id)}
+                      >
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
 
-              <Separator />
-
-              <div className="flex justify-between items-center text-lg font-semibold">
-                <span>Total Pembayaran:</span>
-                <span className="text-primary">
-                  {formatRupiah(totalAmount)}
-                </span>
+          {paymentItems.length > 0 && (
+            <div className="mt-4 flex justify-end">
+              <div className="space-y-2 text-right">
+                <div className="text-2xl font-bold">
+                  Total: {formatRupiah(totalAmount)}
+                </div>
               </div>
             </div>
           )}
@@ -569,7 +583,7 @@ export function PaymentForm({
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={onCancel}
+                  onClick={onCancel || (() => router.back())}
                   disabled={isSubmitting}
                 >
                   Batal
@@ -579,15 +593,74 @@ export function PaymentForm({
                   disabled={isSubmitting || paymentItems.length === 0}
                   className="min-w-32"
                 >
-                  {isSubmitting
-                    ? "Memproses..."
-                    : `Bayar ${formatRupiah(totalAmount)}`}
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Memproses...
+                    </>
+                  ) : (
+                    <>
+                      <Calculator className="mr-2 h-4 w-4" />
+                      Proses Pembayaran
+                    </>
+                  )}
                 </Button>
               </div>
             </form>
           </Form>
         </CardContent>
       </Card>
+
+      {/* Confirmation Dialog */}
+      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Konfirmasi Pembayaran</AlertDialogTitle>
+            <AlertDialogDescription>
+              <div className="space-y-4 mt-4">
+                <div className="flex justify-between">
+                  <span>Pasien:</span>
+                  <span className="font-medium">
+                    {reservationData.patientName}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Metode Pembayaran:</span>
+                  <span className="font-medium">
+                    {pendingPaymentData?.paymentMethod}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Jumlah Item:</span>
+                  <span className="font-medium">
+                    {paymentItems.length} item
+                  </span>
+                </div>
+                <Separator />
+                <div className="flex justify-between text-lg font-bold">
+                  <span>Total Pembayaran:</span>
+                  <span className="text-primary">
+                    {formatRupiah(totalAmount)}
+                  </span>
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSubmitting}>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={processPayment} disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Memproses...
+                </>
+              ) : (
+                "Konfirmasi Pembayaran"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

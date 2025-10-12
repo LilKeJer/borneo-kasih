@@ -8,6 +8,7 @@ import {
   patientDetails,
   doctorDetails,
   payments,
+  paymentDetails,
   prescriptions,
   prescriptionMedicines,
   medicines,
@@ -71,7 +72,14 @@ export async function GET(
 
     // Cek apakah sudah ada pembayaran untuk reservasi ini
     const existingPayment = await db
-      .select()
+      .select({
+        id: payments.id,
+        totalAmount: payments.totalAmount,
+        paymentMethod: payments.paymentMethod,
+        status: payments.status,
+        paymentDate: payments.paymentDate,
+        prescriptionId: payments.prescriptionId,
+      })
       .from(payments)
       .where(
         and(
@@ -80,6 +88,58 @@ export async function GET(
         )
       )
       .limit(1);
+
+    interface PaymentDetailData {
+      id: number;
+      itemType: string;
+      serviceId: number | null;
+      serviceName: string | null;
+      prescriptionId: number | null;
+      quantity: number;
+      unitPrice: number;
+      subtotal: number;
+      notes: string | null;
+    }
+
+    let paymentDetailsData: PaymentDetailData[] = [];
+    if (existingPayment.length > 0) {
+      // Jika ada payment, ambil detail payment
+      const rawPaymentDetails = await db
+        .select({
+          id: paymentDetails.id,
+          itemType: paymentDetails.itemType,
+          serviceId: paymentDetails.serviceId,
+          serviceName: serviceCatalog.name,
+          prescriptionId: paymentDetails.prescriptionId,
+          quantity: paymentDetails.quantity,
+          unitPrice: paymentDetails.unitPrice,
+          subtotal: paymentDetails.subtotal,
+          notes: paymentDetails.notes,
+        })
+        .from(paymentDetails)
+        .leftJoin(
+          serviceCatalog,
+          eq(paymentDetails.serviceId, serviceCatalog.id)
+        )
+        .where(
+          and(
+            eq(paymentDetails.paymentId, existingPayment[0].id),
+            isNull(paymentDetails.deletedAt)
+          )
+        );
+
+      paymentDetailsData = rawPaymentDetails.map((detail) => ({
+        ...detail,
+        unitPrice:
+          typeof detail.unitPrice === "string"
+            ? parseFloat(detail.unitPrice)
+            : detail.unitPrice,
+        subtotal:
+          typeof detail.subtotal === "string"
+            ? parseFloat(detail.subtotal)
+            : detail.subtotal,
+      }));
+    }
 
     // Ambil resep yang terkait dengan pasien ini (dari medical history terbaru)
     const patientPrescriptions = await db
@@ -101,14 +161,24 @@ export async function GET(
       .leftJoin(medicines, eq(prescriptionMedicines.medicineId, medicines.id))
       .where(
         and(
-          eq(prescriptions.medicalHistoryId, reservationData.patientId), // Ini perlu disesuaikan dengan medical history ID yang tepat
-          isNull(prescriptions.deletedAt)
+          // Query prescriptions based on patient's medical history
+          // This is simplified - you may need to join through medical_history table
+          isNull(prescriptions.deletedAt),
+          isNull(prescriptionMedicines.deletedAt)
         )
-      );
+      )
+      .limit(20); // Limit to recent prescriptions
 
-    // Ambil semua layanan yang tersedia
+    // Ambil daftar layanan yang tersedia
     const availableServices = await db
-      .select()
+      .select({
+        id: serviceCatalog.id,
+        name: serviceCatalog.name,
+        description: serviceCatalog.description,
+        basePrice: serviceCatalog.basePrice,
+        category: serviceCatalog.category,
+        isActive: serviceCatalog.isActive,
+      })
       .from(serviceCatalog)
       .where(
         and(eq(serviceCatalog.isActive, true), isNull(serviceCatalog.deletedAt))
@@ -117,13 +187,19 @@ export async function GET(
 
     return NextResponse.json({
       reservation: reservationData,
-      existingPayment: existingPayment[0] || null,
-      prescriptions: patientPrescriptions,
-      availableServices,
       hasPayment: existingPayment.length > 0,
+      existingPayment:
+        existingPayment.length > 0
+          ? {
+              ...existingPayment[0],
+              details: paymentDetailsData,
+            }
+          : null,
+      prescriptions: patientPrescriptions.filter((p) => p.medicineId !== null),
+      availableServices: availableServices,
     });
   } catch (error) {
-    console.error("Error fetching payment details:", error);
+    console.error("Error fetching payment data:", error);
     return NextResponse.json(
       { message: "Internal server error" },
       { status: 500 }

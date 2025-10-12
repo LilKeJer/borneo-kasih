@@ -16,11 +16,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { formatRupiah, formatDateTime } from "@/lib/utils";
 import {
@@ -28,71 +38,91 @@ import {
   CreditCard,
   Eye,
   Loader2,
-  Plus,
   ChevronLeft,
   ChevronRight,
+  FileText,
+  DollarSign,
+  AlertCircle,
 } from "lucide-react";
 import { type PaymentMethod, type PaymentStatus } from "@/types/payment";
 
 interface Payment {
   id: number;
   totalAmount: string;
-  paymentMethod: "Cash" | "Debit" | "Credit" | "Transfer" | "BPJS";
-  status: "Paid" | "Pending" | "Cancelled";
+  paymentMethod: PaymentMethod;
+  status: PaymentStatus;
   paymentDate: string;
   reservationId: number;
   patientName: string;
+  doctorName: string;
 }
 
-interface CompletedReservation {
+interface PaymentDetail {
   id: number;
-  patientName: string;
-  doctorName: string;
-  reservationDate: string;
-  queueNumber: number;
-  status: "Completed";
-  examinationStatus: "Completed";
-  hasPayment: boolean;
+  itemType: string;
+  serviceName?: string;
+  quantity: number;
+  unitPrice: string;
+  subtotal: string;
+  notes?: string;
+}
+
+interface PaginationInfo {
+  page: number;
+  limit: number;
+  totalRecords: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
 }
 
 export default function PaymentsPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [completedReservations, setCompletedReservations] = useState<
-    CompletedReservation[]
-  >([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
-  const [isPaymentDetailOpen, setIsPaymentDetailOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"payments" | "reservations">(
-    "payments"
-  );
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [paymentDetails, setPaymentDetails] = useState<PaymentDetail[]>([]);
+  const [showDetailDialog, setShowDetailDialog] = useState(false);
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
-  useEffect(() => {
-    if (activeTab === "payments") {
-      fetchPayments();
-    } else {
-      fetchCompletedReservations();
-    }
-  }, [activeTab, page, searchTerm]);
+  // Filter states
+  const [statusFilter, setStatusFilter] = useState<PaymentStatus | "">("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
+  // Pagination states
+  const [pagination, setPagination] = useState<PaginationInfo>({
+    page: 1,
+    limit: 10,
+    totalRecords: 0,
+    totalPages: 0,
+    hasNext: false,
+    hasPrev: false,
+  });
+
+  // Fetch payments dengan filter
   const fetchPayments = async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: "10",
-        search: searchTerm,
+
+      const queryParams = new URLSearchParams({
+        page: pagination.page.toString(),
+        limit: pagination.limit.toString(),
+        ...(searchTerm && { search: searchTerm }),
+        ...(statusFilter && { status: statusFilter }),
+        ...(startDate && { startDate }),
+        ...(endDate && { endDate }),
       });
 
-      const response = await fetch(`/api/payment?${params.toString()}`);
-      if (!response.ok) throw new Error("Gagal memuat data pembayaran");
+      const response = await fetch(`/api/payment?${queryParams}`);
+
+      if (!response.ok) {
+        throw new Error("Gagal memuat data pembayaran");
+      }
 
       const data = await response.json();
       setPayments(data.data || []);
-      setTotalPages(data.pagination?.totalPages || 1);
+      setPagination(data.pagination);
     } catch (error) {
       console.error("Error fetching payments:", error);
       toast.error("Gagal memuat data pembayaran");
@@ -101,326 +131,423 @@ export default function PaymentsPage() {
     }
   };
 
-  const fetchCompletedReservations = async () => {
+  // Fetch payment details
+  const fetchPaymentDetails = async (paymentId: number) => {
     try {
-      setLoading(true);
-      // API endpoint untuk reservasi yang selesai tapi belum dibayar
-      const response = await fetch("/api/reservations/completed-unpaid");
-      if (!response.ok) throw new Error("Gagal memuat data reservasi");
+      setLoadingDetails(true);
+      const response = await fetch(
+        `/api/payment-detail?paymentId=${paymentId}`
+      );
+
+      if (!response.ok) {
+        throw new Error("Gagal memuat detail pembayaran");
+      }
 
       const data = await response.json();
-      setCompletedReservations(data.data || []);
+      setPaymentDetails(data.data || []);
     } catch (error) {
-      console.error("Error fetching completed reservations:", error);
-      toast.error("Gagal memuat data reservasi");
+      console.error("Error fetching payment details:", error);
+      toast.error("Gagal memuat detail pembayaran");
     } finally {
-      setLoading(false);
+      setLoadingDetails(false);
     }
   };
 
-  const handleViewPayment = (payment: Payment) => {
+  useEffect(() => {
+    fetchPayments();
+  }, [pagination.page, pagination.limit, statusFilter, startDate, endDate]);
+
+  const handleViewDetail = async (payment: Payment) => {
     setSelectedPayment(payment);
-    setIsPaymentDetailOpen(true);
+    setShowDetailDialog(true);
+    await fetchPaymentDetails(payment.id);
   };
 
-  const handleCreatePayment = (reservationId: number) => {
-    // Redirect ke halaman form pembayaran
-    window.location.href = `/dashboard/receptionist/payments/create?reservationId=${reservationId}`;
+  const handleSearch = () => {
+    setPagination((prev) => ({ ...prev, page: 1 }));
+    fetchPayments();
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setPagination((prev) => ({ ...prev, page: newPage }));
   };
 
   const getPaymentMethodBadge = (method: PaymentMethod) => {
-    const colors = {
-      Cash: "bg-green-100 text-green-800",
-      Debit: "bg-blue-100 text-blue-800",
-      Credit: "bg-purple-100 text-purple-800",
-      Transfer: "bg-orange-100 text-orange-800",
-      BPJS: "bg-red-100 text-red-800",
+    const variants: Record<PaymentMethod, { color: string; text: string }> = {
+      Cash: { color: "default", text: "Tunai" },
+      Debit: { color: "blue", text: "Debit" },
+      Credit: { color: "purple", text: "Kredit" },
+      Transfer: { color: "green", text: "Transfer" },
+      BPJS: { color: "orange", text: "BPJS" },
     };
 
+    const variant = variants[method];
     return (
-      <Badge
-        variant="outline"
-        className={colors[method] || "bg-gray-100 text-gray-800"}
-      >
-        {method}
+      <Badge className={`bg-${variant.color}-100 text-${variant.color}-800`}>
+        {variant.text}
       </Badge>
     );
   };
 
   const getStatusBadge = (status: PaymentStatus) => {
-    switch (status) {
-      case "Paid":
-        return <Badge variant="secondary">Lunas</Badge>;
-      case "Pending":
-        return <Badge variant="outline">Pending</Badge>;
-      case "Cancelled":
-        return <Badge variant="destructive">Dibatalkan</Badge>;
-      default:
-        return <Badge>{status}</Badge>;
-    }
+    const variants: Record<PaymentStatus, { color: string; text: string }> = {
+      Paid: { color: "green", text: "Lunas" },
+      Pending: { color: "yellow", text: "Menunggu" },
+      Cancelled: { color: "red", text: "Dibatalkan" },
+    };
+
+    const variant = variants[status];
+    return (
+      <Badge className={`bg-${variant.color}-100 text-${variant.color}-800`}>
+        {variant.text}
+      </Badge>
+    );
   };
 
   return (
-    <div className="space-y-6">
+    <>
       <PageHeader
-        title="Manajemen Pembayaran"
-        description="Kelola pembayaran pasien dan buat pembayaran baru"
+        title="Daftar Pembayaran"
+        description="Kelola pembayaran pasien"
       />
 
-      {/* Tab Navigation */}
-      <div className="flex space-x-1 rounded-lg bg-muted p-1">
-        <button
-          onClick={() => setActiveTab("payments")}
-          className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-            activeTab === "payments"
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          Riwayat Pembayaran
-        </button>
-        <button
-          onClick={() => setActiveTab("reservations")}
-          className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-            activeTab === "reservations"
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          Perlu Pembayaran
-        </button>
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <DollarSign className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Total Hari Ini</p>
+                <p className="text-xl font-semibold">
+                  {formatRupiah(
+                    payments
+                      .filter((p) => {
+                        const paymentDate = new Date(
+                          p.paymentDate
+                        ).toDateString();
+                        const today = new Date().toDateString();
+                        return paymentDate === today && p.status === "Paid";
+                      })
+                      .reduce((sum, p) => sum + parseFloat(p.totalAmount), 0)
+                  )}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-green-100 rounded-lg">
+                <FileText className="h-5 w-5 text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">
+                  Transaksi Hari Ini
+                </p>
+                <p className="text-xl font-semibold">
+                  {
+                    payments.filter((p) => {
+                      const paymentDate = new Date(
+                        p.paymentDate
+                      ).toDateString();
+                      const today = new Date().toDateString();
+                      return paymentDate === today;
+                    }).length
+                  }
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-yellow-100 rounded-lg">
+                <AlertCircle className="h-5 w-5 text-yellow-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Menunggu</p>
+                <p className="text-xl font-semibold">
+                  {payments.filter((p) => p.status === "Pending").length}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <CreditCard className="h-5 w-5 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">
+                  Total Pembayaran
+                </p>
+                <p className="text-xl font-semibold">
+                  {pagination.totalRecords}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Search Bar */}
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder={
-              activeTab === "payments"
-                ? "Cari pembayaran..."
-                : "Cari reservasi..."
-            }
-            className="pl-8"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        <Button variant="outline" onClick={() => window.location.reload()}>
-          Refresh
-        </Button>
-      </div>
+      {/* Filter Section */}
+      <Card className="mb-6">
+        <CardContent className="p-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Cari nama pasien..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+                onKeyPress={(e) => e.key === "Enter" && handleSearch()}
+              />
+            </div>
 
-      {/* Content */}
+            <Select
+              value={statusFilter}
+              onValueChange={(value) =>
+                setStatusFilter(value as PaymentStatus | "")
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Semua Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Semua Status</SelectItem>
+                <SelectItem value="Paid">Lunas</SelectItem>
+                <SelectItem value="Pending">Menunggu</SelectItem>
+                <SelectItem value="Cancelled">Dibatalkan</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Input
+              type="date"
+              placeholder="Tanggal Mulai"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+            />
+
+            <Input
+              type="date"
+              placeholder="Tanggal Selesai"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+            />
+
+            <Button onClick={handleSearch} className="w-full">
+              <Search className="h-4 w-4 mr-2" />
+              Cari
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Table Section */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CreditCard className="h-5 w-5" />
-            {activeTab === "payments"
-              ? "Daftar Pembayaran"
-              : "Reservasi Belum Dibayar"}
-          </CardTitle>
+          <CardTitle>Daftar Pembayaran</CardTitle>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent>
           {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
-              <span>Memuat data...</span>
+            <div className="flex justify-center items-center h-64">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          ) : payments.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">Tidak ada data pembayaran</p>
             </div>
           ) : (
             <>
-              {activeTab === "payments" ? (
-                /* Payment Table */
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Tanggal</TableHead>
-                      <TableHead>Pasien</TableHead>
-                      <TableHead>Total</TableHead>
-                      <TableHead>Metode</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Aksi</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {payments.length === 0 ? (
-                      <TableRow>
-                        <TableCell
-                          colSpan={6}
-                          className="text-center py-8 text-muted-foreground"
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>No</TableHead>
+                    <TableHead>Tanggal</TableHead>
+                    <TableHead>Pasien</TableHead>
+                    <TableHead>Dokter</TableHead>
+                    <TableHead>Total</TableHead>
+                    <TableHead>Metode</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Aksi</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {payments.map((payment, index) => (
+                    <TableRow key={payment.id}>
+                      <TableCell>
+                        {(pagination.page - 1) * pagination.limit + index + 1}
+                      </TableCell>
+                      <TableCell>
+                        {formatDateTime(payment.paymentDate)}
+                      </TableCell>
+                      <TableCell>{payment.patientName}</TableCell>
+                      <TableCell>{payment.doctorName}</TableCell>
+                      <TableCell>
+                        {formatRupiah(parseFloat(payment.totalAmount))}
+                      </TableCell>
+                      <TableCell>
+                        {getPaymentMethodBadge(payment.paymentMethod)}
+                      </TableCell>
+                      <TableCell>{getStatusBadge(payment.status)}</TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleViewDetail(payment)}
                         >
-                          Tidak ada data pembayaran
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      payments.map((payment) => (
-                        <TableRow key={payment.id}>
-                          <TableCell>
-                            {formatDateTime(payment.paymentDate)}
-                          </TableCell>
-                          <TableCell className="font-medium">
-                            {payment.patientName}
-                          </TableCell>
-                          <TableCell className="font-medium">
-                            {formatRupiah(parseFloat(payment.totalAmount))}
-                          </TableCell>
-                          <TableCell>
-                            {getPaymentMethodBadge(payment.paymentMethod)}
-                          </TableCell>
-                          <TableCell>
-                            {getStatusBadge(payment.status)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleViewPayment(payment)}
-                            >
-                              <Eye className="h-4 w-4 mr-1" />
-                              Detail
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              ) : (
-                /* Reservations Table */
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>No. Antrian</TableHead>
-                      <TableHead>Pasien</TableHead>
-                      <TableHead>Dokter</TableHead>
-                      <TableHead>Tanggal</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Aksi</TableHead>
+                          <Eye className="h-4 w-4 mr-1" />
+                          Detail
+                        </Button>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {completedReservations.length === 0 ? (
-                      <TableRow>
-                        <TableCell
-                          colSpan={6}
-                          className="text-center py-8 text-muted-foreground"
-                        >
-                          Tidak ada reservasi yang perlu pembayaran
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      completedReservations.map((reservation) => (
-                        <TableRow key={reservation.id}>
-                          <TableCell className="font-medium">
-                            {reservation.queueNumber}
-                          </TableCell>
-                          <TableCell>{reservation.patientName}</TableCell>
-                          <TableCell>{reservation.doctorName}</TableCell>
-                          <TableCell>
-                            {formatDateTime(reservation.reservationDate)}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="secondary">
-                              {reservation.examinationStatus}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              size="sm"
-                              onClick={() =>
-                                handleCreatePayment(reservation.id)
-                              }
-                            >
-                              <Plus className="h-4 w-4 mr-1" />
-                              Buat Pembayaran
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              )}
+                  ))}
+                </TableBody>
+              </Table>
 
-              {/* Pagination untuk tab payments */}
-              {activeTab === "payments" && !loading && payments.length > 0 && (
-                <div className="flex items-center justify-between px-6 py-4 border-t">
-                  <p className="text-sm text-muted-foreground">
-                    Halaman {page} dari {totalPages}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPage(page - 1)}
-                      disabled={page === 1}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                      Sebelumnya
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPage(page + 1)}
-                      disabled={page === totalPages}
-                    >
-                      Selanjutnya
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
+              {/* Pagination */}
+              <div className="flex items-center justify-between mt-4">
+                <p className="text-sm text-muted-foreground">
+                  Menampilkan {(pagination.page - 1) * pagination.limit + 1} -{" "}
+                  {Math.min(
+                    pagination.page * pagination.limit,
+                    pagination.totalRecords
+                  )}{" "}
+                  dari {pagination.totalRecords} data
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(pagination.page - 1)}
+                    disabled={!pagination.hasPrev}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(pagination.page + 1)}
+                    disabled={!pagination.hasNext}
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
                 </div>
-              )}
+              </div>
             </>
           )}
         </CardContent>
       </Card>
 
-      {/* Payment Detail Dialog */}
-      <Dialog open={isPaymentDetailOpen} onOpenChange={setIsPaymentDetailOpen}>
-        <DialogContent className="max-w-2xl">
+      {/* Detail Dialog */}
+      <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>Detail Pembayaran</DialogTitle>
+            <DialogDescription>
+              Informasi lengkap pembayaran #{selectedPayment?.id}
+            </DialogDescription>
           </DialogHeader>
+
           {selectedPayment && (
             <div className="space-y-4">
+              {/* Payment Info */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-muted-foreground">ID Pembayaran</p>
-                  <p className="font-medium">#{selectedPayment.id}</p>
+                  <Label>Pasien</Label>
+                  <p className="font-medium">{selectedPayment.patientName}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Tanggal</p>
+                  <Label>Dokter</Label>
+                  <p className="font-medium">{selectedPayment.doctorName}</p>
+                </div>
+                <div>
+                  <Label>Tanggal Pembayaran</Label>
                   <p className="font-medium">
                     {formatDateTime(selectedPayment.paymentDate)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Pasien</p>
-                  <p className="font-medium">{selectedPayment.patientName}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total</p>
-                  <p className="font-medium text-lg">
-                    {formatRupiah(parseFloat(selectedPayment.totalAmount))}
+                  <Label>Metode Pembayaran</Label>
+                  <p className="font-medium">
+                    {getPaymentMethodBadge(selectedPayment.paymentMethod)}
                   </p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">
-                    Metode Pembayaran
-                  </p>
-                  {getPaymentMethodBadge(selectedPayment.paymentMethod)}
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Status</p>
-                  {getStatusBadge(selectedPayment.status)}
                 </div>
               </div>
-              {/* Detail items akan ditampilkan di sini jika API mendukung */}
+
+              <Separator />
+
+              {/* Payment Details */}
+              <div>
+                <Label className="mb-2 block">Detail Item Pembayaran</Label>
+                {loadingDetails ? (
+                  <div className="flex justify-center py-4">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Item</TableHead>
+                        <TableHead>Tipe</TableHead>
+                        <TableHead className="text-right">Qty</TableHead>
+                        <TableHead className="text-right">
+                          Harga Satuan
+                        </TableHead>
+                        <TableHead className="text-right">Subtotal</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paymentDetails.map((detail) => (
+                        <TableRow key={detail.id}>
+                          <TableCell>
+                            {detail.serviceName || detail.notes || "Item"}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{detail.itemType}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {detail.quantity}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {formatRupiah(parseFloat(detail.unitPrice))}
+                          </TableCell>
+                          <TableCell className="text-right font-medium">
+                            {formatRupiah(parseFloat(detail.subtotal))}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </div>
+
+              <Separator />
+
+              {/* Total */}
+              <div className="flex justify-between items-center">
+                <span className="text-lg font-semibold">Total Pembayaran</span>
+                <span className="text-2xl font-bold text-primary">
+                  {formatRupiah(parseFloat(selectedPayment.totalAmount))}
+                </span>
+              </div>
             </div>
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }
