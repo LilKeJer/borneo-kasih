@@ -4,110 +4,125 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/db";
 import { medicines, medicineStocks } from "@/db/schema";
-import { eq, and, isNull, ilike, desc, asc, sql } from "drizzle-orm";
+import { eq, and, isNull, sql, like, or } from "drizzle-orm";
 
-// GET - Mendapatkan semua obat dengan informasi stok
+// GET - List medicines dengan pagination, search, dan filter
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session) {
+    if (
+      !session ||
+      !["Pharmacist", "Admin", "Doctor"].includes(session.user.role)
+    ) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
     const { searchParams } = new URL(req.url);
-    const search = searchParams.get("search") || "";
-    const sortBy = searchParams.get("sortBy") || "name";
-    const sortOrder = searchParams.get("sortOrder") || "asc";
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "10");
-    const offset = (page - 1) * limit;
-    const lowStock = searchParams.get("lowStock") === "true";
+    const search = searchParams.get("search") || "";
+    const category = searchParams.get("category") || "";
+    const isActive = searchParams.get("isActive");
 
-    // Query obat dengan informasi stok
-    const medicinesWithStock = await db
+    const offset = (page - 1) * limit;
+
+    // Build WHERE conditions
+    const conditions = [isNull(medicines.deletedAt)];
+
+    if (search) {
+      conditions.push(
+        or(
+          like(medicines.name, `%${search}%`),
+          like(medicines.description, `%${search}%`)
+        )!
+      );
+    }
+
+    if (category) {
+      conditions.push(eq(medicines.category, category));
+    }
+
+    if (isActive !== null && isActive !== undefined) {
+      conditions.push(eq(medicines.isActive, isActive === "true"));
+    }
+
+    // Get medicines dengan total stock
+    const medicinesQuery = db
       .select({
         id: medicines.id,
         name: medicines.name,
         description: medicines.description,
+        category: medicines.category,
+        unit: medicines.unit,
         price: medicines.price,
         minimumStock: medicines.minimumStock,
         reorderThresholdPercentage: medicines.reorderThresholdPercentage,
-        pharmacistId: medicines.pharmacistId,
+        isActive: medicines.isActive,
+        totalStock: sql<number>`
+          COALESCE(
+            SUM(
+              CASE 
+                WHEN ${medicineStocks.deletedAt} IS NULL 
+                AND ${medicineStocks.expiryDate} > CURRENT_DATE
+                THEN ${medicineStocks.remainingQuantity} 
+                ELSE 0 
+              END
+            ), 0
+          )::integer
+        `,
         createdAt: medicines.createdAt,
         updatedAt: medicines.updatedAt,
-        // Aggregate stock information
-        totalStock: sql<number>`COALESCE(SUM(${medicineStocks.remainingQuantity}), 0)::integer`,
-        batchCount: sql<number>`COUNT(DISTINCT ${medicineStocks.id})::integer`,
       })
       .from(medicines)
-      .leftJoin(
-        medicineStocks,
-        and(
-          eq(medicines.id, medicineStocks.medicineId),
-          isNull(medicineStocks.deletedAt)
-        )
-      )
-      .where(
-        and(
-          isNull(medicines.deletedAt),
-          search ? ilike(medicines.name, `%${search}%`) : undefined
-        )
-      )
+      .leftJoin(medicineStocks, eq(medicines.id, medicineStocks.medicineId))
+      .where(and(...conditions))
       .groupBy(medicines.id)
-      .orderBy(
-        sortOrder === "asc"
-          ? asc(sql`${medicines[sortBy as keyof typeof medicines]}`)
-          : desc(sql`${medicines[sortBy as keyof typeof medicines]}`)
-      )
       .limit(limit)
       .offset(offset);
 
-    // Calculate threshold status
-    const medicinesWithThresholdStatus = medicinesWithStock.map((medicine) => {
-      const totalStock = Number(medicine.totalStock) || 0;
-      const minimumStock = medicine.minimumStock || 0;
-      const thresholdPercentage = medicine.reorderThresholdPercentage || 20;
+    const [medicinesList, totalCountResult] = await Promise.all([
+      medicinesQuery,
+      db
+        .select({ count: sql<number>`count(*)::integer` })
+        .from(medicines)
+        .where(and(...conditions)),
+    ]);
 
-      // Calculate threshold stock level
-      const thresholdStock =
-        minimumStock + (minimumStock * thresholdPercentage) / 100;
-      const isBelowThreshold = totalStock <= thresholdStock;
-      const stockPercentage =
-        minimumStock > 0 ? (totalStock / minimumStock) * 100 : 100;
+    // Calculate status untuk setiap medicine
+    const medicinesWithStatus = medicinesList.map((medicine) => {
+      const totalStock = Number(medicine.totalStock);
+      const minimumStock = medicine.minimumStock;
+      const threshold = medicine.reorderThresholdPercentage;
+      const thresholdAmount = (minimumStock * (100 + threshold)) / 100;
+
+      let status = "Normal";
+      if (totalStock === 0) {
+        status = "Out of Stock";
+      } else if (totalStock <= thresholdAmount) {
+        status = "Low Stock";
+      }
 
       return {
         ...medicine,
         totalStock,
-        isBelowThreshold,
-        thresholdStock,
-        stockPercentage,
+        status,
+        thresholdAmount: Math.ceil(thresholdAmount),
       };
     });
 
-    // Filter by low stock if requested
-    const filteredMedicines = lowStock
-      ? medicinesWithThresholdStatus.filter((m) => m.isBelowThreshold)
-      : medicinesWithThresholdStatus;
-
-    // Get total count for pagination
-    const totalCount = await db
-      .select({ count: sql<number>`COUNT(DISTINCT ${medicines.id})` })
-      .from(medicines)
-      .where(
-        and(
-          isNull(medicines.deletedAt),
-          search ? ilike(medicines.name, `%${search}%`) : undefined
-        )
-      );
+    const totalCount = totalCountResult[0]?.count || 0;
+    const totalPages = Math.ceil(totalCount / limit);
 
     return NextResponse.json({
-      data: filteredMedicines,
+      data: medicinesWithStatus,
       pagination: {
         page,
         limit,
-        total: Number(totalCount[0]?.count) || 0,
-        totalPages: Math.ceil((Number(totalCount[0]?.count) || 0) / limit),
+        totalCount,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1,
       },
     });
   } catch (error) {
@@ -119,7 +134,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST - Tambah obat baru
+// POST - Create new medicine
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -132,82 +147,63 @@ export async function POST(req: NextRequest) {
     const {
       name,
       description,
+      category,
+      unit,
       price,
-      minimumStock = 5,
+      minimumStock = 10,
       reorderThresholdPercentage = 20,
     } = body;
 
     // Validasi input
     if (!name || !price) {
       return NextResponse.json(
-        { message: "Nama dan harga obat wajib diisi" },
+        { message: "Name dan price wajib diisi" },
         { status: 400 }
       );
     }
 
-    // Validasi harga
-    const priceNum = parseFloat(price);
-    if (isNaN(priceNum) || priceNum <= 0) {
-      return NextResponse.json(
-        { message: "Harga harus berupa angka positif" },
-        { status: 400 }
-      );
-    }
+    // Check duplicate name
+    const existingMedicine = await db.query.medicines.findFirst({
+      where: and(eq(medicines.name, name), isNull(medicines.deletedAt)),
+    });
 
-    // Validasi minimum stock
-    if (minimumStock < 0) {
+    if (existingMedicine) {
       return NextResponse.json(
-        { message: "Stok minimum tidak boleh negatif" },
-        { status: 400 }
+        { message: "Medicine dengan nama tersebut sudah ada" },
+        { status: 409 }
       );
     }
 
     // Validasi threshold percentage
     if (reorderThresholdPercentage < 0 || reorderThresholdPercentage > 100) {
       return NextResponse.json(
-        { message: "Persentase threshold harus antara 0 dan 100" },
+        { message: "Reorder threshold percentage harus antara 0-100" },
         { status: 400 }
       );
     }
 
-    // Cek apakah obat dengan nama yang sama sudah ada
-    const existingMedicine = await db
-      .select()
-      .from(medicines)
-      .where(and(eq(medicines.name, name), isNull(medicines.deletedAt)))
-      .limit(1);
-
-    if (existingMedicine.length > 0) {
-      return NextResponse.json(
-        { message: "Obat dengan nama yang sama sudah ada" },
-        { status: 409 }
-      );
-    }
-
-    const pharmacistId = parseInt(session.user.id);
-
-    // Buat obat baru
+    // Insert medicine baru
     const [newMedicine] = await db
       .insert(medicines)
       .values({
         name,
-        description: description || null,
-        price: priceNum.toFixed(2),
+        description,
+        category,
+        unit,
+        pharmacistId: parseInt(session.user.id),
+        price: price.toString(),
         minimumStock,
         reorderThresholdPercentage,
-        pharmacistId,
+        isActive: true,
         createdAt: new Date(),
         updatedAt: new Date(),
       })
       .returning();
 
-    return NextResponse.json(
-      {
-        message: "Obat berhasil ditambahkan",
-        data: newMedicine,
-      },
-      { status: 201 }
-    );
+    return NextResponse.json({
+      message: "Medicine berhasil ditambahkan",
+      data: newMedicine,
+    });
   } catch (error) {
     console.error("Error creating medicine:", error);
     return NextResponse.json(

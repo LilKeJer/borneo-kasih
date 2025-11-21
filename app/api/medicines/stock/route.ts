@@ -16,70 +16,112 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { medicineId, quantity, batchNumber, expiryDate } = body;
+    const {
+      medicineId,
+      batchNumber,
+      quantity,
+      expiryDate,
+      supplier,
+      purchasePrice,
+    } = body;
 
-    // Validate inputs
-    if (!medicineId || !quantity || !expiryDate) {
+    // Validasi input
+    if (!medicineId || !batchNumber || !quantity || !expiryDate) {
       return NextResponse.json(
-        { message: "ID obat, jumlah, dan tanggal kadaluarsa wajib diisi" },
+        {
+          message:
+            "MedicineId, batchNumber, quantity, dan expiryDate wajib diisi",
+        },
         { status: 400 }
       );
     }
 
-    if (quantity <= 0) {
+    // Check if medicine exists
+    const medicine = await db.query.medicines.findFirst({
+      where: and(eq(medicines.id, medicineId), isNull(medicines.deletedAt)),
+    });
+
+    if (!medicine) {
       return NextResponse.json(
-        { message: "Jumlah harus lebih dari 0" },
-        { status: 400 }
+        { message: "Medicine tidak ditemukan" },
+        { status: 404 }
       );
     }
 
-    // Validate expiry date
+    // Check duplicate batch number
+    const existingBatch = await db.query.medicineStocks.findFirst({
+      where: and(
+        eq(medicineStocks.batchNumber, batchNumber),
+        isNull(medicineStocks.deletedAt)
+      ),
+    });
+
+    if (existingBatch) {
+      return NextResponse.json(
+        { message: "Batch number sudah ada" },
+        { status: 409 }
+      );
+    }
+
+    // Validate expiry date (tidak boleh sudah expired)
     const expiry = new Date(expiryDate);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     if (expiry <= today) {
       return NextResponse.json(
-        { message: "Tanggal kadaluarsa harus lebih dari hari ini" },
+        { message: "Expiry date tidak boleh hari ini atau sudah lewat" },
         { status: 400 }
       );
     }
 
-    // Check if medicine exists
-    const medicine = await db
-      .select()
-      .from(medicines)
-      .where(and(eq(medicines.id, medicineId), isNull(medicines.deletedAt)))
-      .limit(1);
-
-    if (medicine.length === 0) {
-      return NextResponse.json(
-        { message: "Obat tidak ditemukan" },
-        { status: 404 }
-      );
-    }
-
-    // Add new stock
+    // Insert new stock batch
     const [newStock] = await db
       .insert(medicineStocks)
       .values({
         medicineId,
+        batchNumber,
         quantity,
-        remainingQuantity: quantity,
-        batchNumber: batchNumber || null,
-        expiryDate: expiry.toISOString().split("T")[0],
+        remainingQuantity: quantity, // Set remainingQuantity = quantity untuk stock baru
+        expiryDate,
+        supplier: supplier || null,
+        purchasePrice: purchasePrice ? purchasePrice.toString() : null,
         addedAt: new Date(),
+        isBelowThreshold: false,
         createdAt: new Date(),
         updatedAt: new Date(),
       })
       .returning();
 
-    // Check if stock is below threshold after adding
-    const totalStock = await db
+    // Check and update threshold status
+    const currentTotalStock = await db
       .select({
-        total: sql<number>`COALESCE(SUM(${medicineStocks.remainingQuantity}), 0)::integer`,
+        total: sql<number>`
+          COALESCE(SUM(${medicineStocks.remainingQuantity}), 0)::integer
+        `,
       })
       .from(medicineStocks)
+      .where(
+        and(
+          eq(medicineStocks.medicineId, medicineId),
+          isNull(medicineStocks.deletedAt),
+          sql`${medicineStocks.expiryDate} > CURRENT_DATE`
+        )
+      );
+
+    const totalStock = currentTotalStock[0]?.total || 0;
+    const thresholdAmount =
+      (medicine.minimumStock * (100 + medicine.reorderThresholdPercentage)) /
+      100;
+    const isBelowThreshold = totalStock <= thresholdAmount;
+
+    // Update threshold status untuk semua stock batch medicine ini
+    await db
+      .update(medicineStocks)
+      .set({
+        isBelowThreshold,
+        updatedAt: new Date(),
+      })
       .where(
         and(
           eq(medicineStocks.medicineId, medicineId),
@@ -87,33 +129,119 @@ export async function POST(req: NextRequest) {
         )
       );
 
-    const currentStock = Number(totalStock[0]?.total) || 0;
-    const minimumStock = medicine[0].minimumStock || 0;
-    const thresholdPercentage = medicine[0].reorderThresholdPercentage || 20;
-    const thresholdStock =
-      minimumStock + (minimumStock * thresholdPercentage) / 100;
+    return NextResponse.json({
+      message: "Stock batch berhasil ditambahkan",
+      data: {
+        ...newStock,
+        totalStock,
+        isBelowThreshold,
+      },
+    });
+  } catch (error) {
+    console.error("Error adding stock batch:", error);
+    return NextResponse.json(
+      { message: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
 
-    // Update threshold status if needed
-    if (currentStock <= thresholdStock) {
-      await db
-        .update(medicineStocks)
-        .set({ isBelowThreshold: true })
-        .where(eq(medicineStocks.id, newStock.id));
+// GET - List stock batches dengan filter by medicineId
+export async function GET(req: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    return NextResponse.json(
-      {
-        message: "Stok berhasil ditambahkan",
-        data: {
-          ...newStock,
-          currentTotalStock: currentStock,
-          isBelowThreshold: currentStock <= thresholdStock,
-        },
+    const { searchParams } = new URL(req.url);
+    const medicineId = searchParams.get("medicineId");
+
+    if (!medicineId) {
+      return NextResponse.json(
+        { message: "MedicineId diperlukan" },
+        { status: 400 }
+      );
+    }
+
+    // Get medicine info
+    const medicine = await db.query.medicines.findFirst({
+      where: and(
+        eq(medicines.id, parseInt(medicineId)),
+        isNull(medicines.deletedAt)
+      ),
+    });
+
+    if (!medicine) {
+      return NextResponse.json(
+        { message: "Medicine tidak ditemukan" },
+        { status: 404 }
+      );
+    }
+
+    // Get stock batches ordered by expiry date (FEFO)
+    const stockBatches = await db
+      .select({
+        id: medicineStocks.id,
+        batchNumber: medicineStocks.batchNumber,
+        quantity: medicineStocks.quantity,
+        remainingQuantity: medicineStocks.remainingQuantity,
+        expiryDate: medicineStocks.expiryDate,
+        supplier: medicineStocks.supplier,
+        purchasePrice: medicineStocks.purchasePrice,
+        addedAt: medicineStocks.addedAt,
+        isBelowThreshold: medicineStocks.isBelowThreshold,
+        status: sql<string>`
+          CASE 
+            WHEN ${medicineStocks.expiryDate} < CURRENT_DATE THEN 'Expired'
+            WHEN ${medicineStocks.remainingQuantity} = 0 THEN 'Empty'
+            WHEN ${medicineStocks.remainingQuantity} < 10 THEN 'Low'
+            ELSE 'Available'
+          END
+        `,
+        daysUntilExpiry: sql<number>`
+          GREATEST(0, DATE_PART('day', ${medicineStocks.expiryDate}::date - CURRENT_DATE))::integer
+        `,
+      })
+      .from(medicineStocks)
+      .where(
+        and(
+          eq(medicineStocks.medicineId, parseInt(medicineId)),
+          isNull(medicineStocks.deletedAt)
+        )
+      )
+      .orderBy(medicineStocks.expiryDate); // FEFO ordering
+
+    // Calculate summary
+    const summary = {
+      totalBatches: stockBatches.length,
+      totalQuantity: stockBatches.reduce((sum, s) => sum + s.quantity, 0),
+      totalRemaining: stockBatches.reduce(
+        (sum, s) => sum + s.remainingQuantity,
+        0
+      ),
+      availableStock: stockBatches
+        .filter((s) => s.status === "Available" || s.status === "Low")
+        .reduce((sum, s) => sum + s.remainingQuantity, 0),
+      expiredStock: stockBatches
+        .filter((s) => s.status === "Expired")
+        .reduce((sum, s) => sum + s.remainingQuantity, 0),
+    };
+
+    return NextResponse.json({
+      medicine: {
+        id: medicine.id,
+        name: medicine.name,
+        unit: medicine.unit,
+        minimumStock: medicine.minimumStock,
+        reorderThresholdPercentage: medicine.reorderThresholdPercentage,
       },
-      { status: 201 }
-    );
+      stockBatches,
+      summary,
+    });
   } catch (error) {
-    console.error("Error adding stock:", error);
+    console.error("Error fetching stock batches:", error);
     return NextResponse.json(
       { message: "Internal server error" },
       { status: 500 }

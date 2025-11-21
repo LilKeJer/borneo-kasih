@@ -1,3 +1,4 @@
+// db/schema/pharmacy.ts
 import {
   pgTable,
   serial,
@@ -37,22 +38,24 @@ export const prescriptions = pgTable(
   }
 );
 
-// Medicine
+// Medicine dengan field tambahan
 export const medicines = pgTable(
   "Medicine",
   {
     id: serial("id").primaryKey(),
     name: varchar("name", { length: 100 }).notNull(),
     description: text("description"),
+    category: varchar("category", { length: 50 }), // Tambahan: kategori obat
+    unit: varchar("unit", { length: 20 }), // Tambahan: unit (tablet, ml, botol, dll)
     pharmacistId: integer("pharmacist_id")
       .notNull()
       .references(() => users.id),
     price: decimal("price", { precision: 10, scale: 2 }).notNull(),
-    // Field baru untuk threshold
-    minimumStock: integer("minimum_stock").default(5), // Default minimum stok
-    reorderThresholdPercentage: integer("reorder_threshold_percentage").default(
-      20
-    ), // Default persentase batas pesan ulang
+    minimumStock: integer("minimum_stock").default(10).notNull(),
+    reorderThresholdPercentage: integer("reorder_threshold_percentage")
+      .default(20)
+      .notNull(),
+    isActive: boolean("is_active").default(true).notNull(), // Tambahan: status aktif
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
     deletedAt: timestamp("deleted_at"),
@@ -60,7 +63,9 @@ export const medicines = pgTable(
   (table) => {
     return {
       nameIdx: index("idx_medicine_name").on(table.name),
+      categoryIdx: index("idx_medicine_category").on(table.category), // Index untuk kategori
       pharmacistIdx: index("idx_medicine_pharmacist").on(table.pharmacistId),
+      activeIdx: index("idx_medicine_active").on(table.isActive), // Index untuk filter aktif
       priceCheck: check("check_price", sql`${table.price} > 0`),
       minimumStockCheck: check(
         "check_minimum_stock",
@@ -74,7 +79,7 @@ export const medicines = pgTable(
   }
 );
 
-// Medicine Stock
+// Medicine Stock dengan field tambahan
 export const medicineStocks = pgTable(
   "MedicineStock",
   {
@@ -82,10 +87,12 @@ export const medicineStocks = pgTable(
     medicineId: integer("medicine_id")
       .notNull()
       .references(() => medicines.id),
+    batchNumber: varchar("batch_number", { length: 50 }).notNull(), // Wajib ada
     quantity: integer("quantity").notNull(),
     remainingQuantity: integer("remaining_quantity").notNull(),
-    batchNumber: varchar("batch_number", { length: 50 }), // Menambahkan nomor batch
-    expiryDate: date("expiry_date"),
+    expiryDate: date("expiry_date").notNull(), // Wajib ada
+    supplier: varchar("supplier", { length: 100 }), // Tambahan: supplier
+    purchasePrice: decimal("purchase_price", { precision: 10, scale: 2 }), // Tambahan: harga beli
     addedAt: timestamp("added_at").defaultNow(),
     isBelowThreshold: boolean("is_below_threshold").default(false),
     createdAt: timestamp("created_at").defaultNow(),
@@ -95,8 +102,10 @@ export const medicineStocks = pgTable(
   (table) => {
     return {
       medicineIdx: index("idx_stock_medicine").on(table.medicineId),
+      batchNumberIdx: index("idx_stock_batch").on(table.batchNumber),
       expiryDateIdx: index("idx_stock_expiry").on(table.expiryDate),
       remainingQtyIdx: index("idx_stock_remaining").on(table.remainingQuantity),
+      supplierIdx: index("idx_stock_supplier").on(table.supplier),
       quantityCheck: check("check_quantity", sql`${table.quantity} >= 0`),
       remainingQuantityCheck: check(
         "check_remaining_quantity",
