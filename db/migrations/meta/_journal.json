@@ -36,6 +36,13 @@
       "when": 1763712149303,
       "tag": "0004_good_captain_britain",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1767758055665,
+      "tag": "0005_add_reservation_id_medical_history",
+      "breakpoints": true
     }
   ]
 }

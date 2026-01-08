@@ -14,6 +14,7 @@ import {
 import { sql } from "drizzle-orm";
 import { relations } from "drizzle-orm";
 import { users } from "./auth";
+import { reservations } from "./reservation";
 
 // Practice Session
 export const practiceSessions = pgTable("PracticeSession", {
@@ -111,6 +112,7 @@ export const medicalHistories = pgTable(
     doctorId: integer("doctor_id")
       .notNull()
       .references(() => users.id),
+    reservationId: integer("reservation_id").references(() => reservations.id),
 
     // Data terenkripsi untuk catatan dokter
     encryptedCondition: text("encrypted_condition"),
@@ -129,6 +131,9 @@ export const medicalHistories = pgTable(
       patientRecordsIdx: index("idx_patient_records").on(table.patientId),
       diagnosisDateIdx: index("idx_diagnosis_date").on(table.dateOfDiagnosis),
       doctorRecordsIdx: index("idx_doctor_records").on(table.doctorId),
+      reservationIdx: index("idx_medical_history_reservation").on(
+        table.reservationId
+      ),
     };
   }
 );
@@ -148,6 +153,10 @@ export const medicalHistoriesRelations = relations(
     doctor: one(users, {
       fields: [medicalHistories.doctorId],
       references: [users.id],
+    }),
+    reservation: one(reservations, {
+      fields: [medicalHistories.reservationId],
+      references: [reservations.id],
     }),
   })
 );

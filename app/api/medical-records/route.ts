@@ -52,6 +52,20 @@ export async function POST(req: NextRequest) {
     } = validationResult.data;
 
     let newPrescriptionId: number | undefined = undefined;
+    const parsedReservationId =
+      reservationId === undefined || reservationId === null
+        ? null
+        : Number.parseInt(String(reservationId), 10);
+
+    if (
+      reservationId !== undefined &&
+      (Number.isNaN(parsedReservationId) || parsedReservationId <= 0)
+    ) {
+      return NextResponse.json(
+        { message: "Reservation ID tidak valid" },
+        { status: 400 }
+      );
+    }
 
     // 1. Simpan Medical History
     // TODO: Implementasi enkripsi yang aman untuk field di bawah ini
@@ -62,6 +76,7 @@ export async function POST(req: NextRequest) {
         patientId: parseInt(patientId),
         doctorId: doctorId,
         nurseId: doctorId, // Asumsi dokter input langsung untuk MVP
+        reservationId: parsedReservationId,
         dateOfDiagnosis: new Date().toISOString().split("T")[0],
         encryptedCondition: condition, // Placeholder enkripsi
         encryptedDescription: description, // Placeholder enkripsi
@@ -201,7 +216,7 @@ export async function POST(req: NextRequest) {
     // Anda perlu tabel medicalHistoryServices dan insert di sini.
 
     // 4. Update status reservasi jika ada reservationId
-    if (reservationId) {
+    if (parsedReservationId) {
       await db
         .update(reservations)
         .set({
@@ -209,7 +224,7 @@ export async function POST(req: NextRequest) {
           examinationStatus: "Completed",
           updatedAt: new Date(),
         })
-        .where(eq(reservations.id, reservationId));
+        .where(eq(reservations.id, parsedReservationId));
     }
 
     return NextResponse.json(
