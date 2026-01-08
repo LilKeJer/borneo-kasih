@@ -1,5 +1,5 @@
 // components/patient/appointment-status-card.tsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,39 +28,7 @@ export function AppointmentStatusCard() {
   const [loading, setLoading] = useState(true);
   const [isAppointmentTime, setIsAppointmentTime] = useState(false);
 
-  useEffect(() => {
-    fetchTodayAppointment();
-  }, []);
-
-  // Check if current time is within 1 hour of appointment time
-  useEffect(() => {
-    console.log("Show check-in:", showCheckInButton);
-    console.log("Appointment time valid:", isAppointmentTime);
-    console.log("Appointment data:", appointment);
-    if (!appointment?.date) return;
-
-    const checkAppointmentTime = () => {
-      const appointmentDate = new Date(appointment.date);
-      const now = new Date();
-
-      // Is appointment time within 1 hour (before or after)
-      const timeDifferenceMs = Math.abs(
-        appointmentDate.getTime() - now.getTime()
-      );
-      const oneHourInMs = 60 * 60 * 1000;
-
-      setIsAppointmentTime(timeDifferenceMs <= oneHourInMs);
-    };
-
-    checkAppointmentTime();
-
-    // Check every minute
-    const intervalId = setInterval(checkAppointmentTime, 60000);
-
-    return () => clearInterval(intervalId);
-  }, [appointment?.date]);
-
-  const fetchTodayAppointment = async () => {
+  const fetchTodayAppointment = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch("/api/patients/today-appointment");
@@ -91,7 +59,37 @@ export function AppointmentStatusCard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchTodayAppointment();
+  }, [fetchTodayAppointment]);
+
+  // Check if current time is within 1 hour of appointment time
+  useEffect(() => {
+    if (!appointment?.date) return;
+
+    const checkAppointmentTime = () => {
+      const appointmentDate = new Date(appointment.date);
+      const now = new Date();
+
+      // Is appointment time within 1 hour (before or after)
+      const timeDifferenceMs = Math.abs(
+        appointmentDate.getTime() - now.getTime()
+      );
+      const oneHourInMs = 60 * 60 * 1000;
+
+      setIsAppointmentTime(timeDifferenceMs <= oneHourInMs);
+    };
+
+    checkAppointmentTime();
+
+    // Check every minute
+    const intervalId = setInterval(checkAppointmentTime, 60000);
+
+    return () => clearInterval(intervalId);
+  }, [appointment?.date]);
+
 
   const handleCheckIn = async () => {
     if (!appointment) return;

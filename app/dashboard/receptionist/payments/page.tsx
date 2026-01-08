@@ -1,7 +1,7 @@
 // app/dashboard/receptionist/payments/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -101,7 +101,7 @@ export default function PaymentsPage() {
   });
 
   // Fetch payments dengan filter
-  const fetchPayments = async () => {
+  const fetchPayments = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -129,7 +129,14 @@ export default function PaymentsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [
+    pagination.page,
+    pagination.limit,
+    searchTerm,
+    statusFilter,
+    startDate,
+    endDate,
+  ]);
 
   // Fetch payment details
   const fetchPaymentDetails = async (paymentId: number) => {
@@ -155,7 +162,7 @@ export default function PaymentsPage() {
 
   useEffect(() => {
     fetchPayments();
-  }, [pagination.page, pagination.limit, statusFilter, startDate, endDate]);
+  }, [fetchPayments]);
 
   const handleViewDetail = async (payment: Payment) => {
     setSelectedPayment(payment);

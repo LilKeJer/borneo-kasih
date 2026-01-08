@@ -1,7 +1,7 @@
 // app/dashboard/receptionist/queue/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import {
   Card,
@@ -80,11 +80,7 @@ export default function QueueManagementPage() {
 
   const { emergencyPatients, lastEmergency, dismissLatest } =
     useEmergencyPolling();
-  useEffect(() => {
-    fetchQueueData();
-  }, [selectedDate]);
-
-  const fetchQueueData = async () => {
+  const fetchQueueData = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch(`/api/queue/date?date=${selectedDate}`);
@@ -99,7 +95,11 @@ export default function QueueManagementPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedDate]);
+
+  useEffect(() => {
+    fetchQueueData();
+  }, [fetchQueueData]);
 
   const handleCheckIn = async () => {
     if (!reservationIdToCheckIn) return;

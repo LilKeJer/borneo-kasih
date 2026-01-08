@@ -1,7 +1,7 @@
 // app/dashboard/patient/appointments/[id]/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -38,11 +38,7 @@ export default function AppointmentDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchAppointmentDetail();
-  }, [appointmentId]);
-
-  const fetchAppointmentDetail = async () => {
+  const fetchAppointmentDetail = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch(`/api/appointments/${appointmentId}`);
@@ -59,7 +55,11 @@ export default function AppointmentDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [appointmentId]);
+
+  useEffect(() => {
+    fetchAppointmentDetail();
+  }, [fetchAppointmentDetail]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {

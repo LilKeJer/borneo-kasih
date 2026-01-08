@@ -1,7 +1,7 @@
 // app/dashboard/patient/appointments/[id]/reschedule/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -46,11 +46,7 @@ export default function RescheduleAppointmentPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchAppointment();
-  }, [appointmentId]);
-
-  const fetchAppointment = async () => {
+  const fetchAppointment = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
@@ -69,9 +65,13 @@ export default function RescheduleAppointmentPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [appointmentId]);
 
-  const fetchTimeSlots = async () => {
+  useEffect(() => {
+    fetchAppointment();
+  }, [fetchAppointment]);
+
+  const fetchTimeSlots = useCallback(async () => {
     if (!appointment || !selectedDate) return;
 
     try {
@@ -92,13 +92,13 @@ export default function RescheduleAppointmentPage() {
     } finally {
       setLoadingSlots(false);
     }
-  };
+  }, [appointment, selectedDate]);
 
   useEffect(() => {
     if (selectedDate && appointment?.doctorId) {
       fetchTimeSlots();
     }
-  }, [selectedDate, appointment?.doctorId]);
+  }, [selectedDate, appointment?.doctorId, fetchTimeSlots]);
 
   const handleReschedule = async () => {
     if (!appointment || !selectedDate || !selectedSlot) {

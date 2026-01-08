@@ -1,7 +1,7 @@
 // components/admin/staff-table.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Table,
   TableBody,
@@ -68,11 +68,7 @@ export function StaffTable({ onEdit }: StaffTableProps) {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  useEffect(() => {
-    fetchStaff();
-  }, [searchTerm, roleFilter, page]);
-
-  const fetchStaff = async () => {
+  const fetchStaff = useCallback(async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams({
@@ -109,7 +105,11 @@ export function StaffTable({ onEdit }: StaffTableProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchTerm, roleFilter, page]);
+
+  useEffect(() => {
+    fetchStaff();
+  }, [fetchStaff]);
 
   const handleDelete = async (id: string) => {
     if (!confirm("Apakah Anda yakin ingin menghapus staff ini?")) return;
