@@ -51,6 +51,18 @@ export async function POST(req: NextRequest) {
       prescriptions: prescriptionItems, // Array of PrescriptionItemFormValues
     } = validationResult.data;
 
+    const reservationIdValue =
+      reservationId === undefined || reservationId === null
+        ? null
+        : Number.parseInt(String(reservationId), 10);
+
+    if (reservationIdValue !== null && Number.isNaN(reservationIdValue)) {
+      return NextResponse.json(
+        { message: "reservationId harus berupa angka" },
+        { status: 400 }
+      );
+    }
+
     let newPrescriptionId: number | undefined = undefined;
 
     // 1. Simpan Medical History
@@ -60,6 +72,7 @@ export async function POST(req: NextRequest) {
       .insert(medicalHistories)
       .values({
         patientId: parseInt(patientId),
+        reservationId: reservationIdValue,
         doctorId: doctorId,
         nurseId: doctorId, // Asumsi dokter input langsung untuk MVP
         dateOfDiagnosis: new Date().toISOString().split("T")[0],
@@ -201,7 +214,7 @@ export async function POST(req: NextRequest) {
     // Anda perlu tabel medicalHistoryServices dan insert di sini.
 
     // 4. Update status reservasi jika ada reservationId
-    if (reservationId) {
+    if (reservationIdValue !== null) {
       await db
         .update(reservations)
         .set({
@@ -209,7 +222,7 @@ export async function POST(req: NextRequest) {
           examinationStatus: "Completed",
           updatedAt: new Date(),
         })
-        .where(eq(reservations.id, reservationId));
+        .where(eq(reservations.id, reservationIdValue));
     }
 
     return NextResponse.json(

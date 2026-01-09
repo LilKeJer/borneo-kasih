@@ -1,7 +1,7 @@
 // app/dashboard/pharmacist/inventory/page.tsx
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useCallback } from "react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
 import {
@@ -114,15 +114,7 @@ function InventoryContent() {
   const [selectedMedicine, setSelectedMedicine] =
     useState<MedicineWithStock | null>(null);
 
-  useEffect(() => {
-    if (activeFilter === "expiring") {
-      fetchExpiringMedicines();
-    } else {
-      fetchMedicines();
-    }
-  }, [searchTerm, page, activeFilter]);
-
-  const fetchMedicines = async () => {
+  const fetchMedicines = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
@@ -142,9 +134,9 @@ function InventoryContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchTerm, page, activeFilter]);
 
-  const fetchExpiringMedicines = async () => {
+  const fetchExpiringMedicines = useCallback(async () => {
     setLoadingExpiring(true);
     try {
       const response = await fetch("/api/medicines/expiring");
@@ -158,7 +150,15 @@ function InventoryContent() {
     } finally {
       setLoadingExpiring(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (activeFilter === "expiring") {
+      fetchExpiringMedicines();
+    } else {
+      fetchMedicines();
+    }
+  }, [activeFilter, fetchMedicines, fetchExpiringMedicines]);
 
   const handleRefresh = () => {
     if (activeFilter === "expiring") {

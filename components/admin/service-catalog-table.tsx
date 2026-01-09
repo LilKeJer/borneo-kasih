@@ -1,7 +1,7 @@
 // components/admin/service-catalog-table.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Table,
   TableBody,
@@ -62,11 +62,7 @@ export function ServiceCatalogTable({
   const [serviceToDelete, setServiceToDelete] = useState<Service | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  useEffect(() => {
-    fetchServices();
-  }, [searchTerm, categoryFilter, activeFilter, page]);
-
-  const fetchServices = async () => {
+  const fetchServices = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -103,7 +99,11 @@ export function ServiceCatalogTable({
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchTerm, categoryFilter, activeFilter, page]);
+
+  useEffect(() => {
+    fetchServices();
+  }, [fetchServices]);
 
   const handleDelete = async () => {
     if (!serviceToDelete) return;

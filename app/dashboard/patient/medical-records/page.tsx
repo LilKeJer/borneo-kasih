@@ -1,7 +1,7 @@
 // app/dashboard/patient/medical-records/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import {
   Table,
@@ -59,11 +59,7 @@ export default function PatientMedicalRecordsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  useEffect(() => {
-    fetchMedicalRecords();
-  }, [page]);
-
-  const fetchMedicalRecords = async () => {
+  const fetchMedicalRecords = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch(
@@ -83,7 +79,11 @@ export default function PatientMedicalRecordsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page]);
+
+  useEffect(() => {
+    fetchMedicalRecords();
+  }, [fetchMedicalRecords]);
 
   const handleRowClick = async (record: MedicalRecord) => {
     setIsDetailOpen(true);

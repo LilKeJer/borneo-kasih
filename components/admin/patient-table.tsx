@@ -1,7 +1,7 @@
 // components/admin/patient-table.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Table,
   TableBody,
@@ -46,11 +46,7 @@ export function PatientTable() {
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
 
-  useEffect(() => {
-    fetchPatients();
-  }, [searchTerm, page]);
-
-  const fetchPatients = async () => {
+  const fetchPatients = useCallback(async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams({
@@ -71,7 +67,11 @@ export function PatientTable() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchTerm, page]);
+
+  useEffect(() => {
+    fetchPatients();
+  }, [fetchPatients]);
 
   const handleView = (patient: Patient) => {
     setSelectedPatient(patient);

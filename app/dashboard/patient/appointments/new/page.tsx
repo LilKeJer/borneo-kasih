@@ -1,7 +1,7 @@
 // app/dashboard/patient/appointments/new/page.tsx
 "use client";
 import React from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -49,11 +49,7 @@ export default function NewAppointmentPage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    fetchDoctors();
-  }, []);
-
-  const fetchDoctors = async () => {
+  const fetchDoctors = useCallback(async () => {
     try {
       setLoadingDoctors(true);
       const response = await fetch("/api/appointments/doctors");
@@ -70,9 +66,13 @@ export default function NewAppointmentPage() {
     } finally {
       setLoadingDoctors(false);
     }
-  };
+  }, []);
 
-  const fetchTimeSlots = async () => {
+  useEffect(() => {
+    fetchDoctors();
+  }, [fetchDoctors]);
+
+  const fetchTimeSlots = useCallback(async () => {
     if (!selectedDoctor || !selectedDate) return;
 
     try {
@@ -93,13 +93,13 @@ export default function NewAppointmentPage() {
     } finally {
       setLoadingSlots(false);
     }
-  };
+  }, [selectedDoctor, selectedDate]);
 
   useEffect(() => {
     if (step === 3 && selectedDoctor && selectedDate) {
       fetchTimeSlots();
     }
-  }, [step, selectedDoctor, selectedDate]);
+  }, [step, selectedDoctor, selectedDate, fetchTimeSlots]);
 
   const handleNextStep = () => {
     if (step === 1 && !selectedDoctor) {

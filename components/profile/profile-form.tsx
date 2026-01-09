@@ -1,7 +1,7 @@
 // components/profile/profile-form.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -96,11 +96,7 @@ export function ProfileForm() {
     },
   });
 
-  useEffect(() => {
-    fetchProfile();
-  }, []);
-
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     try {
       const response = await fetch("/api/profile");
       if (!response.ok) throw new Error("Failed to fetch profile");
@@ -122,7 +118,11 @@ export function ProfileForm() {
       console.error("Error fetching profile:", error);
       toast.error("Gagal memuat data profile");
     }
-  };
+  }, [form, user?.role]);
+
+  useEffect(() => {
+    fetchProfile();
+  }, [fetchProfile]);
 
   async function onSubmit(values: ProfileFormValues) {
     setIsLoading(true);

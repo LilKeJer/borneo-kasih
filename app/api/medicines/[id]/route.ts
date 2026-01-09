@@ -9,7 +9,7 @@ import { eq, and, isNull, ne, gte, sql } from "drizzle-orm";
 // GET - Get medicine detail dengan semua stock batches
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -18,7 +18,8 @@ export async function GET(
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    const medicineId = parseInt(params.id);
+    const resolvedParams = await params;
+    const medicineId = parseInt(resolvedParams.id);
 
     // Get medicine data
     const medicine = await db.query.medicines.findFirst({
@@ -103,7 +104,7 @@ export async function GET(
 // PUT - Update medicine
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -112,7 +113,8 @@ export async function PUT(
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    const medicineId = parseInt(params.id);
+    const resolvedParams = await params;
+    const medicineId = parseInt(resolvedParams.id);
     const body = await req.json();
     const {
       name,
@@ -257,7 +259,7 @@ export async function PUT(
 // DELETE - Soft delete medicine
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -266,7 +268,8 @@ export async function DELETE(
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    const medicineId = parseInt(params.id);
+    const resolvedParams = await params;
+    const medicineId = parseInt(resolvedParams.id);
 
     // Check if medicine exists
     const existingMedicine = await db.query.medicines.findFirst({

@@ -1,7 +1,7 @@
 // app/dashboard/receptionist/payments/create/page.tsx
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { PaymentForm } from "@/components/receptionist/payment-form";
@@ -22,17 +22,7 @@ function CreatePaymentContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!reservationId) {
-      setError("ID reservasi tidak ditemukan");
-      setLoading(false);
-      return;
-    }
-
-    fetchPaymentData();
-  }, [reservationId]);
-
-  const fetchPaymentData = async () => {
+  const fetchPaymentData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -61,7 +51,17 @@ function CreatePaymentContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [reservationId, router]);
+
+  useEffect(() => {
+    if (!reservationId) {
+      setError("ID reservasi tidak ditemukan");
+      setLoading(false);
+      return;
+    }
+
+    fetchPaymentData();
+  }, [reservationId, fetchPaymentData]);
 
   const handlePaymentSuccess = () => {
     toast.success("Pembayaran berhasil dibuat!");
