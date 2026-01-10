@@ -140,6 +140,8 @@ export async function POST(req: NextRequest) {
         .insert(prescriptions)
         .values({
           medicalHistoryId: medicalRecordId,
+          paymentStatus: "Unpaid",
+          dispenseStatus: "Pending",
           createdAt: new Date(),
           updatedAt: new Date(),
         })
