@@ -174,18 +174,22 @@ export function PaymentForm({
 
   // Tambah prescription items
   const addPrescriptionItems = () => {
-    const newItems: PaymentItem[] = [];
-
-    selectedPrescriptions.forEach((prescriptionId) => {
-      const prescription = prescriptions.find(
-        (p) => p.prescriptionId === prescriptionId
-      );
-      if (prescription) {
+    const newItems: PaymentItem[] = prescriptions
+      .filter((prescription) =>
+        selectedPrescriptions.has(prescription.prescriptionId)
+      )
+      .map((prescription) => {
         const unitPrice = parseFloat(prescription.medicinePrice);
         const quantity = prescription.quantityUsed;
         const subtotal = unitPrice * quantity;
+        const notesParts = [
+          prescription.dosage,
+          prescription.frequency,
+          prescription.duration,
+        ].filter(Boolean);
+        const notes = notesParts.length > 0 ? notesParts.join(" - ") : undefined;
 
-        newItems.push({
+        return {
           id: generateItemId(),
           itemType: "Prescription",
           prescriptionId: prescription.prescriptionId,
@@ -193,10 +197,9 @@ export function PaymentForm({
           quantity: quantity,
           unitPrice: unitPrice,
           subtotal: subtotal,
-          notes: `${prescription.dosage} - ${prescription.frequency} - ${prescription.duration}`,
-        });
-      }
-    });
+          notes: notes,
+        };
+      });
 
     setPaymentItems((prev) => [...prev, ...newItems]);
     setSelectedPrescriptions(new Set());
@@ -411,7 +414,7 @@ export function PaymentForm({
                 <div className="space-y-2 p-4 border rounded-lg">
                   {prescriptions.map((prescription) => (
                     <div
-                      key={prescription.prescriptionId}
+                      key={`${prescription.prescriptionId}-${prescription.medicineId}`}
                       className="flex items-center justify-between"
                     >
                       <div className="flex items-center gap-2">

@@ -47,9 +47,9 @@ export interface PrescriptionData {
   medicineId: number;
   medicineName: string;
   medicinePrice: string;
-  dosage: string;
-  frequency: string;
-  duration: string;
+  dosage: string | null;
+  frequency: string | null;
+  duration: string | null;
   quantityUsed: number;
 }
 
