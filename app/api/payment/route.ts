@@ -9,8 +9,12 @@ import {
   reservations,
   patientDetails,
   doctorDetails,
+  medicalHistories,
+  prescriptions,
+  prescriptionMedicines,
+  medicineStocks,
 } from "@/db/schema";
-import { eq, and, isNull, desc, gte, lte } from "drizzle-orm";
+import { eq, and, isNull, desc, gte, lte, sql } from "drizzle-orm";
 import { type CreatePaymentRequest, type PaymentMethod } from "@/types/payment";
 
 // POST - Buat pembayaran baru
@@ -25,7 +29,7 @@ export async function POST(req: NextRequest) {
     const receptionistId = parseInt(session.user.id);
     const body: CreatePaymentRequest = await req.json();
 
-    const { reservationId, paymentMethod, items, prescriptionId } = body;
+    const { reservationId, paymentMethod, items } = body;
 
     // Validasi input
     if (!reservationId || !paymentMethod || !items || items.length === 0) {
@@ -91,6 +95,57 @@ export async function POST(req: NextRequest) {
         throw new Error("Reservasi ini sudah memiliki pembayaran");
       }
 
+      const reservationPrescription = await tx
+        .select({
+          prescriptionId: prescriptions.id,
+        })
+        .from(medicalHistories)
+        .innerJoin(
+          prescriptions,
+          eq(prescriptions.medicalHistoryId, medicalHistories.id)
+        )
+        .where(
+          and(
+            eq(medicalHistories.reservationId, reservationId),
+            isNull(medicalHistories.deletedAt),
+            isNull(prescriptions.deletedAt)
+          )
+        )
+        .limit(1);
+
+      const reservationPrescriptionId =
+        reservationPrescription[0]?.prescriptionId ?? null;
+      const prescriptionItems = items.filter(
+        (item) => item.itemType === "Prescription"
+      );
+      const hasPrescriptionItem = prescriptionItems.length > 0;
+      const providedPrescriptionIds = new Set(
+        prescriptionItems
+          .map((item) => item.prescriptionId)
+          .filter((id): id is number => typeof id === "number")
+      );
+
+      if (hasPrescriptionItem && !reservationPrescriptionId) {
+        throw new Error("Reservasi ini tidak memiliki resep");
+      }
+
+      if (providedPrescriptionIds.size > 1) {
+        throw new Error(
+          "Hanya satu resep yang bisa dibayar dalam transaksi ini"
+        );
+      }
+
+      if (providedPrescriptionIds.size === 1) {
+        const [providedId] = Array.from(providedPrescriptionIds);
+        if (providedId !== reservationPrescriptionId) {
+          throw new Error("Resep yang dipilih tidak sesuai dengan reservasi");
+        }
+      }
+
+      const paymentPrescriptionId = hasPrescriptionItem
+        ? reservationPrescriptionId
+        : null;
+
       // Validasi dan hitung total amount
       let totalAmount = 0;
       for (const item of items) {
@@ -111,6 +166,42 @@ export async function POST(req: NextRequest) {
         throw new Error("Total pembayaran harus lebih dari 0");
       }
 
+      if (paymentPrescriptionId) {
+        const prescriptionMedicineRows = await tx
+          .select({
+            stockId: prescriptionMedicines.stockId,
+            quantityUsed: prescriptionMedicines.quantityUsed,
+          })
+          .from(prescriptionMedicines)
+          .where(
+            and(
+              eq(prescriptionMedicines.prescriptionId, paymentPrescriptionId),
+              isNull(prescriptionMedicines.deletedAt)
+            )
+          );
+
+        for (const row of prescriptionMedicineRows) {
+          const updatedStock = await tx
+            .update(medicineStocks)
+            .set({
+              remainingQuantity: sql`${medicineStocks.remainingQuantity} - ${row.quantityUsed}`,
+              updatedAt: new Date(),
+            })
+            .where(
+              and(
+                eq(medicineStocks.id, row.stockId),
+                isNull(medicineStocks.deletedAt),
+                gte(medicineStocks.remainingQuantity, row.quantityUsed)
+              )
+            )
+            .returning({ id: medicineStocks.id });
+
+          if (updatedStock.length === 0) {
+            throw new Error("Stok obat tidak cukup untuk resep ini");
+          }
+        }
+      }
+
       // Buat payment record
       const [newPayment] = await tx
         .insert(payments)
@@ -121,7 +212,7 @@ export async function POST(req: NextRequest) {
           totalAmount: totalAmount.toFixed(2),
           paymentMethod: paymentMethod,
           status: "Paid",
-          prescriptionId: prescriptionId || null,
+          prescriptionId: paymentPrescriptionId,
           paymentDate: new Date(),
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -133,7 +224,10 @@ export async function POST(req: NextRequest) {
         paymentId: newPayment.id,
         itemType: item.itemType,
         serviceId: item.serviceId || null,
-        prescriptionId: item.prescriptionId || null,
+        prescriptionId:
+          item.itemType === "Prescription"
+            ? item.prescriptionId || paymentPrescriptionId
+            : null,
         quantity: item.quantity,
         unitPrice: item.unitPrice.toFixed(2),
         subtotal: item.subtotal.toFixed(2),
@@ -144,18 +238,29 @@ export async function POST(req: NextRequest) {
 
       await tx.insert(paymentDetails).values(paymentDetailsData);
 
+      if (paymentPrescriptionId) {
+        await tx
+          .update(prescriptions)
+          .set({
+            paymentStatus: "Paid",
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(prescriptions.id, paymentPrescriptionId),
+              isNull(prescriptions.deletedAt)
+            )
+          );
+      }
+
       // Update status reservasi
-      // Jika examination sudah completed, update reservation juga ke completed
-      // Jika tidak, set status ke "Waiting for Payment"
+      // Jika examination sudah completed, pastikan reservation juga completed
       const updateData: { updatedAt: Date; status?: string } = {
         updatedAt: new Date(),
       };
 
       if (reservationData.examinationStatus === "Completed") {
         updateData.status = "Completed";
-      } else {
-        // Set flag bahwa payment sudah dibuat tapi examination belum selesai
-        updateData.status = "Confirmed";
       }
 
       await tx
