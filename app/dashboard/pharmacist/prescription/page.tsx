@@ -51,13 +51,15 @@ interface MedicineInPrescription {
   isDispensed: boolean; // Untuk menandai apakah obat ini sudah diserahkan
 }
 
+type PrescriptionStatus = "Pending" | "Processed" | "Dispensed";
+
 interface Prescription {
   id: number;
   medicalHistoryId: number;
   patientName: string;
   doctorName: string;
   prescriptionDate: string;
-  status: "Pending" | "Dispensed"; // Status resep keseluruhan
+  status: PrescriptionStatus; // Status resep keseluruhan
   medicines: MedicineInPrescription[];
   hasPayment: boolean;
 }
@@ -192,6 +194,7 @@ export default function PrescriptionsPage() {
     switch (status) {
       case "Pending":
         return <Badge variant="outline">Pending</Badge>;
+      case "Processed":
       case "Dispensed":
         return (
           <Badge variant="secondary" className="bg-green-600 text-white">
@@ -404,7 +407,8 @@ export default function PrescriptionsPage() {
                 </Button>
               )}
             {selectedPrescription &&
-              selectedPrescription.status === "Dispensed" && (
+              (selectedPrescription.status === "Processed" ||
+                selectedPrescription.status === "Dispensed") && (
                 <Badge
                   variant="secondary"
                   className="bg-green-600 text-white text-sm p-2"
