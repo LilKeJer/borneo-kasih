@@ -9,6 +9,7 @@ import {
   doctorDetails,
   payments,
   paymentDetails,
+  medicalHistories,
   prescriptions,
   prescriptionMedicines,
   medicines,
@@ -141,8 +142,8 @@ export async function GET(
       }));
     }
 
-    // Ambil resep yang terkait dengan pasien ini (dari medical history terbaru)
-    const patientPrescriptions = await db
+    // Ambil resep yang terkait dengan reservasi ini
+    const reservationPrescriptions = await db
       .select({
         prescriptionId: prescriptions.id,
         medicineId: medicines.id,
@@ -153,21 +154,25 @@ export async function GET(
         duration: prescriptionMedicines.encryptedDuration,
         quantityUsed: prescriptionMedicines.quantityUsed,
       })
-      .from(prescriptions)
-      .leftJoin(
+      .from(medicalHistories)
+      .innerJoin(
+        prescriptions,
+        eq(prescriptions.medicalHistoryId, medicalHistories.id)
+      )
+      .innerJoin(
         prescriptionMedicines,
         eq(prescriptions.id, prescriptionMedicines.prescriptionId)
       )
-      .leftJoin(medicines, eq(prescriptionMedicines.medicineId, medicines.id))
+      .innerJoin(medicines, eq(prescriptionMedicines.medicineId, medicines.id))
       .where(
         and(
-          // Query prescriptions based on patient's medical history
-          // This is simplified - you may need to join through medical_history table
+          eq(medicalHistories.reservationId, reservationId),
+          isNull(medicalHistories.deletedAt),
           isNull(prescriptions.deletedAt),
-          isNull(prescriptionMedicines.deletedAt)
+          isNull(prescriptionMedicines.deletedAt),
+          isNull(medicines.deletedAt)
         )
-      )
-      .limit(20); // Limit to recent prescriptions
+      );
 
     // Ambil daftar layanan yang tersedia
     const availableServices = await db
@@ -195,7 +200,7 @@ export async function GET(
               details: paymentDetailsData,
             }
           : null,
-      prescriptions: patientPrescriptions.filter((p) => p.medicineId !== null),
+      prescriptions: reservationPrescriptions,
       availableServices: availableServices,
     });
   } catch (error) {
