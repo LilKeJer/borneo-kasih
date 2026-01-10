@@ -25,6 +25,12 @@ export const prescriptions = pgTable(
     medicalHistoryId: integer("medical_history_id")
       .notNull()
       .references(() => medicalHistories.id),
+    paymentStatus: varchar("payment_status", { length: 20 })
+      .notNull()
+      .default("Unpaid"),
+    dispenseStatus: varchar("dispense_status", { length: 20 })
+      .notNull()
+      .default("Pending"),
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
     deletedAt: timestamp("deleted_at"),

@@ -57,7 +57,7 @@ interface Prescription {
   patientName: string;
   doctorName: string;
   prescriptionDate: string;
-  status: "Pending" | "Processed" | "Partially Processed" | "Cancelled"; // Status resep keseluruhan
+  status: "Pending" | "Dispensed"; // Status resep keseluruhan
   medicines: MedicineInPrescription[];
   hasPayment: boolean;
 }
@@ -192,20 +192,12 @@ export default function PrescriptionsPage() {
     switch (status) {
       case "Pending":
         return <Badge variant="outline">Pending</Badge>;
-      case "Processed":
+      case "Dispensed":
         return (
           <Badge variant="secondary" className="bg-green-600 text-white">
-            Sudah Diproses
+            Sudah Diserahkan
           </Badge>
         );
-      case "Partially Processed":
-        return (
-          <Badge variant="default" className="bg-yellow-500 text-black">
-            Diproses Sebagian
-          </Badge>
-        );
-      case "Cancelled":
-        return <Badge variant="destructive">Dibatalkan</Badge>;
       default:
         return <Badge>{status}</Badge>;
     }
@@ -412,7 +404,7 @@ export default function PrescriptionsPage() {
                 </Button>
               )}
             {selectedPrescription &&
-              selectedPrescription.status === "Processed" && (
+              selectedPrescription.status === "Dispensed" && (
                 <Badge
                   variant="secondary"
                   className="bg-green-600 text-white text-sm p-2"
