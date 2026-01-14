@@ -13,8 +13,12 @@ export async function GET(
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || session.user.role !== "Patient") {
+    if (!session) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+
+    if (session.user.role !== "Patient") {
+      return NextResponse.json({ message: "Payment not found" }, { status: 404 });
     }
 
     const resolvedParams = await params;
@@ -81,9 +85,14 @@ export async function GET(
       )
       .orderBy(paymentDetails.id);
 
+    const normalizedDetails = details.map((detail) => ({
+      ...detail,
+      serviceName: detail.serviceName ?? null,
+    }));
+
     return NextResponse.json({
       payment: payment[0],
-      details,
+      details: normalizedDetails,
     });
   } catch (error) {
     console.error("Error fetching payment detail:", error);

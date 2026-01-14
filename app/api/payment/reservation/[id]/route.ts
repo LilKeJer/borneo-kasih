@@ -56,7 +56,10 @@ export async function GET(
         patientDetails,
         eq(reservations.patientId, patientDetails.userId)
       )
-      .leftJoin(doctorDetails, eq(reservations.doctorId, doctorDetails.userId))
+      .leftJoin(
+        doctorDetails,
+        eq(reservations.doctorId, doctorDetails.userId)
+      )
       .where(
         and(eq(reservations.id, reservationId), isNull(reservations.deletedAt))
       )
@@ -120,7 +123,10 @@ export async function GET(
         .from(paymentDetails)
         .leftJoin(
           serviceCatalog,
-          eq(paymentDetails.serviceId, serviceCatalog.id)
+          and(
+            eq(paymentDetails.serviceId, serviceCatalog.id),
+            isNull(serviceCatalog.deletedAt)
+          )
         )
         .where(
           and(
@@ -200,7 +206,7 @@ export async function GET(
               details: paymentDetailsData,
             }
           : null,
-      prescriptions: reservationPrescriptions,
+      prescriptions: reservationPrescriptions ?? [],
       availableServices: availableServices,
     });
   } catch (error) {
