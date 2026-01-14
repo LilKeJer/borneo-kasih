@@ -98,6 +98,7 @@ export async function POST(req: NextRequest) {
       const reservationPrescription = await tx
         .select({
           prescriptionId: prescriptions.id,
+          paymentStatus: prescriptions.paymentStatus,
         })
         .from(medicalHistories)
         .innerJoin(
@@ -113,8 +114,11 @@ export async function POST(req: NextRequest) {
         )
         .limit(1);
 
+      const reservationPrescriptionData = reservationPrescription[0] ?? null;
       const reservationPrescriptionId =
-        reservationPrescription[0]?.prescriptionId ?? null;
+        reservationPrescriptionData?.prescriptionId ?? null;
+      const reservationPrescriptionStatus =
+        reservationPrescriptionData?.paymentStatus ?? null;
       const prescriptionItems = items.filter(
         (item) => item.itemType === "Prescription"
       );
@@ -145,6 +149,13 @@ export async function POST(req: NextRequest) {
       const paymentPrescriptionId = hasPrescriptionItem
         ? reservationPrescriptionId
         : null;
+
+      if (paymentPrescriptionId && reservationPrescriptionStatus === "Paid") {
+        return NextResponse.json(
+          { message: "Resep ini sudah dibayar" },
+          { status: 400 }
+        );
+      }
 
       // Validasi dan hitung total amount
       let totalAmount = 0;
@@ -273,6 +284,10 @@ export async function POST(req: NextRequest) {
         totalAmount: totalAmount,
       };
     });
+
+    if (result instanceof NextResponse) {
+      return result;
+    }
 
     return NextResponse.json(
       {

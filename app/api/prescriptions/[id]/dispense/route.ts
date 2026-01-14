@@ -50,7 +50,7 @@ export async function POST(
 
     if (prescription.dispenseStatus === "Dispensed") {
       return NextResponse.json(
-        { message: "Resep sudah diserahkan" },
+        { message: "Resep sudah diproses" },
         { status: 400 }
       );
     }
