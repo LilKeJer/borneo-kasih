@@ -15,6 +15,7 @@ import { sql } from "drizzle-orm";
 import { relations } from "drizzle-orm";
 import { users } from "./auth";
 import { reservations } from "./reservation";
+import { serviceCatalog } from "./payment";
 
 // Practice Session
 export const practiceSessions = pgTable("PracticeSession", {
@@ -138,10 +139,42 @@ export const medicalHistories = pgTable(
   }
 );
 
+export const medicalHistoryServices = pgTable(
+  "MedicalHistoryService",
+  {
+    id: serial("id").primaryKey(),
+    medicalHistoryId: integer("medical_history_id")
+      .notNull()
+      .references(() => medicalHistories.id),
+    serviceId: integer("service_id")
+      .notNull()
+      .references(() => serviceCatalog.id),
+    quantity: integer("quantity").notNull().default(1),
+    notes: varchar("notes", { length: 255 }),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+    deletedAt: timestamp("deleted_at"),
+  },
+  (table) => {
+    return {
+      medicalHistoryIdx: index("idx_medical_history_service_history").on(
+        table.medicalHistoryId
+      ),
+      serviceIdx: index("idx_medical_history_service_service").on(
+        table.serviceId
+      ),
+      quantityCheck: check(
+        "check_medical_history_service_quantity",
+        sql`${table.quantity} > 0`
+      ),
+    };
+  }
+);
+
 // Relations
 export const medicalHistoriesRelations = relations(
   medicalHistories,
-  ({ one }) => ({
+  ({ one, many }) => ({
     patient: one(users, {
       fields: [medicalHistories.patientId],
       references: [users.id],
@@ -157,6 +190,21 @@ export const medicalHistoriesRelations = relations(
     doctor: one(users, {
       fields: [medicalHistories.doctorId],
       references: [users.id],
+    }),
+    services: many(medicalHistoryServices),
+  })
+);
+
+export const medicalHistoryServicesRelations = relations(
+  medicalHistoryServices,
+  ({ one }) => ({
+    medicalHistory: one(medicalHistories, {
+      fields: [medicalHistoryServices.medicalHistoryId],
+      references: [medicalHistories.id],
+    }),
+    service: one(serviceCatalog, {
+      fields: [medicalHistoryServices.serviceId],
+      references: [serviceCatalog.id],
     }),
   })
 );

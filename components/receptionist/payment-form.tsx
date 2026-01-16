@@ -58,6 +58,7 @@ import {
 } from "lucide-react";
 import {
   type Service,
+  type RecommendedService,
   type PrescriptionData,
   type PaymentItem,
   type ReservationData,
@@ -81,6 +82,7 @@ interface PaymentFormProps {
   reservationData: ReservationData;
   availableServices: Service[];
   prescriptions: PrescriptionData[];
+  recommendedServices?: RecommendedService[];
   onSuccess?: () => void;
   onCancel?: () => void;
 }
@@ -90,6 +92,7 @@ export function PaymentForm({
   reservationData,
   availableServices,
   prescriptions,
+  recommendedServices,
   onSuccess,
   onCancel,
 }: PaymentFormProps) {
@@ -121,6 +124,29 @@ export function PaymentForm({
     const total = paymentItems.reduce((sum, item) => sum + item.subtotal, 0);
     setTotalAmount(total);
   }, [paymentItems]);
+
+  useEffect(() => {
+    if (!recommendedServices || recommendedServices.length === 0) return;
+
+    setPaymentItems((prev) => {
+      if (prev.length > 0) return prev;
+
+      return recommendedServices.map((service) => {
+        const unitPrice = parseFloat(service.basePrice);
+        const quantity = service.quantity;
+        return {
+          id: generateItemId(),
+          itemType: "Service",
+          serviceId: service.serviceId,
+          serviceName: service.serviceName,
+          quantity,
+          unitPrice,
+          subtotal: unitPrice * quantity,
+          notes: service.notes ?? undefined,
+        };
+      });
+    });
+  }, [recommendedServices]);
 
   // Generate unique ID untuk payment item
   const generateItemId = () => {

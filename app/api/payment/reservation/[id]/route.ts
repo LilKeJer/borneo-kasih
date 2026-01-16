@@ -10,6 +10,7 @@ import {
   payments,
   paymentDetails,
   medicalHistories,
+  medicalHistoryServices,
   prescriptions,
   prescriptionMedicines,
   medicines,
@@ -196,6 +197,32 @@ export async function GET(
       )
       .orderBy(serviceCatalog.category, serviceCatalog.name);
 
+    const recommendedServices = await db
+      .select({
+        serviceId: serviceCatalog.id,
+        serviceName: serviceCatalog.name,
+        basePrice: serviceCatalog.basePrice,
+        quantity: medicalHistoryServices.quantity,
+        notes: medicalHistoryServices.notes,
+      })
+      .from(medicalHistoryServices)
+      .innerJoin(
+        medicalHistories,
+        eq(medicalHistoryServices.medicalHistoryId, medicalHistories.id)
+      )
+      .innerJoin(
+        serviceCatalog,
+        eq(medicalHistoryServices.serviceId, serviceCatalog.id)
+      )
+      .where(
+        and(
+          eq(medicalHistories.reservationId, reservationId),
+          isNull(medicalHistories.deletedAt),
+          isNull(medicalHistoryServices.deletedAt),
+          isNull(serviceCatalog.deletedAt)
+        )
+      );
+
     return NextResponse.json({
       reservation: reservationData,
       hasPayment: existingPayment.length > 0,
@@ -207,6 +234,7 @@ export async function GET(
             }
           : null,
       prescriptions: reservationPrescriptions ?? [],
+      recommendedServices,
       availableServices: availableServices,
     });
   } catch (error) {
