@@ -156,6 +156,7 @@ function CreatePaymentContent() {
           reservationData={paymentData.reservation}
           availableServices={paymentData.availableServices}
           prescriptions={paymentData.prescriptions}
+          recommendedServices={paymentData.recommendedServices ?? []}
           onSuccess={handlePaymentSuccess}
           onCancel={handleCancel}
         />

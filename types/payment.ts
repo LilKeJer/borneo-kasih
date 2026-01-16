@@ -42,6 +42,14 @@ export interface Service {
   updatedAt?: string;
 }
 
+export interface RecommendedService {
+  serviceId: number;
+  serviceName: string;
+  basePrice: string;
+  quantity: number;
+  notes?: string | null;
+}
+
 export interface PrescriptionData {
   prescriptionId: number;
   medicineId: number;
@@ -93,6 +101,7 @@ export interface PaymentFormData {
   existingPayment: ExistingPayment | null;
   prescriptions: PrescriptionData[];
   availableServices: Service[];
+  recommendedServices?: RecommendedService[];
   hasPayment: boolean;
 }
 

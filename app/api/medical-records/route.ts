@@ -8,17 +8,16 @@ import {
   prescriptions,
   prescriptionMedicines,
   reservations,
+  medicalHistoryServices,
   medicines, // Untuk mendapatkan nama obat saat validasi stok
   medicineStocks, // Untuk validasi stok
-  // Jika Anda memutuskan menyimpan layanan terkait medical record:
-  // serviceCatalog,
-  // medicalHistoryServices, // Anda perlu membuat skema ini jika mau
+  serviceCatalog,
 } from "@/db/schema";
 import {
   fullMedicalRecordSchema,
   type PrescriptionItemFormValues, // Menggunakan tipe dari validasi
 } from "@/lib/validations/medical-record"; // Sesuaikan path
-import { eq, and, gte, isNull, sql, desc } from "drizzle-orm";
+import { eq, and, gte, isNull, sql, desc, inArray } from "drizzle-orm";
 // import { encryptData, generateEncryptionKey } from "@/lib/utils/encryption"; // Jika enkripsi dilakukan di backend
 
 export async function POST(req: NextRequest) {
@@ -48,6 +47,7 @@ export async function POST(req: NextRequest) {
       treatment,
       doctorNotes,
 
+      services: serviceItems,
       prescriptions: prescriptionItems, // Array of PrescriptionItemFormValues
     } = validationResult.data;
 
@@ -118,6 +118,64 @@ export async function POST(req: NextRequest) {
         .returning({ id: medicalHistories.id });
 
       medicalRecordId = newMedicalRecord.id;
+    }
+
+    const normalizedServices = (serviceItems ?? []).map((service) => {
+      const serviceId = Number.parseInt(service.serviceId, 10);
+      if (Number.isNaN(serviceId)) {
+        throw new Error("Layanan tidak valid");
+      }
+      return {
+        serviceId,
+        quantity: service.quantity,
+        notes: service.notes || null,
+      };
+    });
+
+    if (normalizedServices.length > 0) {
+      const uniqueServiceIds = Array.from(
+        new Set(normalizedServices.map((service) => service.serviceId))
+      );
+      const validServices = await db
+        .select({ id: serviceCatalog.id })
+        .from(serviceCatalog)
+        .where(
+          and(
+            inArray(serviceCatalog.id, uniqueServiceIds),
+            eq(serviceCatalog.isActive, true),
+            isNull(serviceCatalog.deletedAt)
+          )
+        );
+
+      if (validServices.length !== uniqueServiceIds.length) {
+        throw new Error("Ada layanan yang tidak tersedia");
+      }
+    }
+
+    await db
+      .update(medicalHistoryServices)
+      .set({
+        deletedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(medicalHistoryServices.medicalHistoryId, medicalRecordId),
+          isNull(medicalHistoryServices.deletedAt)
+        )
+      );
+
+    if (normalizedServices.length > 0) {
+      await db.insert(medicalHistoryServices).values(
+        normalizedServices.map((service) => ({
+          medicalHistoryId: medicalRecordId,
+          serviceId: service.serviceId,
+          quantity: service.quantity,
+          notes: service.notes,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }))
+      );
     }
 
     // 2. Proses Resep jika ada
@@ -239,12 +297,6 @@ export async function POST(req: NextRequest) {
       );
       await db.insert(prescriptionMedicines).values(prescriptionMedicineValues);
     }
-
-    // 3. Proses Layanan (jika ada dan ingin dicatat terpisah)
-    // Untuk saat ini, kita asumsikan layanan akan ditambahkan manual di form pembayaran
-    // atau layanan utama sudah implisit dari reservasi.
-    // Jika ingin menyimpan layanan yang dipilih dokter terkait medical record,
-    // Anda perlu tabel medicalHistoryServices dan insert di sini.
 
     // 4. Update status reservasi jika ada reservationId
     if (reservationIdValue !== null) {
