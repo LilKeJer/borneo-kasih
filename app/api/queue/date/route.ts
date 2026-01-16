@@ -3,8 +3,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/db";
-import { reservations, doctorDetails, patientDetails } from "@/db/schema";
-import { eq, and, isNull, gte, lte, sql } from "drizzle-orm";
+import {
+  reservations,
+  doctorDetails,
+  patientDetails,
+  medicalHistories,
+} from "@/db/schema";
+import { eq, and, isNull, gte, lte, sql, inArray, desc } from "drizzle-orm";
 interface QueueItem {
   id: number;
   patientId: number;
@@ -14,6 +19,10 @@ interface QueueItem {
   status: string;
   examinationStatus: string;
   checkedInAt: string | null;
+  complaint?: string | null;
+  isPriority?: boolean;
+  priorityReason?: string | null;
+  hasNurseCheckup?: boolean;
 }
 
 interface DoctorQueueGroup {
@@ -71,6 +80,7 @@ export async function GET(req: NextRequest) {
         queueNumber: reservations.queueNumber,
         status: reservations.status,
         examinationStatus: reservations.examinationStatus,
+        complaint: reservations.complaint,
         isPriority: reservations.isPriority,
         priorityReason: reservations.priorityReason,
         checkedInAt: sql<
@@ -93,6 +103,31 @@ export async function GET(req: NextRequest) {
       )
       .orderBy(doctorDetails.name, reservations.queueNumber);
 
+    const reservationIds = queues.map((queue) => queue.id);
+    const nurseCheckupMap = new Map<number, boolean>();
+
+    if (reservationIds.length > 0) {
+      const nurseCheckups = await db
+        .select({
+          reservationId: medicalHistories.reservationId,
+          updatedAt: medicalHistories.updatedAt,
+        })
+        .from(medicalHistories)
+        .where(
+          and(
+            inArray(medicalHistories.reservationId, reservationIds),
+            isNull(medicalHistories.deletedAt)
+          )
+        )
+        .orderBy(desc(medicalHistories.updatedAt));
+
+      for (const record of nurseCheckups) {
+        if (record.reservationId && !nurseCheckupMap.has(record.reservationId)) {
+          nurseCheckupMap.set(record.reservationId, true);
+        }
+      }
+    }
+
     // Mengelompokkan antrian berdasarkan dokter
     const queuesByDoctor = queues.reduce((result, queue) => {
       const doctorId = queue.doctorId.toString();
@@ -112,6 +147,10 @@ export async function GET(req: NextRequest) {
         status: queue.status,
         examinationStatus: queue.examinationStatus || "Not Started",
         checkedInAt: queue.checkedInAt,
+        complaint: queue.complaint ?? null,
+        isPriority: queue.isPriority ?? false,
+        priorityReason: queue.priorityReason ?? null,
+        hasNurseCheckup: nurseCheckupMap.get(queue.id) || false,
       });
       return result;
     }, {} as Record<string, DoctorQueueGroup>);

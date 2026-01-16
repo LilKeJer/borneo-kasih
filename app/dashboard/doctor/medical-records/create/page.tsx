@@ -42,6 +42,11 @@ function CreateMedicalRecordContent() {
   const [loadingPatient, setLoadingPatient] = useState(true);
   const [loadingServices, setLoadingServices] = useState(true);
   const [loadingMedicines, setLoadingMedicines] = useState(true);
+  const [loadingNurseNotes, setLoadingNurseNotes] = useState(false);
+  const [nurseNotes, setNurseNotes] = useState<string | null>(null);
+  const [nurseCheckupTimestamp, setNurseCheckupTimestamp] = useState<
+    string | null
+  >(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -78,6 +83,23 @@ function CreateMedicalRecordContent() {
         const medicinesData = await medicinesRes.json();
         setAvailableMedicines(medicinesData.data || []);
         setLoadingMedicines(false);
+
+        if (reservationIdParam) {
+          setLoadingNurseNotes(true);
+          const nurseRes = await fetch(
+            `/api/nurse/checkups?reservationId=${reservationIdParam}`
+          );
+          if (nurseRes.ok) {
+            const nurseData = await nurseRes.json();
+            if (nurseData.exists) {
+              setNurseNotes(nurseData.nurseNotes || "");
+              setNurseCheckupTimestamp(
+                nurseData.nurseCheckupTimestamp || null
+              );
+            }
+          }
+          setLoadingNurseNotes(false);
+        }
       } catch (err) {
         console.error("Fetch data error:", err);
         setError(
@@ -88,6 +110,7 @@ function CreateMedicalRecordContent() {
         setLoadingPatient(false);
         setLoadingServices(false);
         setLoadingMedicines(false);
+        setLoadingNurseNotes(false);
       }
     }
     fetchData();
@@ -171,6 +194,33 @@ function CreateMedicalRecordContent() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {loadingNurseNotes && (
+            <div className="mb-6 text-sm text-muted-foreground">
+              Memuat catatan perawat...
+            </div>
+          )}
+          {nurseNotes && (
+            <Card className="mb-6 border-l-4 border-l-blue-500">
+              <CardHeader>
+                <CardTitle className="text-base">Catatan Perawat</CardTitle>
+                {nurseCheckupTimestamp && (
+                  <CardDescription>
+                    Diperbarui{" "}
+                    {new Date(nurseCheckupTimestamp).toLocaleString("id-ID", {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </CardDescription>
+                )}
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">{nurseNotes}</p>
+              </CardContent>
+            </Card>
+          )}
           {patient && (
             <FullMedicalRecordForm
               patientId={patientIdParam}
