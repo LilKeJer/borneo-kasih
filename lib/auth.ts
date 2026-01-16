@@ -4,7 +4,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcrypt";
 import { db } from "@/db";
 import { users } from "@/db/schema/auth"; // Make sure the path is correct
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
@@ -28,7 +28,10 @@ export const authOptions: NextAuthOptions = {
 
         // Cari user berdasarkan username
         const foundUser = await db.query.users.findFirst({
-          where: eq(users.username, credentials.username),
+          where: and(
+            eq(users.username, credentials.username),
+            isNull(users.deletedAt)
+          ),
           with: {
             adminDetails: true,
             doctorDetails: true,
@@ -56,6 +59,10 @@ export const authOptions: NextAuthOptions = {
         // Check user status
         if (foundUser.role === "Patient" && foundUser.status === "Pending") {
           throw new Error("Akun Anda sedang menunggu verifikasi admin");
+        }
+
+        if (foundUser.status === "Rejected") {
+          throw new Error("Akun Anda ditolak");
         }
 
         if (

@@ -37,7 +37,7 @@ export async function GET() {
         isPriority: reservations.isPriority,
         priorityReason: reservations.priorityReason,
         // Tambahan informasi dari reservasi (jika ada)
-        complaint: sql<string>`null`, // Placeholder, kita bisa tambahkan nantinya
+        complaint: reservations.complaint,
       })
       .from(reservations)
       .leftJoin(
@@ -68,8 +68,7 @@ export async function GET() {
         isPriority: reservations.isPriority,
         priorityReason: reservations.priorityReason,
         checkedInAt: sql<string>`CASE WHEN ${reservations.examinationStatus} = 'Waiting' THEN ${reservations.updatedAt}::text ELSE NULL END`,
-        // Placeholder untuk keluhan
-        complaint: sql<string>`null`,
+        complaint: reservations.complaint,
       })
       .from(reservations)
       .leftJoin(

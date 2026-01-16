@@ -130,7 +130,7 @@ function InventoryContent() {
       if (!response.ok) throw new Error("Gagal memuat data obat");
       const data = await response.json();
       const medicinesList = Array.isArray(data.data) ? data.data : [];
-      const normalized = medicinesList.map(
+      const normalized: MedicineWithStock[] = medicinesList.map(
         (medicine: Record<string, unknown>) => {
           const totalStock = Number(medicine.totalStock ?? 0);
           const minimumStock = Number(medicine.minimumStock ?? 0);

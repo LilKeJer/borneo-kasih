@@ -2,6 +2,7 @@ import {
   pgTable,
   serial,
   varchar,
+  text,
   timestamp,
   integer,
   index,
@@ -33,6 +34,7 @@ export const reservations = pgTable(
     queueNumber: integer("queue_number"),
     status: varchar("status", { length: 20 }).notNull(),
     examinationStatus: varchar("examination_status", { length: 20 }),
+    complaint: text("complaint"),
     isPriority: boolean("is_priority").default(false),
     priorityReason: varchar("priority_reason", { length: 255 }),
     createdAt: timestamp("created_at").defaultNow(),
@@ -53,7 +55,7 @@ export const reservations = pgTable(
       ),
       examinationStatusCheck: check(
         "check_examination_status",
-        sql`${table.examinationStatus} IS NULL OR ${table.examinationStatus} IN ('Waiting', 'In Progress', 'Completed', 'Cancelled')`
+        sql`${table.examinationStatus} IS NULL OR ${table.examinationStatus} IN ('Waiting', 'In Progress', 'Completed', 'Cancelled', 'Waiting for Payment')`
       ),
     };
   }
