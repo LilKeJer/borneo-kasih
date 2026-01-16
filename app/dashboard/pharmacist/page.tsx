@@ -89,7 +89,16 @@ export default function PharmacistDashboardPage() {
       const response = await fetch("/api/medicines/low-stock");
       if (!response.ok) throw new Error("Failed to fetch low stock medicines");
       const data = await response.json();
-      setLowStockMedicines(data.data || []);
+      const medicines = Array.isArray(data.medicines) ? data.medicines : [];
+      setLowStockMedicines(
+        medicines.map((medicine: Record<string, unknown>) => ({
+          id: Number(medicine.id),
+          name: String(medicine.name ?? ""),
+          totalStock: Number(medicine.currentStock ?? 0),
+          minimumStock: Number(medicine.minimumStock ?? 0),
+          thresholdStock: Number(medicine.thresholdAmount ?? 0),
+        }))
+      );
     } catch (error) {
       console.error("Error fetching low stock medicines:", error);
       toast.error("Gagal memuat data stok rendah.");
@@ -196,7 +205,7 @@ export default function PharmacistDashboardPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <Button variant="outline" className="w-full justify-start" asChild>
-              <Link href="/dashboard/pharmacist/prescriptions">
+              <Link href="/dashboard/pharmacist/prescription">
                 <Pill className="mr-2 h-4 w-4" /> Lihat Semua Resep
               </Link>
             </Button>

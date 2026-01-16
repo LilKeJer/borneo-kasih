@@ -70,7 +70,7 @@ interface MedicineWithStock {
   minimumStock: number;
   reorderThresholdPercentage: number;
   totalStock: number;
-  batchCount: number;
+  batchCount?: number | null;
   isBelowThreshold: boolean;
   thresholdStock: number;
   stockPercentage: number;
@@ -114,6 +114,10 @@ function InventoryContent() {
   const [selectedMedicine, setSelectedMedicine] =
     useState<MedicineWithStock | null>(null);
 
+  useEffect(() => {
+    setPage(1);
+  }, [activeFilter, searchTerm]);
+
   const fetchMedicines = useCallback(async () => {
     setLoading(true);
     try {
@@ -121,13 +125,60 @@ function InventoryContent() {
         search: searchTerm,
         page: page.toString(),
         limit: "10",
-        lowStock: (activeFilter === "low_stock").toString(),
       });
       const response = await fetch(`/api/medicines?${params.toString()}`);
       if (!response.ok) throw new Error("Gagal memuat data obat");
       const data = await response.json();
-      setMedicines(data.data || []);
-      setTotalPages(data.pagination.totalPages || 1);
+      const medicinesList = Array.isArray(data.data) ? data.data : [];
+      const normalized = medicinesList.map(
+        (medicine: Record<string, unknown>) => {
+          const totalStock = Number(medicine.totalStock ?? 0);
+          const minimumStock = Number(medicine.minimumStock ?? 0);
+          const reorderThresholdPercentage = Number(
+            medicine.reorderThresholdPercentage ?? 0
+          );
+          const thresholdStock = Number(
+            medicine.thresholdAmount ??
+              Math.ceil(
+                (minimumStock * (100 + reorderThresholdPercentage)) / 100
+              )
+          );
+          const stockPercentage =
+            minimumStock > 0
+              ? Math.round((totalStock / minimumStock) * 100)
+              : 0;
+
+          return {
+            id: Number(medicine.id),
+            name: String(medicine.name ?? ""),
+            description:
+              medicine.description === null ||
+              medicine.description === undefined
+                ? null
+                : String(medicine.description),
+            price: String(medicine.price ?? "0"),
+            minimumStock,
+            reorderThresholdPercentage,
+            totalStock,
+            batchCount:
+              medicine.batchCount === null ||
+              medicine.batchCount === undefined
+                ? null
+                : Number(medicine.batchCount),
+            isBelowThreshold: totalStock <= thresholdStock,
+            thresholdStock,
+            stockPercentage,
+          };
+        }
+      );
+      const filtered =
+        activeFilter === "low_stock"
+          ? normalized.filter((medicine) => medicine.isBelowThreshold)
+          : normalized;
+      setMedicines(filtered);
+      setTotalPages(
+        activeFilter === "low_stock" ? 1 : data.pagination?.totalPages || 1
+      );
     } catch (error) {
       toast.error("Gagal memuat data obat.");
       console.error(error);
@@ -143,7 +194,41 @@ function InventoryContent() {
       if (!response.ok)
         throw new Error("Gagal memuat data obat akan kadaluarsa");
       const data = await response.json();
-      setExpiringMedicines(data.data || []);
+      const batches = Array.isArray(data.allBatches) ? data.allBatches : [];
+      const mapped = batches.map((batch: Record<string, unknown>) => {
+        const expiryStatus = String(batch.expiryStatus ?? "");
+        let urgency: MedicineStockItem["urgency"] = "Low";
+
+        switch (expiryStatus) {
+          case "Expired":
+            urgency = "Expired";
+            break;
+          case "Expiring Today":
+            urgency = "Critical";
+            break;
+          case "Expiring This Week":
+            urgency = "High";
+            break;
+          case "Expiring This Month":
+            urgency = "Medium";
+            break;
+          default:
+            urgency = "Low";
+        }
+
+        return {
+          id: Number(batch.stockId ?? batch.id),
+          medicineId: Number(batch.medicineId ?? 0),
+          medicineName: String(batch.medicineName ?? ""),
+          batchNumber: batch.batchNumber ? String(batch.batchNumber) : null,
+          expiryDate: String(batch.expiryDate ?? ""),
+          remainingQuantity: Number(batch.remainingQuantity ?? 0),
+          addedAt: "",
+          daysUntilExpiry: Number(batch.daysRemaining ?? 0),
+          urgency,
+        };
+      });
+      setExpiringMedicines(mapped);
     } catch (error) {
       toast.error("Gagal memuat data obat akan kadaluarsa.");
       console.error(error);
@@ -435,7 +520,12 @@ function InventoryContent() {
                         {formatRupiah(parseFloat(medicine.price))}
                       </TableCell>
                       <TableCell>
-                        {medicine.totalStock} ({medicine.batchCount} batch)
+                        {medicine.totalStock} (
+                        {medicine.batchCount === null ||
+                        medicine.batchCount === undefined
+                          ? "-"
+                          : medicine.batchCount}{" "}
+                        batch)
                       </TableCell>
                       <TableCell>{medicine.minimumStock}</TableCell>
                       <TableCell>
@@ -489,7 +579,7 @@ function InventoryContent() {
               </Table>
             )}
           </CardContent>
-          {!loading && medicines.length > 0 && activeFilter !== "expiring" && (
+          {!loading && medicines.length > 0 && activeFilter === "all" && (
             <div className="flex items-center justify-between px-6 py-4 border-t">
               <p className="text-sm text-muted-foreground">
                 Halaman {page} dari {totalPages}

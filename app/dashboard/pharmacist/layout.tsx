@@ -12,7 +12,7 @@ const navItems = [
   },
   {
     title: "Medicines",
-    href: "/dashboard/pharmacist/medicines",
+    href: "/dashboard/pharmacist/inventory",
     icon: <Pill className="h-4 w-4" />,
   },
   {
@@ -22,7 +22,7 @@ const navItems = [
   },
   {
     title: "Prescriptions",
-    href: "/dashboard/pharmacist/prescriptions",
+    href: "/dashboard/pharmacist/prescription",
     icon: <ClipboardList className="h-4 w-4" />,
   },
   {
