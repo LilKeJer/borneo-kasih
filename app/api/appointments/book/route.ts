@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
 
     const patientId = parseInt(session.user.id);
     const body = await req.json();
-    const { doctorId, scheduleId, appointmentDate } = body;
+    const { doctorId, scheduleId, appointmentDate, complaint } = body;
 
     if (!doctorId || !scheduleId || !appointmentDate) {
       return NextResponse.json(
@@ -79,6 +79,10 @@ export async function POST(req: NextRequest) {
         queueNumber,
         status: "Pending",
         examinationStatus: "Waiting",
+        complaint:
+          typeof complaint === "string" && complaint.trim()
+            ? complaint.trim()
+            : null,
         createdAt: new Date(),
         updatedAt: new Date(),
       })

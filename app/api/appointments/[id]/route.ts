@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/db";
 import { reservations, doctorDetails } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 export async function GET(
   req: NextRequest,
@@ -31,11 +31,14 @@ export async function GET(
         queueNumber: reservations.queueNumber,
         status: reservations.status,
         examinationStatus: reservations.examinationStatus,
+        complaint: reservations.complaint,
         doctorName: doctorDetails.name,
       })
       .from(reservations)
       .leftJoin(doctorDetails, eq(reservations.doctorId, doctorDetails.userId))
-      .where(eq(reservations.id, appointmentId))
+      .where(
+        and(eq(reservations.id, appointmentId), isNull(reservations.deletedAt))
+      )
       .limit(1);
 
     if (appointment.length === 0) {
@@ -62,6 +65,7 @@ export async function GET(
       status: appointment[0].status,
       examinationStatus: appointment[0].examinationStatus || "Not Started", // Tambahkan ini jika belum ada
       doctor: appointment[0].doctorName || "Unknown Doctor",
+      complaint: appointment[0].complaint || null,
     });
   } catch (error) {
     console.error("Error fetching appointment:", error);

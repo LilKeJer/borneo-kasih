@@ -25,6 +25,7 @@ interface AppointmentDetail {
   queueNumber: number | null;
   status: string;
   examinationStatus: string | null;
+  complaint: string | null;
 }
 
 export default function AppointmentDetailPage() {
@@ -82,6 +83,8 @@ export default function AppointmentDetailPage() {
         return <Badge variant="outline">Belum Check-in</Badge>;
       case "Waiting":
         return <Badge variant="secondary">Menunggu Pemeriksaan</Badge>;
+      case "Waiting for Payment":
+        return <Badge variant="secondary">Menunggu Pembayaran</Badge>;
       case "In Progress":
         return <Badge variant="default">Sedang Diperiksa</Badge>;
       case "Completed":
@@ -143,6 +146,8 @@ export default function AppointmentDetailPage() {
         return "Dokter sedang memeriksa Anda.";
       case "Completed":
         return "Pemeriksaan telah selesai. Silakan menuju kasir untuk pembayaran.";
+      case "Waiting for Payment":
+        return "Pemeriksaan selesai. Silakan lakukan pembayaran di resepsionis.";
       case "Cancelled":
         return "Janji temu ini telah dibatalkan.";
       default:
@@ -222,6 +227,15 @@ export default function AppointmentDetailPage() {
                 <div>
                   <h3 className="font-medium">Dokter</h3>
                   <p>{appointment.doctor}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <ClipboardListIcon className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <div>
+                  <h3 className="font-medium">Keluhan</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {appointment.complaint || "Tidak ada keluhan"}
+                  </p>
                 </div>
               </div>
             </div>
@@ -323,14 +337,16 @@ export default function AppointmentDetailPage() {
 
               <div
                 className={`relative z-10 flex flex-col items-center ${
-                  appointment.examinationStatus === "Completed"
+                  appointment.examinationStatus === "Completed" ||
+                  appointment.examinationStatus === "Waiting for Payment"
                     ? "text-primary"
                     : "text-muted-foreground"
                 }`}
               >
                 <div
                   className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                    appointment.examinationStatus === "Completed"
+                    appointment.examinationStatus === "Completed" ||
+                    appointment.examinationStatus === "Waiting for Payment"
                       ? "bg-primary text-white"
                       : "bg-gray-200"
                   }`}

@@ -168,6 +168,8 @@ export default function QueueManagementPage() {
     switch (status) {
       case "Waiting":
         return <Badge variant="outline">Menunggu</Badge>;
+      case "Waiting for Payment":
+        return <Badge variant="secondary">Menunggu Pembayaran</Badge>;
       case "In Progress":
         return <Badge variant="secondary">Sedang Diperiksa</Badge>;
       case "Completed":

@@ -126,6 +126,8 @@ export function AppointmentStatusCard() {
         return <Badge variant="outline">Belum Check-in</Badge>;
       case "Waiting":
         return <Badge variant="secondary">Menunggu Pemeriksaan</Badge>;
+      case "Waiting for Payment":
+        return <Badge variant="secondary">Menunggu Pembayaran</Badge>;
       case "In Progress":
         return <Badge variant="default">Sedang Diperiksa</Badge>;
       case "Completed":
@@ -319,14 +321,16 @@ export function AppointmentStatusCard() {
 
             <div
               className={`relative z-10 flex flex-col items-center ${
-                appointment.examinationStatus === "Completed"
+                appointment.examinationStatus === "Completed" ||
+                appointment.examinationStatus === "Waiting for Payment"
                   ? "text-primary"
                   : "text-muted-foreground"
               }`}
             >
               <div
                 className={`w-5 h-5 rounded-full flex items-center justify-center ${
-                  appointment.examinationStatus === "Completed"
+                  appointment.examinationStatus === "Completed" ||
+                  appointment.examinationStatus === "Waiting for Payment"
                     ? "bg-primary text-white"
                     : "bg-gray-200"
                 } text-xs`}

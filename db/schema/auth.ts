@@ -37,7 +37,7 @@ export const users = pgTable(
       ),
       statusCheck: check(
         "check_user_status",
-        sql`${table.status} IN ('Active', 'Pending', 'Verified', 'Suspended', 'Inactive')`
+        sql`${table.status} IN ('Active', 'Pending', 'Verified', 'Suspended', 'Inactive', 'Rejected')`
       ),
     };
   }
