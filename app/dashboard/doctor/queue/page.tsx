@@ -233,7 +233,7 @@ export default function DoctorQueuePage() {
               <div className="flex justify-between items-center gap-4">
                 <Button asChild variant="outline" className="flex-1">
                   <Link
-                    href={`/dashboard/doctor/medical-records/create?patientId=${currentPatient.patientId}`}
+                    href={`/dashboard/doctor/medical-records/create?patientId=${currentPatient.patientId}&reservationId=${currentPatient.id}`}
                   >
                     <FileText className="mr-2 h-4 w-4" />
                     Buat Rekam Medis

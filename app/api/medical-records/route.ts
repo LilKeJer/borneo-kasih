@@ -18,7 +18,7 @@ import {
   fullMedicalRecordSchema,
   type PrescriptionItemFormValues, // Menggunakan tipe dari validasi
 } from "@/lib/validations/medical-record"; // Sesuaikan path
-import { eq, and, gte, isNull, sql } from "drizzle-orm";
+import { eq, and, gte, isNull, sql, desc } from "drizzle-orm";
 // import { encryptData, generateEncryptionKey } from "@/lib/utils/encryption"; // Jika enkripsi dilakukan di backend
 
 export async function POST(req: NextRequest) {
@@ -64,30 +64,61 @@ export async function POST(req: NextRequest) {
     }
 
     let newPrescriptionId: number | undefined = undefined;
+    let medicalRecordId: number;
 
-    // 1. Simpan Medical History
+    const existingRecord =
+      reservationIdValue === null
+        ? null
+        : await db.query.medicalHistories.findFirst({
+            where: and(
+              eq(medicalHistories.reservationId, reservationIdValue),
+              isNull(medicalHistories.deletedAt)
+            ),
+            orderBy: [desc(medicalHistories.updatedAt)],
+          });
+
+    // 1. Simpan atau perbarui Medical History
     // TODO: Implementasi enkripsi yang aman untuk field di bawah ini
-    // Untuk saat ini, kita simpan sebagai plaintext atau placeholder
-    const [newMedicalRecord] = await db
-      .insert(medicalHistories)
-      .values({
-        patientId: parseInt(patientId),
-        reservationId: reservationIdValue,
-        doctorId: doctorId,
-        nurseId: doctorId, // Asumsi dokter input langsung untuk MVP
-        dateOfDiagnosis: new Date().toISOString().split("T")[0],
-        encryptedCondition: condition, // Placeholder enkripsi
-        encryptedDescription: description, // Placeholder enkripsi
-        encryptedTreatment: treatment, // Placeholder enkripsi
-        encryptedDoctorNotes: doctorNotes || null, // Placeholder enkripsi
-        encryptionIvDoctor: "iv_placeholder_doctor", // TODO: Generate IV yang aman
-        encryptionIvNurse: "iv_placeholder_nurse", // TODO: Generate IV yang aman
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning({ id: medicalHistories.id });
+    if (existingRecord) {
+      await db
+        .update(medicalHistories)
+        .set({
+          doctorId: doctorId,
+          dateOfDiagnosis: new Date().toISOString().split("T")[0],
+          encryptedCondition: condition, // Placeholder enkripsi
+          encryptedDescription: description, // Placeholder enkripsi
+          encryptedTreatment: treatment, // Placeholder enkripsi
+          encryptedDoctorNotes: doctorNotes || null, // Placeholder enkripsi
+          encryptionIvDoctor: "iv_placeholder_doctor", // TODO: Generate IV yang aman
+          updatedAt: new Date(),
+        })
+        .where(eq(medicalHistories.id, existingRecord.id));
 
-    const medicalRecordId = newMedicalRecord.id;
+      medicalRecordId = existingRecord.id;
+    } else {
+      const [newMedicalRecord] = await db
+        .insert(medicalHistories)
+        .values({
+          patientId: parseInt(patientId),
+          reservationId: reservationIdValue,
+          doctorId: doctorId,
+          nurseId: doctorId, // Fallback untuk memenuhi NOT NULL
+          encryptedNurseNotes: null,
+          encryptionIvNurse: null,
+          nurseCheckupTimestamp: null,
+          dateOfDiagnosis: new Date().toISOString().split("T")[0],
+          encryptedCondition: condition, // Placeholder enkripsi
+          encryptedDescription: description, // Placeholder enkripsi
+          encryptedTreatment: treatment, // Placeholder enkripsi
+          encryptedDoctorNotes: doctorNotes || null, // Placeholder enkripsi
+          encryptionIvDoctor: "iv_placeholder_doctor", // TODO: Generate IV yang aman
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .returning({ id: medicalHistories.id });
+
+      medicalRecordId = newMedicalRecord.id;
+    }
 
     // 2. Proses Resep jika ada
     if (prescriptionItems && prescriptionItems.length > 0) {
