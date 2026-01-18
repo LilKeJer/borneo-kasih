@@ -6,6 +6,8 @@ import {
   doctorDetails,
   doctorSchedules,
   practiceSessions,
+  medicalHistories,
+  prescriptions,
 } from "@/db/schema";
 import { eq, and, isNull, gte, lte, sql } from "drizzle-orm";
 
@@ -16,6 +18,7 @@ interface QueueItem {
   status: "Waiting" | "In Progress";
   reservationDate: Date;
   reservationStatus: string;
+  isPriority: boolean | null;
 }
 
 // Definisi tipe untuk pengelompokan
@@ -26,6 +29,20 @@ interface DoctorSessionGroup {
   sessionName: string;
 
   queues: QueueItem[];
+}
+
+interface PaymentQueueItem {
+  reservationId: number;
+  queueNumber: number | null;
+  doctorName: string | null;
+  isPriority: boolean | null;
+}
+
+interface PharmacyQueueItem {
+  reservationId: number;
+  queueNumber: number | null;
+  doctorName: string | null;
+  isPriority: boolean | null;
 }
 
 export async function GET() {
@@ -50,6 +67,7 @@ export async function GET() {
         queueNumber: reservations.queueNumber,
         examinationStatus: reservations.examinationStatus,
         status: reservations.status, // Tambahkan status reservasi
+        isPriority: reservations.isPriority,
         reservationDate: reservations.reservationDate,
       })
       .from(reservations)
@@ -103,13 +121,66 @@ export async function GET() {
         status: queue.examinationStatus as "Waiting" | "In Progress",
         reservationStatus: queue.status, // Simpan status reservasi
         reservationDate: queue.reservationDate,
+        isPriority: queue.isPriority ?? false,
       });
 
       return result;
     }, {} as Record<string, DoctorSessionGroup>);
 
+    const paymentQueues: PaymentQueueItem[] = await db
+      .select({
+        reservationId: reservations.id,
+        queueNumber: reservations.queueNumber,
+        doctorName: doctorDetails.name,
+        isPriority: reservations.isPriority,
+      })
+      .from(reservations)
+      .leftJoin(doctorDetails, eq(reservations.doctorId, doctorDetails.userId))
+      .where(
+        and(
+          gte(reservations.reservationDate, today),
+          lte(reservations.reservationDate, nextDay),
+          eq(reservations.examinationStatus, "Waiting for Payment"),
+          eq(reservations.status, "Confirmed"),
+          isNull(reservations.deletedAt)
+        )
+      )
+      .orderBy(doctorDetails.name, reservations.queueNumber);
+
+    const pharmacyQueues: PharmacyQueueItem[] = await db
+      .select({
+        reservationId: reservations.id,
+        queueNumber: reservations.queueNumber,
+        doctorName: doctorDetails.name,
+        isPriority: reservations.isPriority,
+      })
+      .from(prescriptions)
+      .innerJoin(
+        medicalHistories,
+        eq(prescriptions.medicalHistoryId, medicalHistories.id)
+      )
+      .innerJoin(reservations, eq(medicalHistories.reservationId, reservations.id))
+      .leftJoin(doctorDetails, eq(reservations.doctorId, doctorDetails.userId))
+      .where(
+        and(
+          gte(reservations.reservationDate, today),
+          lte(reservations.reservationDate, nextDay),
+          eq(prescriptions.paymentStatus, "Paid"),
+          sql`${prescriptions.dispenseStatus} <> 'Dispensed'`,
+          sql`${reservations.status} <> 'Cancelled'`,
+          isNull(prescriptions.deletedAt),
+          isNull(medicalHistories.deletedAt),
+          isNull(reservations.deletedAt)
+        )
+      )
+      .orderBy(doctorDetails.name, reservations.queueNumber);
+
     return NextResponse.json({
-      data: Object.values(queuesByDoctorAndSession),
+      data: {
+        doctorQueues: Object.values(queuesByDoctorAndSession),
+        paymentQueues,
+        pharmacyQueues,
+      },
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
