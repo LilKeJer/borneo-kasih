@@ -20,7 +20,7 @@ export async function GET() {
     }
 
     // Query reservasi yang:
-    // 1. Status examination = "Completed" atau "Waiting for Payment"
+    // 1. Status examination = "Waiting for Payment" (atau "Completed" untuk data lama)
     // 2. Belum memiliki payment
     const completedReservations = await db
       .select({

@@ -78,6 +78,10 @@ export async function POST(req: NextRequest) {
       }
 
       const reservationData = reservation[0];
+      const allowedExamStatuses = ["Waiting for Payment", "Completed"];
+      if (!allowedExamStatuses.includes(reservationData.examinationStatus ?? "")) {
+        throw new Error("Reservasi belum masuk tahap pembayaran");
+      }
 
       // Cek apakah sudah ada pembayaran
       const existingPayment = await tx
@@ -264,19 +268,14 @@ export async function POST(req: NextRequest) {
           );
       }
 
-      // Update status reservasi
-      // Jika examination sudah completed, pastikan reservation juga completed
-      const updateData: { updatedAt: Date; status?: string } = {
-        updatedAt: new Date(),
-      };
-
-      if (reservationData.examinationStatus === "Completed") {
-        updateData.status = "Completed";
-      }
-
+      // Update status reservasi setelah pembayaran berhasil
       await tx
         .update(reservations)
-        .set(updateData)
+        .set({
+          status: "Completed",
+          examinationStatus: "Completed",
+          updatedAt: new Date(),
+        })
         .where(eq(reservations.id, reservationId));
 
       return {

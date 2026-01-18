@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "10");
     const offset = (page - 1) * limit;
 
-    // Query reservasi yang sudah selesai tapi belum ada pembayaran
+    // Query reservasi yang menunggu pembayaran
     const completedReservations = await db
       .select({
         id: reservations.id,
@@ -48,8 +48,8 @@ export async function GET(req: NextRequest) {
       .leftJoin(doctorDetails, eq(reservations.doctorId, doctorDetails.userId))
       .where(
         and(
-          eq(reservations.examinationStatus, "Completed"),
-          eq(reservations.status, "Completed"),
+          eq(reservations.examinationStatus, "Waiting for Payment"),
+          eq(reservations.status, "Confirmed"),
           isNull(reservations.deletedAt),
           // Subquery untuk memastikan tidak ada pembayaran
           notExists(
@@ -89,8 +89,8 @@ export async function GET(req: NextRequest) {
       .from(reservations)
       .where(
         and(
-          eq(reservations.examinationStatus, "Completed"),
-          eq(reservations.status, "Completed"),
+          eq(reservations.examinationStatus, "Waiting for Payment"),
+          eq(reservations.status, "Confirmed"),
           isNull(reservations.deletedAt),
           notExists(
             db
