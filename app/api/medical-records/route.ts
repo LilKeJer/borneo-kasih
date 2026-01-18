@@ -300,14 +300,23 @@ export async function POST(req: NextRequest) {
 
     // 4. Update status reservasi jika ada reservationId
     if (reservationIdValue !== null) {
-      await db
-        .update(reservations)
-        .set({
-          status: "Completed",
-          examinationStatus: "Completed",
-          updatedAt: new Date(),
-        })
-        .where(eq(reservations.id, reservationIdValue));
+      const reservation = await db.query.reservations.findFirst({
+        where: and(
+          eq(reservations.id, reservationIdValue),
+          isNull(reservations.deletedAt)
+        ),
+      });
+
+      if (reservation && reservation.examinationStatus !== "Completed") {
+        await db
+          .update(reservations)
+          .set({
+            status: "Confirmed",
+            examinationStatus: "Waiting for Payment",
+            updatedAt: new Date(),
+          })
+          .where(eq(reservations.id, reservationIdValue));
+      }
     }
 
     return NextResponse.json(
