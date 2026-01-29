@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/db";
 import { users, reservations } from "@/db/schema";
-import { gte, sql, and } from "drizzle-orm";
+import { gte, sql, and, isNull, inArray } from "drizzle-orm";
 
 export async function GET() {
   try {
@@ -17,7 +17,8 @@ export async function GET() {
     // Get total users
     const totalUsers = await db
       .select({ count: sql<number>`COUNT(*)` })
-      .from(users);
+      .from(users)
+      .where(isNull(users.deletedAt));
 
     // Get patients today (yang ada reservasi hari ini)
     const today = new Date();
@@ -31,7 +32,9 @@ export async function GET() {
       .where(
         and(
           gte(reservations.reservationDate, today),
-          sql`${reservations.reservationDate} < ${tomorrow}`
+          sql`${reservations.reservationDate} < ${tomorrow}`,
+          isNull(reservations.deletedAt),
+          inArray(reservations.status, ["Pending", "Confirmed", "Completed"])
         )
       );
 
@@ -43,7 +46,8 @@ export async function GET() {
         and(
           gte(reservations.reservationDate, today),
           sql`${reservations.reservationDate} < ${tomorrow}`,
-          sql`${reservations.status} IN ('Confirmed', 'In Progress')`
+          isNull(reservations.deletedAt),
+          inArray(reservations.examinationStatus, ["Waiting", "In Progress"])
         )
       );
 
