@@ -149,7 +149,7 @@ export async function PUT(req: NextRequest) {
       case "Patient":
         await db
           .update(patientDetails)
-          .set({ name, email, phone, address })
+          .set({ phone, address })
           .where(eq(patientDetails.userId, userId));
         break;
     }
