@@ -59,22 +59,16 @@ export default function PharmacistDashboardPage() {
   const fetchDashboardStats = async () => {
     setLoadingStats(true);
     try {
-      // --- Mock Data ---
-      // In a real application, you would fetch this from an API endpoint
-      // e.g., const response = await fetch("/api/pharmacist/dashboard-stats");
-      // if (!response.ok) throw new Error("Failed to fetch dashboard stats");
-      // const data = await response.json();
-      // setDashboardStats(data);
-      await new Promise((resolve) => setTimeout(resolve, 800)); // Simulate network delay
-      setDashboardStats({
-        pendingPrescriptions: 5,
-        readyForPickup: 2,
-        medicineInventoryCount: 480,
-        transactionsToday: 12,
-        totalSalesToday: 975000,
-        lowStockCount: 4,
-      });
-      // --- End Mock Data ---
+      const response = await fetch("/api/pharmacist/dashboard");
+      if (!response.ok) throw new Error("Failed to fetch dashboard stats");
+      const data = (await response.json()) as Omit<
+        DashboardStats,
+        "lowStockCount"
+      >;
+      setDashboardStats((prev) => ({
+        ...data,
+        lowStockCount: prev?.lowStockCount ?? 0,
+      }));
     } catch (error) {
       console.error("Error fetching dashboard stats:", error);
       toast.error("Gagal memuat statistik dashboard.");
@@ -90,6 +84,19 @@ export default function PharmacistDashboardPage() {
       if (!response.ok) throw new Error("Failed to fetch low stock medicines");
       const data = await response.json();
       const medicines = Array.isArray(data.medicines) ? data.medicines : [];
+      const lowStockCount =
+        typeof data.summary?.totalLowStockMedicines === "number"
+          ? data.summary.totalLowStockMedicines
+          : medicines.length;
+
+      setDashboardStats((prev) => ({
+        pendingPrescriptions: prev?.pendingPrescriptions ?? 0,
+        readyForPickup: prev?.readyForPickup ?? 0,
+        medicineInventoryCount: prev?.medicineInventoryCount ?? 0,
+        transactionsToday: prev?.transactionsToday ?? 0,
+        totalSalesToday: prev?.totalSalesToday ?? 0,
+        lowStockCount,
+      }));
       setLowStockMedicines(
         medicines.map((medicine: Record<string, unknown>) => ({
           id: Number(medicine.id),

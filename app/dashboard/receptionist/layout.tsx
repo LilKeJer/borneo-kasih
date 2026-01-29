@@ -2,26 +2,13 @@
 import { ReactNode } from "react";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
-import {
-  Users,
-  Calendar,
-  Home,
-  ClipboardList,
-  CreditCard,
-  User,
-  UserPlus,
-} from "lucide-react";
+import { Home, ClipboardList, CreditCard, User, UserPlus } from "lucide-react";
 
 const navItems = [
   {
     title: "Dashboard",
     href: "/dashboard/receptionist",
     icon: <Home className="h-4 w-4" />,
-  },
-  {
-    title: "Appointments",
-    href: "/dashboard/receptionist/appointments",
-    icon: <Calendar className="h-4 w-4" />,
   },
   {
     title: "Antrian",
@@ -32,11 +19,6 @@ const navItems = [
     title: "Walk-in",
     href: "/dashboard/receptionist/walk-in",
     icon: <UserPlus className="h-4 w-4" />,
-  },
-  {
-    title: "Patients",
-    href: "/dashboard/receptionist/patients",
-    icon: <Users className="h-4 w-4" />,
   },
   {
     title: "Payments", // Menu baru

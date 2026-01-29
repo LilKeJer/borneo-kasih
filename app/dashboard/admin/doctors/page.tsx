@@ -1,7 +1,8 @@
 // app/dashboard/admin/doctors/page.tsx
 import { PageHeader } from "@/components/dashboard/page-header";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Download } from "lucide-react";
+import { PlusCircle } from "lucide-react";
 import { DoctorManagementTable } from "@/components/admin/doctor-management-table";
 
 export default function DoctorManagementPage() {
@@ -11,16 +12,12 @@ export default function DoctorManagementPage() {
         title="Manajemen Dokter"
         description="Kelola dokter dan jadwal praktek"
       >
-        <div className="flex items-center gap-2">
-          <Button>
+        <Button asChild>
+          <Link href="/dashboard/admin/staff">
             <PlusCircle className="mr-2 h-4 w-4" />
             Tambah Dokter
-          </Button>
-          <Button variant="outline">
-            <Download className="mr-2 h-4 w-4" />
-            Export
-          </Button>
-        </div>
+          </Link>
+        </Button>
       </PageHeader>
 
       <DoctorManagementTable />
