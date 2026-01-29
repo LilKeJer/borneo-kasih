@@ -22,6 +22,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { formatDate } from "@/lib/utils/date";
+import { useEncryption } from "@/hooks/use-encryption";
 import {
   FileText,
   Calendar,
@@ -41,11 +42,13 @@ interface MedicalRecord {
   date: string;
   doctor: string;
   diagnosis: string;
+  encryptionIvDoctor?: string | null;
 }
 
 interface MedicalRecordDetail extends MedicalRecord {
   description?: string;
   treatment?: string;
+  encryptionIvDoctor?: string | null;
 }
 
 export default function PatientMedicalRecordsPage() {
@@ -58,6 +61,45 @@ export default function PatientMedicalRecordsPage() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const { decrypt, initialize } = useEncryption();
+
+  useEffect(() => {
+    initialize();
+  }, [initialize]);
+
+  const resolveIv = useCallback(
+    (ivString: string | null | undefined, key: string) => {
+      if (!ivString) return null;
+      try {
+        const parsed = JSON.parse(ivString) as Record<string, string>;
+        if (parsed && typeof parsed === "object" && parsed[key]) {
+          return parsed[key];
+        }
+      } catch {
+        // ignore parse errors, fall back to raw iv
+      }
+      return ivString;
+    },
+    []
+  );
+
+  const decryptField = useCallback(
+    async (
+      value: string,
+      ivString: string | null | undefined,
+      key: string
+    ) => {
+      const iv = resolveIv(ivString, key);
+      if (!iv) return null;
+      try {
+        return await decrypt(value, iv);
+      } catch (error) {
+        console.error("Decrypt error:", error);
+        return null;
+      }
+    },
+    [decrypt, resolveIv]
+  );
 
   const fetchMedicalRecords = useCallback(async () => {
     try {
@@ -71,7 +113,24 @@ export default function PatientMedicalRecordsPage() {
       }
 
       const data = await response.json();
-      setRecords(data.data);
+      const rawRecords = data.data || [];
+      const decryptedRecords = await Promise.all(
+        rawRecords.map(async (record: MedicalRecord) => {
+          if (!record.encryptionIvDoctor) {
+            return record;
+          }
+          const decryptedDiagnosis = await decryptField(
+            record.diagnosis,
+            record.encryptionIvDoctor,
+            "condition"
+          );
+          return {
+            ...record,
+            diagnosis: decryptedDiagnosis || "Data terenkripsi",
+          };
+        })
+      );
+      setRecords(decryptedRecords);
       setTotalPages(data.pagination.totalPages);
     } catch (error) {
       console.error("Error fetching medical records:", error);
@@ -79,7 +138,7 @@ export default function PatientMedicalRecordsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page]);
+  }, [page, decryptField]);
 
   useEffect(() => {
     fetchMedicalRecords();
@@ -99,7 +158,40 @@ export default function PatientMedicalRecordsPage() {
       }
 
       const data = await response.json();
-      setRecordDetail(data);
+      const hasIv = Boolean(data.encryptionIvDoctor);
+      const decryptedDiagnosis = hasIv
+        ? await decryptField(
+            data.diagnosis,
+            data.encryptionIvDoctor,
+            "condition"
+          )
+        : null;
+      const decryptedDescription = hasIv
+        ? await decryptField(
+            data.description,
+            data.encryptionIvDoctor,
+            "description"
+          )
+        : null;
+      const decryptedTreatment = hasIv
+        ? await decryptField(
+            data.treatment,
+            data.encryptionIvDoctor,
+            "treatment"
+          )
+        : null;
+      setRecordDetail({
+        ...data,
+        diagnosis: hasIv
+          ? decryptedDiagnosis || "Data terenkripsi"
+          : data.diagnosis,
+        description: hasIv
+          ? decryptedDescription || "Data terenkripsi"
+          : data.description,
+        treatment: hasIv
+          ? decryptedTreatment || "Data terenkripsi"
+          : data.treatment,
+      });
     } catch (error) {
       console.error("Error fetching record detail:", error);
       alert("Gagal memuat detail pemeriksaan");

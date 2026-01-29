@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/table";
 import { Loader2, FileText, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { useEncryption } from "@/hooks/use-encryption";
 
 interface NurseCheckup {
   id: number;
@@ -31,6 +32,7 @@ interface NurseCheckup {
   patientName: string;
   doctorName: string;
   nurseNotes: string | null;
+  encryptionIvNurse?: string | null;
   nurseCheckupTimestamp: string | null;
 }
 
@@ -41,6 +43,11 @@ export default function NurseMedicalRecordsPage() {
     null
   );
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const { decrypt, initialize } = useEncryption();
+
+  useEffect(() => {
+    initialize();
+  }, [initialize]);
 
   const fetchRecords = useCallback(async () => {
     try {
@@ -50,14 +57,32 @@ export default function NurseMedicalRecordsPage() {
         throw new Error("Failed to fetch nurse checkup history");
       }
       const data = await response.json();
-      setRecords(Array.isArray(data.data) ? data.data : []);
+      const rawRecords = Array.isArray(data.data) ? data.data : [];
+      const decryptedRecords = await Promise.all(
+        rawRecords.map(async (record: NurseCheckup) => {
+          if (record.nurseNotes && record.encryptionIvNurse) {
+            try {
+              const decrypted = await decrypt(
+                record.nurseNotes,
+                record.encryptionIvNurse
+              );
+              return { ...record, nurseNotes: decrypted };
+            } catch (error) {
+              console.error("Gagal mendekripsi catatan perawat:", error);
+              return { ...record, nurseNotes: "Data terenkripsi" };
+            }
+          }
+          return record;
+        })
+      );
+      setRecords(decryptedRecords);
     } catch (error) {
       console.error("Error fetching nurse history:", error);
       toast.error("Gagal memuat riwayat pemeriksaan perawat.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [decrypt]);
 
   useEffect(() => {
     fetchRecords();

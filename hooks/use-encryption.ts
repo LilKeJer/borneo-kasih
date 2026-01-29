@@ -1,7 +1,7 @@
 // hooks/use-encryption.ts
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import {
   generateEncryptionKey,
   encryptData,
@@ -13,63 +13,68 @@ import {
 export function useEncryption() {
   const [key, setKey] = useState<CryptoKey | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const keyRef = useRef<CryptoKey | null>(null);
 
   const initialize = useCallback(async () => {
-    if (!key && typeof window !== "undefined") {
-      try {
-        // Check if we have a stored key in localStorage
-        const storedKey = localStorage.getItem("encryptionKey");
-
-        if (storedKey) {
-          // Import the stored key
-          const importedKey = await importEncryptionKey(storedKey);
-          setKey(importedKey);
-        } else {
-          // Generate a new key
-          const newKey = await generateEncryptionKey();
-
-          // Export the key to JWK format and store it
-          const exportedKey = await exportPublicKey(newKey);
-          localStorage.setItem("encryptionKey", exportedKey);
-
-          setKey(newKey);
-        }
-
-        setIsInitialized(true);
-      } catch (error) {
-        console.error("Error initializing encryption:", error);
-      }
+    if (keyRef.current) {
+      return keyRef.current;
     }
-  }, [key]);
+
+    if (typeof window === "undefined") {
+      return null;
+    }
+
+    try {
+      // Check if we have a stored key in localStorage
+      const storedKey = localStorage.getItem("encryptionKey");
+
+      if (storedKey) {
+        // Import the stored key
+        const importedKey = await importEncryptionKey(storedKey);
+        keyRef.current = importedKey;
+        setKey(importedKey);
+      } else {
+        // Generate a new key
+        const newKey = await generateEncryptionKey();
+
+        // Export the key to JWK format and store it
+        const exportedKey = await exportPublicKey(newKey);
+        localStorage.setItem("encryptionKey", exportedKey);
+
+        keyRef.current = newKey;
+        setKey(newKey);
+      }
+
+      setIsInitialized(true);
+      return keyRef.current;
+    } catch (error) {
+      console.error("Error initializing encryption:", error);
+      return null;
+    }
+  }, []);
 
   const encrypt = useCallback(
     async (data: string) => {
-      if (!key) {
-        await initialize();
-      }
-
-      if (!key) {
+      const activeKey = keyRef.current ?? (await initialize());
+      if (!activeKey) {
         throw new Error("Encryption key not initialized");
       }
 
-      return await encryptData(data, key);
+      return await encryptData(data, activeKey);
     },
-    [key, initialize]
+    [initialize]
   );
 
   const decrypt = useCallback(
     async (ciphertext: string, iv: string) => {
-      if (!key) {
-        await initialize();
-      }
-
-      if (!key) {
+      const activeKey = keyRef.current ?? (await initialize());
+      if (!activeKey) {
         throw new Error("Encryption key not initialized");
       }
 
-      return await decryptData(ciphertext, iv, key);
+      return await decryptData(ciphertext, iv, activeKey);
     },
-    [key, initialize]
+    [initialize]
   );
 
   return {

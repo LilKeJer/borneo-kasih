@@ -7,6 +7,7 @@ export const prescriptionItemSchema = z.object({
   dosage: z.string().min(1, "Dosis wajib diisi"),
   frequency: z.string().min(1, "Frekuensi wajib diisi"),
   duration: z.string().min(1, "Durasi wajib diisi"),
+  encryptionIv: z.string().optional(),
   quantity: z.coerce
     .number({ invalid_type_error: "Kuantitas harus angka" })
     .int("Kuantitas harus bilangan bulat")
@@ -32,6 +33,7 @@ export const fullMedicalRecordSchema = z.object({
   description: z.string().min(1, "Deskripsi pemeriksaan wajib diisi"),
   treatment: z.string().min(1, "Penanganan/Perawatan wajib diisi"),
   doctorNotes: z.string().optional().or(z.literal("")), // Memperbolehkan string kosong
+  encryptionIvDoctor: z.string().optional(),
   services: z.array(serviceItemSchema).optional(),
   prescriptions: z.array(prescriptionItemSchema).optional(),
 });

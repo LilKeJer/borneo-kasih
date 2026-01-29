@@ -32,6 +32,7 @@ export async function GET(
         description: medicalHistories.encryptedDescription,
         treatment: medicalHistories.encryptedTreatment,
         doctorNotes: medicalHistories.encryptedDoctorNotes,
+        encryptionIvDoctor: medicalHistories.encryptionIvDoctor,
         dateOfDiagnosis: medicalHistories.dateOfDiagnosis,
         createdAt: medicalHistories.createdAt,
       })
@@ -92,7 +93,8 @@ export async function PUT(
     const resolvedParams = await params;
     const recordId = parseInt(resolvedParams.id);
     const body = await req.json();
-    const { condition, description, treatment, doctorNotes } = body;
+    const { condition, description, treatment, doctorNotes, encryptionIvDoctor } =
+      body;
 
     // Periksa apakah rekam medis ada
     const existingRecord = await db.query.medicalHistories.findFirst({
@@ -119,6 +121,8 @@ export async function PUT(
         encryptedTreatment: treatment || existingRecord.encryptedTreatment,
         encryptedDoctorNotes:
           doctorNotes || existingRecord.encryptedDoctorNotes,
+        encryptionIvDoctor:
+          encryptionIvDoctor || existingRecord.encryptionIvDoctor,
         updatedAt: new Date(),
       })
       .where(eq(medicalHistories.id, recordId));

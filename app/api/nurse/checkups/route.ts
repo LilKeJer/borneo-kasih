@@ -49,6 +49,7 @@ export async function GET(req: NextRequest) {
       id: existingRecord.id,
       reservationId: existingRecord.reservationId,
       nurseNotes: existingRecord.encryptedNurseNotes || "",
+      encryptionIvNurse: existingRecord.encryptionIvNurse || null,
       nurseCheckupTimestamp: existingRecord.nurseCheckupTimestamp,
     });
   } catch (error) {
@@ -69,7 +70,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { reservationId, nurseNotes } = body;
+    const { reservationId, nurseNotes, encryptionIvNurse } = body;
     const reservationIdNumber = Number(reservationId);
 
     if (!reservationId || Number.isNaN(reservationIdNumber)) {
@@ -130,7 +131,7 @@ export async function POST(req: NextRequest) {
         .set({
           nurseId,
           encryptedNurseNotes: trimmedNotes,
-          encryptionIvNurse: "iv_placeholder_nurse",
+          encryptionIvNurse: encryptionIvNurse ?? null,
           nurseCheckupTimestamp: new Date(),
           updatedAt: new Date(),
         })
@@ -150,7 +151,7 @@ export async function POST(req: NextRequest) {
         doctorId: reservation.doctorId,
         nurseId,
         encryptedNurseNotes: trimmedNotes,
-        encryptionIvNurse: "iv_placeholder_nurse",
+        encryptionIvNurse: encryptionIvNurse ?? null,
         nurseCheckupTimestamp: new Date(),
         createdAt: new Date(),
         updatedAt: new Date(),

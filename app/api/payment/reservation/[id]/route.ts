@@ -159,6 +159,7 @@ export async function GET(
         dosage: prescriptionMedicines.encryptedDosage,
         frequency: prescriptionMedicines.encryptedFrequency,
         duration: prescriptionMedicines.encryptedDuration,
+        encryptionIv: prescriptionMedicines.encryptionIv,
         quantityUsed: prescriptionMedicines.quantityUsed,
       })
       .from(medicalHistories)

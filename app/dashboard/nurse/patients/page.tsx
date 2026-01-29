@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/table";
 import { toast } from "sonner";
 import { Loader2, RefreshCw, Search } from "lucide-react";
+import { useEncryption } from "@/hooks/use-encryption";
 
 interface QueueItem {
   id: number;
@@ -60,6 +61,11 @@ export default function NursePatientsPage() {
   const [notesLoading, setNotesLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [lastCheckupAt, setLastCheckupAt] = useState<string | null>(null);
+  const { encrypt, decrypt, initialize } = useEncryption();
+
+  useEffect(() => {
+    initialize();
+  }, [initialize]);
 
   const fetchQueueData = useCallback(async () => {
     try {
@@ -143,7 +149,20 @@ export default function NursePatientsPage() {
       if (response.ok) {
         const data = await response.json();
         if (data.exists) {
-          setNurseNotes(data.nurseNotes || "");
+          if (data.nurseNotes && data.encryptionIvNurse) {
+            try {
+              const decrypted = await decrypt(
+                data.nurseNotes,
+                data.encryptionIvNurse
+              );
+              setNurseNotes(decrypted);
+            } catch (error) {
+              console.error("Gagal mendekripsi catatan perawat:", error);
+              setNurseNotes("Data terenkripsi");
+            }
+          } else {
+            setNurseNotes(data.nurseNotes || "");
+          }
           setLastCheckupAt(data.nurseCheckupTimestamp || null);
         }
       }
@@ -163,6 +182,7 @@ export default function NursePatientsPage() {
 
     try {
       setSaving(true);
+      const encrypted = await encrypt(nurseNotes);
       const response = await fetch("/api/nurse/checkups", {
         method: "POST",
         headers: {
@@ -170,7 +190,8 @@ export default function NursePatientsPage() {
         },
         body: JSON.stringify({
           reservationId: selectedQueue.id,
-          nurseNotes,
+          nurseNotes: encrypted.ciphertext,
+          encryptionIvNurse: encrypted.iv,
         }),
       });
 

@@ -1,7 +1,7 @@
 // components/doctor/FullMedicalRecordForm.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -35,6 +35,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, PlusCircle, Trash2 } from "lucide-react";
 import { type Service as ApiServiceType } from "@/types/payment"; // Asumsi tipe ini ada dan sesuai
 import { type Medicine as ApiMedicineType } from "@/types/pharmacy"; // Tipe dari langkah 1.1
+import { useEncryption } from "@/hooks/use-encryption";
 
 interface FullMedicalRecordFormProps {
   patientId: string;
@@ -54,6 +55,7 @@ export function FullMedicalRecordForm({
   onCancel,
 }: FullMedicalRecordFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { encrypt, initialize } = useEncryption();
 
   const form = useForm<FullMedicalRecordFormValues>({
     resolver: zodResolver(fullMedicalRecordSchema),
@@ -87,17 +89,75 @@ export function FullMedicalRecordForm({
     name: "prescriptions",
   });
 
+  useEffect(() => {
+    initialize();
+  }, [initialize]);
+
   async function onSubmit(data: FullMedicalRecordFormValues) {
     setIsSubmitting(true);
     try {
+      const doctorIvMap: Record<string, string> = {};
+      const encryptDoctorField = async (value: string, key: string) => {
+        const { ciphertext, iv } = await encrypt(value);
+        doctorIvMap[key] = iv;
+        return ciphertext;
+      };
+
+      const encryptedCondition = await encryptDoctorField(
+        data.condition,
+        "condition"
+      );
+      const encryptedDescription = await encryptDoctorField(
+        data.description,
+        "description"
+      );
+      const encryptedTreatment = await encryptDoctorField(
+        data.treatment,
+        "treatment"
+      );
+      const encryptedDoctorNotes = data.doctorNotes?.trim()
+        ? await encryptDoctorField(data.doctorNotes, "doctorNotes")
+        : "";
+
+      const encryptedPrescriptions = data.prescriptions
+        ? await Promise.all(
+            data.prescriptions.map(async (item) => {
+              const ivMap: Record<string, string> = {};
+              const { ciphertext: encryptedDosage, iv: dosageIv } =
+                await encrypt(item.dosage);
+              const { ciphertext: encryptedFrequency, iv: frequencyIv } =
+                await encrypt(item.frequency);
+              const { ciphertext: encryptedDuration, iv: durationIv } =
+                await encrypt(item.duration);
+
+              ivMap.dosage = dosageIv;
+              ivMap.frequency = frequencyIv;
+              ivMap.duration = durationIv;
+
+              return {
+                ...item,
+                dosage: encryptedDosage,
+                frequency: encryptedFrequency,
+                duration: encryptedDuration,
+                encryptionIv: JSON.stringify(ivMap),
+              };
+            })
+          )
+        : [];
+
       // Pastikan data yang dikirim sesuai dengan ekspektasi API
       const payload = {
         ...data,
+        condition: encryptedCondition,
+        description: encryptedDescription,
+        treatment: encryptedTreatment,
+        doctorNotes: encryptedDoctorNotes,
+        encryptionIvDoctor: JSON.stringify(doctorIvMap),
         services:
           data.services?.map((s) => ({ ...s, quantity: Number(s.quantity) })) ||
           [],
         prescriptions:
-          data.prescriptions?.map((p) => ({
+          encryptedPrescriptions.map((p) => ({
             ...p,
             quantity: Number(p.quantity),
           })) || [],
