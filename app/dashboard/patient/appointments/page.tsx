@@ -119,7 +119,7 @@ export default function AppointmentsPage() {
   };
 
   const canModifyAppointment = (status: string) => {
-    return status === "Pending" || status === "Confirmed";
+    return status === "Pending";
   };
 
   const formatDateTime = (dateString: string) => {
