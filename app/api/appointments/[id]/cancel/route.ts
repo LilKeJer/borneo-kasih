@@ -3,8 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/db";
-import { reservations, dailyScheduleStatuses } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { reservations, dailyScheduleStatuses, payments } from "@/db/schema";
+import { eq, and, isNull } from "drizzle-orm";
 
 export async function PUT(
   req: NextRequest,
@@ -36,13 +36,44 @@ export async function PUT(
       );
     }
 
-    // Check if appointment can be cancelled (only pending and confirmed)
+    // Check if appointment can be cancelled (only before check-in/payment)
+    if (appointment.status !== "Pending") {
+      return NextResponse.json(
+        { message: "Janji temu hanya dapat dibatalkan sebelum check-in" },
+        { status: 400 }
+      );
+    }
+
+    const blockedExamStatuses = new Set([
+      "In Progress",
+      "Waiting for Payment",
+      "Completed",
+      "Cancelled",
+    ]);
     if (
-      appointment.status !== "Pending" &&
-      appointment.status !== "Confirmed"
+      appointment.examinationStatus &&
+      blockedExamStatuses.has(appointment.examinationStatus)
     ) {
       return NextResponse.json(
         { message: "Janji temu tidak dapat dibatalkan" },
+        { status: 400 }
+      );
+    }
+
+    const existingPayment = await db
+      .select({ id: payments.id })
+      .from(payments)
+      .where(
+        and(
+          eq(payments.reservationId, appointmentId),
+          isNull(payments.deletedAt)
+        )
+      )
+      .limit(1);
+
+    if (existingPayment.length > 0) {
+      return NextResponse.json(
+        { message: "Janji temu tidak dapat dibatalkan karena sudah dibayar" },
         { status: 400 }
       );
     }
