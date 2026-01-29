@@ -18,12 +18,14 @@ interface MedicineData {
   frequency: string;
   duration: string;
   quantity: number;
+  encryptionIv?: string | null;
 }
 
 interface PrescriptionGroup {
   date: string;
   doctorName: string;
   diagnosis: string;
+  encryptionIvDoctor?: string | null;
   medicines: MedicineData[];
 }
 
@@ -43,6 +45,7 @@ export async function GET() {
         // Medical record data
         visitDate: medicalHistories.createdAt,
         diagnosis: medicalHistories.encryptedCondition,
+        encryptionIvDoctor: medicalHistories.encryptionIvDoctor,
         doctorName: users.username,
 
         // Prescription data
@@ -53,6 +56,7 @@ export async function GET() {
         dosage: prescriptionMedicines.encryptedDosage,
         frequency: prescriptionMedicines.encryptedFrequency,
         duration: prescriptionMedicines.encryptedDuration,
+        encryptionIv: prescriptionMedicines.encryptionIv,
         quantity: prescriptionMedicines.quantityUsed,
       })
       .from(medicalHistories)
@@ -81,6 +85,7 @@ export async function GET() {
           date: row.visitDate?.toISOString().split("T")[0] || "No date",
           doctorName: `Dr. ${row.doctorName}` || "Unknown Doctor",
           diagnosis: row.diagnosis || "General Checkup",
+          encryptionIvDoctor: row.encryptionIvDoctor || null,
           medicines: [],
         };
       }
@@ -91,6 +96,7 @@ export async function GET() {
           dosage: row.dosage || "See doctor",
           frequency: row.frequency || "See doctor",
           duration: row.duration || "See doctor",
+          encryptionIv: row.encryptionIv || null,
           quantity: row.quantity || 0,
         });
       }

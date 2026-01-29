@@ -56,6 +56,7 @@ export async function GET(req: NextRequest) {
         patientName: patientDetails.name,
         doctorName: doctorDetails.name,
         nurseNotes: medicalHistories.encryptedNurseNotes,
+        encryptionIvNurse: medicalHistories.encryptionIvNurse,
         nurseCheckupTimestamp: medicalHistories.nurseCheckupTimestamp,
       })
       .from(medicalHistories)

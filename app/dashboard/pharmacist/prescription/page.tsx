@@ -115,6 +115,19 @@ export default function PrescriptionsPage() {
     if (!encryptionInitialized || !prescription) return;
     setLoading(true);
     try {
+      const resolveIv = (ivString: string | null, key: string) => {
+        if (!ivString) return null;
+        try {
+          const parsed = JSON.parse(ivString) as Record<string, string>;
+          if (parsed && typeof parsed === "object" && parsed[key]) {
+            return parsed[key];
+          }
+        } catch {
+          // ignore parse errors, fall back to raw iv
+        }
+        return ivString;
+      };
+
       const decrypted: DecryptedMedicine[] = await Promise.all(
         prescription.medicines.map(async (med) => {
           if (
@@ -123,14 +136,22 @@ export default function PrescriptionsPage() {
             med.encryptedDuration &&
             med.encryptionIv
           ) {
+            const dosageIv = resolveIv(med.encryptionIv, "dosage");
+            const frequencyIv = resolveIv(med.encryptionIv, "frequency");
+            const durationIv = resolveIv(med.encryptionIv, "duration");
+
+            if (!dosageIv || !frequencyIv || !durationIv) {
+              return { ...med, dosage: "-", frequency: "-", duration: "-" };
+            }
+
             return {
               ...med,
-              dosage: await decrypt(med.encryptedDosage, med.encryptionIv),
+              dosage: await decrypt(med.encryptedDosage, dosageIv),
               frequency: await decrypt(
                 med.encryptedFrequency,
-                med.encryptionIv
+                frequencyIv
               ),
-              duration: await decrypt(med.encryptedDuration, med.encryptionIv),
+              duration: await decrypt(med.encryptedDuration, durationIv),
             };
           }
           return { ...med, dosage: "-", frequency: "-", duration: "-" }; // Fallback

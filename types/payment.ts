@@ -58,6 +58,7 @@ export interface PrescriptionData {
   dosage: string | null;
   frequency: string | null;
   duration: string | null;
+  encryptionIv?: string | null;
   quantityUsed: number;
 }
 

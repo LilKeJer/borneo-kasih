@@ -48,6 +48,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { formatRupiah } from "@/lib/utils";
+import { useEncryption } from "@/hooks/use-encryption";
 import {
   Trash2,
   Plus,
@@ -110,6 +111,7 @@ export function PaymentForm({
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingPaymentData, setPendingPaymentData] =
     useState<PaymentFormValues | null>(null);
+  const { decrypt, initialize } = useEncryption();
 
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentSchema),
@@ -118,6 +120,10 @@ export function PaymentForm({
       notes: "",
     },
   });
+
+  useEffect(() => {
+    initialize();
+  }, [initialize]);
 
   // Hitung total amount setiap kali paymentItems berubah
   useEffect(() => {
@@ -199,20 +205,58 @@ export function PaymentForm({
   };
 
   // Tambah prescription items
-  const addPrescriptionItems = () => {
-    const newItems: PaymentItem[] = prescriptions
-      .filter((prescription) =>
-        selectedPrescriptions.has(prescription.prescriptionId)
-      )
-      .map((prescription) => {
+  const addPrescriptionItems = async () => {
+    const resolveIv = (ivString: string | null | undefined, key: string) => {
+      if (!ivString) return null;
+      try {
+        const parsed = JSON.parse(ivString) as Record<string, string>;
+        if (parsed && typeof parsed === "object" && parsed[key]) {
+          return parsed[key];
+        }
+      } catch {
+        // ignore parse errors, fall back to raw iv
+      }
+      return ivString || null;
+    };
+
+    const selectedItems = prescriptions.filter((prescription) =>
+      selectedPrescriptions.has(prescription.prescriptionId)
+    );
+
+    const newItems: PaymentItem[] = await Promise.all(
+      selectedItems.map(async (prescription) => {
         const unitPrice = parseFloat(prescription.medicinePrice);
         const quantity = prescription.quantityUsed;
         const subtotal = unitPrice * quantity;
-        const notesParts = [
-          prescription.dosage,
-          prescription.frequency,
-          prescription.duration,
-        ].filter(Boolean);
+
+        let dosage = prescription.dosage;
+        let frequency = prescription.frequency;
+        let duration = prescription.duration;
+
+        if (prescription.encryptionIv && dosage && frequency && duration) {
+          try {
+            const dosageIv = resolveIv(prescription.encryptionIv, "dosage");
+            const frequencyIv = resolveIv(prescription.encryptionIv, "frequency");
+            const durationIv = resolveIv(prescription.encryptionIv, "duration");
+
+            if (dosageIv) {
+              dosage = await decrypt(dosage, dosageIv);
+            }
+            if (frequencyIv) {
+              frequency = await decrypt(frequency, frequencyIv);
+            }
+            if (durationIv) {
+              duration = await decrypt(duration, durationIv);
+            }
+          } catch (error) {
+            console.error("Gagal mendekripsi resep:", error);
+            dosage = "Data terenkripsi";
+            frequency = "Data terenkripsi";
+            duration = "Data terenkripsi";
+          }
+        }
+
+        const notesParts = [dosage, frequency, duration].filter(Boolean);
         const notes = notesParts.length > 0 ? notesParts.join(" - ") : undefined;
 
         return {
@@ -225,7 +269,8 @@ export function PaymentForm({
           subtotal: subtotal,
           notes: notes,
         };
-      });
+      })
+    );
 
     setPaymentItems((prev) => [...prev, ...newItems]);
     setSelectedPrescriptions(new Set());

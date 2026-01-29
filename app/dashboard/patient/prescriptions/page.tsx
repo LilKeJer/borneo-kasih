@@ -1,7 +1,7 @@
 // app/dashboard/patient/prescriptions/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,6 +17,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils/date";
+import { useEncryption } from "@/hooks/use-encryption";
 
 interface Medicine {
   name: string;
@@ -24,12 +25,14 @@ interface Medicine {
   frequency: string;
   duration: string;
   quantity: number;
+  encryptionIv?: string | null;
 }
 
 interface Prescription {
   date: string;
   doctorName: string;
   diagnosis: string;
+  encryptionIvDoctor?: string | null;
   medicines: Medicine[];
 }
 
@@ -37,12 +40,13 @@ export default function PatientPrescriptionsPage() {
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { decrypt, initialize } = useEncryption();
 
   useEffect(() => {
-    fetchPrescriptions();
-  }, []);
+    initialize();
+  }, [initialize]);
 
-  const fetchPrescriptions = async () => {
+  const fetchPrescriptions = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -54,15 +58,94 @@ export default function PatientPrescriptionsPage() {
       }
 
       const data = await response.json();
+      const rawPrescriptions = data.prescriptions || [];
 
-      setPrescriptions(data.prescriptions);
+      const resolveIv = (ivString: string | null | undefined, key: string) => {
+        if (!ivString) return null;
+        try {
+          const parsed = JSON.parse(ivString) as Record<string, string>;
+          if (parsed && typeof parsed === "object" && parsed[key]) {
+            return parsed[key];
+          }
+        } catch {
+          // ignore parse errors, fall back to raw iv
+        }
+        return ivString;
+      };
+
+      const decryptedPrescriptions = await Promise.all(
+        rawPrescriptions.map(async (prescription: Prescription) => {
+          let decryptedDiagnosis = prescription.diagnosis;
+          if (prescription.encryptionIvDoctor) {
+            try {
+              const iv = resolveIv(
+                prescription.encryptionIvDoctor,
+                "condition"
+              );
+              if (iv) {
+                decryptedDiagnosis = await decrypt(prescription.diagnosis, iv);
+              }
+            } catch (error) {
+              console.error("Gagal mendekripsi diagnosis:", error);
+              decryptedDiagnosis = "Data terenkripsi";
+            }
+          }
+
+          const decryptedMedicines = await Promise.all(
+            prescription.medicines.map(async (medicine) => {
+              if (!medicine.encryptionIv) {
+                return medicine;
+              }
+
+              try {
+                const dosageIv = resolveIv(medicine.encryptionIv, "dosage");
+                const frequencyIv = resolveIv(medicine.encryptionIv, "frequency");
+                const durationIv = resolveIv(medicine.encryptionIv, "duration");
+
+                return {
+                  ...medicine,
+                  dosage: dosageIv
+                    ? await decrypt(medicine.dosage, dosageIv)
+                    : medicine.dosage,
+                  frequency: frequencyIv
+                    ? await decrypt(medicine.frequency, frequencyIv)
+                    : medicine.frequency,
+                  duration: durationIv
+                    ? await decrypt(medicine.duration, durationIv)
+                    : medicine.duration,
+                };
+              } catch (error) {
+                console.error("Gagal mendekripsi resep:", error);
+                return {
+                  ...medicine,
+                  dosage: "Data terenkripsi",
+                  frequency: "Data terenkripsi",
+                  duration: "Data terenkripsi",
+                };
+              }
+            })
+          );
+
+          return {
+            ...prescription,
+            diagnosis: decryptedDiagnosis,
+            medicines: decryptedMedicines,
+          };
+        })
+      );
+
+      setPrescriptions(decryptedPrescriptions);
     } catch (err) {
       setError("Gagal memuat data resep. Silakan coba lagi.");
       console.error("Error loading prescriptions:", err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [decrypt]);
+
+  useEffect(() => {
+    fetchPrescriptions();
+  }, [fetchPrescriptions]);
 
   if (loading) {
     return (

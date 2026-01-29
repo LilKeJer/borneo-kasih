@@ -30,6 +30,7 @@ export async function GET(
         condition: medicalHistories.encryptedCondition,
         description: medicalHistories.encryptedDescription,
         treatment: medicalHistories.encryptedTreatment,
+        encryptionIvDoctor: medicalHistories.encryptionIvDoctor,
         createdAt: medicalHistories.createdAt,
         doctorName: users.username,
       })
@@ -57,6 +58,7 @@ export async function GET(
       diagnosis: record[0].condition || "Pemeriksaan Umum",
       description: record[0].description || "Tidak ada deskripsi",
       treatment: record[0].treatment || "Tidak ada penanganan",
+      encryptionIvDoctor: record[0].encryptionIvDoctor || null,
     });
   } catch (error) {
     console.error("Error fetching medical record detail:", error);

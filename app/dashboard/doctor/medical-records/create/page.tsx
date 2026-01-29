@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { type Service as ApiServiceType } from "@/types/payment";
 import { type Medicine as ApiMedicineType } from "@/types/pharmacy";
+import { useEncryption } from "@/hooks/use-encryption";
 
 interface PatientData {
   id: string;
@@ -48,6 +49,11 @@ function CreateMedicalRecordContent() {
     string | null
   >(null);
   const [error, setError] = useState<string | null>(null);
+  const { decrypt, initialize } = useEncryption();
+
+  useEffect(() => {
+    initialize();
+  }, [initialize]);
 
   useEffect(() => {
     if (!patientIdParam) {
@@ -92,7 +98,20 @@ function CreateMedicalRecordContent() {
           if (nurseRes.ok) {
             const nurseData = await nurseRes.json();
             if (nurseData.exists) {
-              setNurseNotes(nurseData.nurseNotes || "");
+              if (nurseData.nurseNotes && nurseData.encryptionIvNurse) {
+                try {
+                  const decrypted = await decrypt(
+                    nurseData.nurseNotes,
+                    nurseData.encryptionIvNurse
+                  );
+                  setNurseNotes(decrypted);
+                } catch (error) {
+                  console.error("Gagal mendekripsi catatan perawat:", error);
+                  setNurseNotes("Data terenkripsi");
+                }
+              } else {
+                setNurseNotes(nurseData.nurseNotes || "");
+              }
               setNurseCheckupTimestamp(
                 nurseData.nurseCheckupTimestamp || null
               );
@@ -114,7 +133,7 @@ function CreateMedicalRecordContent() {
       }
     }
     fetchData();
-  }, [patientIdParam]);
+  }, [patientIdParam, reservationIdParam, decrypt]);
 
   const handleSuccess = (medicalRecordId: number, prescriptionId?: number) => {
     // Tampilkan notifikasi sukses

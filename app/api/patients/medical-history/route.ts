@@ -28,6 +28,7 @@ export async function GET(req: NextRequest) {
         id: medicalHistories.id,
         dateOfDiagnosis: medicalHistories.dateOfDiagnosis,
         condition: medicalHistories.encryptedCondition,
+        encryptionIvDoctor: medicalHistories.encryptionIvDoctor,
         createdAt: medicalHistories.createdAt,
         doctorName: users.username,
       })
@@ -50,6 +51,7 @@ export async function GET(req: NextRequest) {
         date: history.dateOfDiagnosis || history.createdAt,
         doctor: `Dr. ${history.doctorName}`,
         diagnosis: history.condition || "Pemeriksaan Umum",
+        encryptionIvDoctor: history.encryptionIvDoctor || null,
       })),
       pagination: {
         page,

@@ -46,6 +46,7 @@ export async function POST(req: NextRequest) {
       description,
       treatment,
       doctorNotes,
+      encryptionIvDoctor,
 
       services: serviceItems,
       prescriptions: prescriptionItems, // Array of PrescriptionItemFormValues
@@ -78,18 +79,17 @@ export async function POST(req: NextRequest) {
           });
 
     // 1. Simpan atau perbarui Medical History
-    // TODO: Implementasi enkripsi yang aman untuk field di bawah ini
     if (existingRecord) {
       await db
         .update(medicalHistories)
         .set({
           doctorId: doctorId,
           dateOfDiagnosis: new Date().toISOString().split("T")[0],
-          encryptedCondition: condition, // Placeholder enkripsi
-          encryptedDescription: description, // Placeholder enkripsi
-          encryptedTreatment: treatment, // Placeholder enkripsi
-          encryptedDoctorNotes: doctorNotes || null, // Placeholder enkripsi
-          encryptionIvDoctor: "iv_placeholder_doctor", // TODO: Generate IV yang aman
+          encryptedCondition: condition,
+          encryptedDescription: description,
+          encryptedTreatment: treatment,
+          encryptedDoctorNotes: doctorNotes || null,
+          encryptionIvDoctor: encryptionIvDoctor ?? null,
           updatedAt: new Date(),
         })
         .where(eq(medicalHistories.id, existingRecord.id));
@@ -107,11 +107,11 @@ export async function POST(req: NextRequest) {
           encryptionIvNurse: null,
           nurseCheckupTimestamp: null,
           dateOfDiagnosis: new Date().toISOString().split("T")[0],
-          encryptedCondition: condition, // Placeholder enkripsi
-          encryptedDescription: description, // Placeholder enkripsi
-          encryptedTreatment: treatment, // Placeholder enkripsi
-          encryptedDoctorNotes: doctorNotes || null, // Placeholder enkripsi
-          encryptionIvDoctor: "iv_placeholder_doctor", // TODO: Generate IV yang aman
+          encryptedCondition: condition,
+          encryptedDescription: description,
+          encryptedTreatment: treatment,
+          encryptedDoctorNotes: doctorNotes || null,
+          encryptionIvDoctor: encryptionIvDoctor ?? null,
           createdAt: new Date(),
           updatedAt: new Date(),
         })
@@ -275,19 +275,14 @@ export async function POST(req: NextRequest) {
             );
           }
 
-          // TODO: Implementasi enkripsi yang aman untuk field di bawah ini
-          const placeholderIv = `iv_placeholder_${
-            item.medicineId
-          }_${Date.now()}`;
-
           return {
             prescriptionId: newPrescriptionId!,
             medicineId: parseInt(item.medicineId),
             stockId: suitableStock[0].id, // Gunakan ID batch yang terpilih
-            encryptedDosage: item.dosage, // TANPA ENKRIPSI SEMENTARA
-            encryptedFrequency: item.frequency, // TANPA ENKRIPSI SEMENTARA
-            encryptedDuration: item.duration, // TANPA ENKRIPSI SEMENTARA
-            encryptionIv: placeholderIv,
+            encryptedDosage: item.dosage, // ciphertext dari client
+            encryptedFrequency: item.frequency, // ciphertext dari client
+            encryptedDuration: item.duration, // ciphertext dari client
+            encryptionIv: item.encryptionIv ?? null,
             quantityUsed: item.quantity,
             notes: item.notes || null,
             createdAt: new Date(),
