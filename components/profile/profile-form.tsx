@@ -65,21 +65,18 @@ export function ProfileForm() {
   const schema = createProfileSchema(user?.role || "");
   type ProfileFormValues =
     | {
-        role: "Doctor";
         name: string;
         email: string;
         phone?: string;
         specialization?: string;
       }
     | {
-        role: "Patient";
         name: string;
         email: string;
         phone?: string;
         address?: string;
       }
     | {
-        role?: string;
         name: string;
         email: string;
         phone?: string;
@@ -127,12 +124,23 @@ export function ProfileForm() {
   async function onSubmit(values: ProfileFormValues) {
     setIsLoading(true);
     try {
+      const payload =
+        user?.role === "Patient"
+          ? {
+              phone: values.phone,
+              address:
+                "address" in values
+                  ? values.address
+                  : profile?.address || "",
+            }
+          : values;
+
       const response = await fetch("/api/profile", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(values),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) throw new Error("Failed to update profile");
@@ -194,7 +202,11 @@ export function ProfileForm() {
               <FormItem>
                 <FormLabel>Nama Lengkap</FormLabel>
                 <FormControl>
-                  <Input placeholder="Nama Lengkap" {...field} />
+                  <Input
+                    placeholder="Nama Lengkap"
+                    {...field}
+                    disabled={user?.role === "Patient"}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -212,6 +224,7 @@ export function ProfileForm() {
                     type="email"
                     placeholder="email@example.com"
                     {...field}
+                    disabled={user?.role === "Patient"}
                   />
                 </FormControl>
                 <FormMessage />
