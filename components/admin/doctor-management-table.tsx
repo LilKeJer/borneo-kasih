@@ -1,7 +1,7 @@
 // components/admin/doctor-management-table.tsx
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Table,
   TableBody,
@@ -10,76 +10,125 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Search, Edit, Trash, Calendar } from "lucide-react";
+import { Search } from "lucide-react";
+import { toast } from "sonner";
 
-// Data dummy untuk dokter
-const dummyDoctors = [
-  {
-    id: "1",
-    name: "Dr. Borneo",
-    specialization: "Umum",
-    email: "dokter@borneokasih.com",
-    phone: "08123456790",
-    status: "Active",
-    schedule: ["Senin (Pagi)", "Rabu (Pagi)", "Jumat (Malam)"],
-  },
-  {
-    id: "2",
-    name: "Dr. Siti Aisyah",
-    specialization: "Anak",
-    email: "siti@borneokasih.com",
-    phone: "08567891234",
-    status: "Active",
-    schedule: ["Selasa (Pagi)", "Kamis (Pagi)", "Sabtu (Pagi)"],
-  },
-  {
-    id: "3",
-    name: "Dr. Ahmad Jailani",
-    specialization: "Penyakit Dalam",
-    email: "ahmad@borneokasih.com",
-    phone: "08123987456",
-    status: "Active",
-    schedule: ["Senin (Malam)", "Rabu (Malam)", "Jumat (Pagi)"],
-  },
-  {
-    id: "4",
-    name: "Dr. Putri Handayani",
-    specialization: "Kandungan",
-    email: "putri@borneokasih.com",
-    phone: "08789456123",
-    status: "Active",
-    schedule: ["Selasa (Malam)", "Kamis (Malam)", "Sabtu (Malam)"],
-  },
-  {
-    id: "5",
-    name: "Dr. Budi Santoso",
-    specialization: "Umum",
-    email: "budi@borneokasih.com",
-    phone: "08234567890",
-    status: "Inactive",
-    schedule: [],
-  },
+interface ApiDoctor {
+  id: number;
+  username: string;
+  status?: string | null;
+  details?: {
+    name?: string | null;
+    specialization?: string | null;
+    email?: string | null;
+    phone?: string | null;
+  } | null;
+}
+
+interface ApiSchedule {
+  doctorId: number;
+  dayOfWeek: number;
+  sessionName: string | null;
+  isActive: boolean | null;
+}
+
+interface DoctorRow {
+  id: number;
+  name: string;
+  specialization: string;
+  email: string;
+  phone: string;
+  status: string;
+  schedules: string[];
+}
+
+const dayLabels = [
+  "Minggu",
+  "Senin",
+  "Selasa",
+  "Rabu",
+  "Kamis",
+  "Jumat",
+  "Sabtu",
 ];
 
 export function DoctorManagementTable() {
+  const [doctors, setDoctors] = useState<DoctorRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Filter dokter berdasarkan pencarian
-  const filteredDoctors = dummyDoctors.filter(
-    (doctor) =>
-      doctor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doctor.specialization.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doctor.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  useEffect(() => {
+    const fetchDoctors = async () => {
+      try {
+        setLoading(true);
+        const [doctorsRes, schedulesRes] = await Promise.all([
+          fetch("/api/staff?role=Doctor&limit=1000"),
+          fetch("/api/doctor-schedules"),
+        ]);
+
+        if (!doctorsRes.ok) {
+          throw new Error("Gagal memuat data dokter");
+        }
+
+        const doctorsPayload = await doctorsRes.json();
+        const doctorData = Array.isArray(doctorsPayload.data)
+          ? (doctorsPayload.data as ApiDoctor[])
+          : [];
+
+        const schedulesPayload = schedulesRes.ok
+          ? await schedulesRes.json()
+          : [];
+        const schedules = Array.isArray(schedulesPayload)
+          ? (schedulesPayload as ApiSchedule[])
+          : [];
+
+        const scheduleMap = new Map<number, string[]>();
+        schedules.forEach((schedule) => {
+          if (!schedule.doctorId) return;
+          if (schedule.isActive === false) return;
+          const dayLabel =
+            dayLabels[schedule.dayOfWeek] ?? `Hari ${schedule.dayOfWeek}`;
+          const sessionName = schedule.sessionName || "Sesi";
+          const label = `${dayLabel} (${sessionName})`;
+          const existing = scheduleMap.get(schedule.doctorId) ?? [];
+          if (!existing.includes(label)) {
+            scheduleMap.set(schedule.doctorId, [...existing, label]);
+          }
+        });
+
+        const rows: DoctorRow[] = doctorData.map((doctor) => ({
+          id: Number(doctor.id),
+          name: doctor.details?.name || doctor.username,
+          specialization: doctor.details?.specialization || "-",
+          email: doctor.details?.email || "-",
+          phone: doctor.details?.phone || "-",
+          status: doctor.status || "Active",
+          schedules: scheduleMap.get(Number(doctor.id)) ?? [],
+        }));
+
+        setDoctors(rows);
+      } catch (error) {
+        console.error("Error fetching doctors:", error);
+        toast.error("Gagal memuat data dokter");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDoctors();
+  }, []);
+
+  const filteredDoctors = useMemo(() => {
+    if (!searchTerm.trim()) return doctors;
+    const keyword = searchTerm.toLowerCase();
+    return doctors.filter((doctor) =>
+      [doctor.name, doctor.specialization, doctor.email]
+        .filter(Boolean)
+        .some((value) => value.toLowerCase().includes(keyword))
+    );
+  }, [doctors, searchTerm]);
 
   return (
     <div className="space-y-4">
@@ -106,77 +155,57 @@ export function DoctorManagementTable() {
               <TableHead>Telepon</TableHead>
               <TableHead>Jadwal</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="text-right">Aksi</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredDoctors.map((doctor) => (
-              <TableRow key={doctor.id}>
-                <TableCell className="font-medium">{doctor.name}</TableCell>
-                <TableCell>{doctor.specialization}</TableCell>
-                <TableCell>{doctor.email}</TableCell>
-                <TableCell>{doctor.phone}</TableCell>
-                <TableCell>
-                  <div className="flex flex-wrap gap-1">
-                    {doctor.schedule.length > 0 ? (
-                      doctor.schedule.map((schedule, index) => (
-                        <Badge key={index} variant="outline">
-                          {schedule}
-                        </Badge>
-                      ))
-                    ) : (
-                      <span className="text-muted-foreground text-sm">
-                        Tidak ada jadwal
-                      </span>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge
-                    variant={
-                      doctor.status === "Active" ? "secondary" : "outline"
-                    }
-                  >
-                    {doctor.status === "Active" ? "Aktif" : "Tidak Aktif"}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="h-8 w-8 p-0">
-                        <span className="sr-only">Open menu</span>
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem>
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <Trash className="mr-2 h-4 w-4" />
-                        Hapus
-                      </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <Calendar className="mr-2 h-4 w-4" />
-                        Kelola Jadwal
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center">
+                  Memuat data...
                 </TableCell>
               </TableRow>
-            ))}
+            ) : filteredDoctors.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center">
+                  Tidak ada data dokter
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredDoctors.map((doctor) => (
+                <TableRow key={doctor.id}>
+                  <TableCell className="font-medium">
+                    {doctor.name}
+                  </TableCell>
+                  <TableCell>{doctor.specialization}</TableCell>
+                  <TableCell>{doctor.email}</TableCell>
+                  <TableCell>{doctor.phone}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {doctor.schedules.length > 0 ? (
+                        doctor.schedules.map((schedule) => (
+                          <Badge key={schedule} variant="outline">
+                            {schedule}
+                          </Badge>
+                        ))
+                      ) : (
+                        <span className="text-muted-foreground text-sm">
+                          Tidak ada jadwal
+                        </span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={doctor.status === "Active" ? "secondary" : "outline"}
+                    >
+                      {doctor.status === "Active" ? "Aktif" : "Tidak Aktif"}
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
-      </div>
-
-      <div className="flex items-center justify-end space-x-2 py-4">
-        <Button variant="outline" size="sm" disabled>
-          Sebelumnya
-        </Button>
-        <Button variant="outline" size="sm">
-          Selanjutnya
-        </Button>
       </div>
     </div>
   );

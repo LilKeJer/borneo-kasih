@@ -70,10 +70,10 @@ export default function QueueDisplayPage() {
   useEffect(() => {
     fetchQueueData();
 
-    // Set interval for auto-refresh (every 60 seconds)
+    // Set interval for auto-refresh (every 30 seconds)
     const intervalId = setInterval(() => {
       fetchQueueData();
-    }, 60000); // 60 seconds
+    }, 30000); // 30 seconds
 
     // Clear interval on component unmount
     return () => clearInterval(intervalId);
@@ -325,7 +325,7 @@ export default function QueueDisplayPage() {
         {/* Footer information */}
         <div className="mt-6 text-center">
           <p className="text-lg text-gray-600">
-            Tampilan ini diperbarui secara otomatis setiap menit
+            Tampilan ini diperbarui secara otomatis setiap 30 detik
           </p>
         </div>
       </div>

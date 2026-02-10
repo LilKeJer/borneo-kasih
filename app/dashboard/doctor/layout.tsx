@@ -2,16 +2,7 @@
 import { ReactNode } from "react";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
-import {
-  FileText,
-  Pill,
-  Users,
-  Calendar,
-  Home,
-  ClipboardList,
-  User,
-  Clock,
-} from "lucide-react";
+import { Home, User, Clock } from "lucide-react";
 
 const navItems = [
   {
@@ -23,31 +14,6 @@ const navItems = [
     title: "Antrian",
     href: "/dashboard/doctor/queue", // Menambahkan link ke antrian
     icon: <Clock className="h-4 w-4" />,
-  },
-  {
-    title: "Appointments",
-    href: "/dashboard/doctor/appointments",
-    icon: <Calendar className="h-4 w-4" />,
-  },
-  {
-    title: "Patients",
-    href: "/dashboard/doctor/patients",
-    icon: <Users className="h-4 w-4" />,
-  },
-  {
-    title: "Medical Records",
-    href: "/dashboard/doctor/medical-records",
-    icon: <FileText className="h-4 w-4" />,
-  },
-  {
-    title: "Prescriptions",
-    href: "/dashboard/doctor/prescriptions",
-    icon: <Pill className="h-4 w-4" />,
-  },
-  {
-    title: "Schedule",
-    href: "/dashboard/doctor/schedule",
-    icon: <ClipboardList className="h-4 w-4" />,
   },
   {
     title: "Profile",
