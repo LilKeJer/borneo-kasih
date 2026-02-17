@@ -20,6 +20,49 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Database Reset + Seed (Testing)
+
+Pastikan file `.env` sudah berisi `DATABASE_URL` yang valid.
+
+Alur reset + seed yang direkomendasikan:
+
+```bash
+npm run db:reset
+npm run db:seed
+```
+
+Shortcut yang tersedia:
+
+```bash
+npm run db:reset:seed
+npm run db:rebuild
+```
+
+Catatan command:
+- `db:reset` menghapus semua tabel existing lalu menjalankan `drizzle-kit push --force` agar schema sinkron ke definisi terbaru.
+- `db:seed` menjalankan seed dummy via `node ./db/run-ts.cjs ./db/seed.ts` (tanpa `ts-node`).
+
+Akun demo dari seed (password semua akun: `test12345`):
+
+- `admin`
+- `doctor`
+- `nurse`
+- `receptionist`
+- `pharmacist`
+- `patient1`
+- `patient2`
+- `patient3`
+
+Catatan:
+- `patient_pending` sengaja dibuat status `Pending` untuk skenario verifikasi admin.
+- Perintah reset/seed bersifat destruktif untuk data existing, gunakan untuk local/dev/testing.
+
+## Panduan Blackbox Testing (Seed-based)
+
+Dokumen alur dan checklist blackbox testing berbasis seed tersedia di:
+
+- `docs/blackbox-testing-seed.md`
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
