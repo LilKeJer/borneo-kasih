@@ -29,8 +29,28 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const date = new Date(dateStr);
-    const formattedDate = date.toISOString().split("T")[0];
+    const dateParts = dateStr.split("-").map((part) => Number(part));
+    if (
+      dateParts.length !== 3 ||
+      dateParts.some((part) => Number.isNaN(part))
+    ) {
+      return NextResponse.json(
+        { message: "Format tanggal tidak valid" },
+        { status: 400 }
+      );
+    }
+
+    const [year, month, day] = dateParts;
+    const date = new Date(year, month - 1, day);
+
+    if (Number.isNaN(date.getTime())) {
+      return NextResponse.json(
+        { message: "Format tanggal tidak valid" },
+        { status: 400 }
+      );
+    }
+
+    const formattedDate = dateStr;
     const dayOfWeek = date.getDay(); // 0 = Minggu, 1 = Senin, dst.
 
     // Cari jadwal dokter untuk hari tersebut
@@ -107,10 +127,15 @@ export async function GET(req: NextRequest) {
         // Buat time slot dengan interval 1 jam
         const startHour = start.getHours();
         const endHour = end.getHours();
+        const totalHours =
+          endHour > startHour
+            ? endHour - startHour
+            : 24 - startHour + endHour;
 
-        for (let h = startHour; h < endHour; h++) {
+        for (let i = 0; i < totalHours; i++) {
+          const hour = (startHour + i) % 24;
           const slotTime = new Date(date);
-          slotTime.setHours(h, 0, 0, 0);
+          slotTime.setHours(hour, 0, 0, 0);
 
           hourSlots.push({
             scheduleId: s.scheduleId,

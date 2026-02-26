@@ -6,6 +6,13 @@ import { db } from "@/db";
 import { reservations, dailyScheduleStatuses } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 
+function toDateOnly(value: Date): string {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -27,7 +34,14 @@ export async function POST(req: NextRequest) {
 
     // Cek kuota jadwal harian
     const scheduleDateObj = new Date(appointmentDate);
-    const formattedDate = scheduleDateObj.toISOString().split("T")[0];
+    if (Number.isNaN(scheduleDateObj.getTime())) {
+      return NextResponse.json(
+        { message: "Tanggal janji temu tidak valid" },
+        { status: 400 }
+      );
+    }
+
+    const formattedDate = toDateOnly(scheduleDateObj);
 
     // Cek status jadwal harian
     const dailyStatus = await db
@@ -78,7 +92,7 @@ export async function POST(req: NextRequest) {
         reservationDate: scheduleDateObj,
         queueNumber,
         status: "Pending",
-        examinationStatus: "Waiting",
+        examinationStatus: null,
         complaint:
           typeof complaint === "string" && complaint.trim()
             ? complaint.trim()

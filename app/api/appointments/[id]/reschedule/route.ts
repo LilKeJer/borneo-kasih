@@ -6,6 +6,13 @@ import { db } from "@/db";
 import { reservations, dailyScheduleStatuses, payments } from "@/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 
+function toDateOnly(value: Date): string {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -22,8 +29,9 @@ export async function PUT(
     const appointmentId = parseInt(resolvedParams.id);
     const body = await req.json();
     const { scheduleId, appointmentDate } = body;
+    const scheduleIdNumber = Number(scheduleId);
 
-    if (!scheduleId || !appointmentDate) {
+    if (!scheduleId || !appointmentDate || Number.isNaN(scheduleIdNumber)) {
       return NextResponse.json(
         { message: "Data jadwal baru tidak lengkap" },
         { status: 400 }
@@ -91,9 +99,7 @@ export async function PUT(
     if (appointment.scheduleId) {
       const oldAppointmentDate = appointment.reservationDate;
       if (oldAppointmentDate) {
-        const oldFormattedDate = new Date(oldAppointmentDate)
-          .toISOString()
-          .split("T")[0];
+        const oldFormattedDate = toDateOnly(new Date(oldAppointmentDate));
 
         const oldDailyStatus = await db
           .select({
@@ -125,7 +131,13 @@ export async function PUT(
 
     // 2. Increase or create currentReservations in NEW dailyScheduleStatuses
     const newScheduleDateObj = new Date(appointmentDate);
-    const newFormattedDate = newScheduleDateObj.toISOString().split("T")[0];
+    if (Number.isNaN(newScheduleDateObj.getTime())) {
+      return NextResponse.json(
+        { message: "Tanggal janji temu tidak valid" },
+        { status: 400 }
+      );
+    }
+    const newFormattedDate = toDateOnly(newScheduleDateObj);
 
     // Check NEW daily schedule status
     const newDailyStatus = await db
@@ -136,7 +148,7 @@ export async function PUT(
       .from(dailyScheduleStatuses)
       .where(
         and(
-          eq(dailyScheduleStatuses.scheduleId, scheduleId),
+          eq(dailyScheduleStatuses.scheduleId, scheduleIdNumber),
           eq(dailyScheduleStatuses.date, newFormattedDate)
         )
       );
@@ -152,7 +164,7 @@ export async function PUT(
       const [newStatus] = await db
         .insert(dailyScheduleStatuses)
         .values({
-          scheduleId: scheduleId,
+          scheduleId: scheduleIdNumber,
           date: newFormattedDate,
           isActive: true,
           currentReservations: 0,
@@ -169,10 +181,11 @@ export async function PUT(
     await db
       .update(reservations)
       .set({
-        scheduleId,
+        scheduleId: scheduleIdNumber,
         reservationDate: newScheduleDateObj,
         queueNumber,
         status: "Pending", // Reset to pending as it needs to be confirmed again
+        examinationStatus: null,
         updatedAt: new Date(),
       })
       .where(eq(reservations.id, appointmentId));

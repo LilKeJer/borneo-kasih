@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/db";
 import { reservations, doctorDetails } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and, isNull } from "drizzle-orm";
 
 export async function GET() {
   try {
@@ -23,11 +23,14 @@ export async function GET() {
         reservationDate: reservations.reservationDate,
         queueNumber: reservations.queueNumber,
         status: reservations.status,
+        examinationStatus: reservations.examinationStatus,
         doctorName: doctorDetails.name,
       })
       .from(reservations)
       .leftJoin(doctorDetails, eq(reservations.doctorId, doctorDetails.userId))
-      .where(eq(reservations.patientId, patientId))
+      .where(
+        and(eq(reservations.patientId, patientId), isNull(reservations.deletedAt))
+      )
       .orderBy(desc(reservations.reservationDate));
 
     return NextResponse.json(
@@ -36,6 +39,7 @@ export async function GET() {
         date: appointment.reservationDate,
         queueNumber: appointment.queueNumber,
         status: appointment.status,
+        examinationStatus: appointment.examinationStatus || "Not Started",
         doctor: appointment.doctorName || "Dokter",
       }))
     );

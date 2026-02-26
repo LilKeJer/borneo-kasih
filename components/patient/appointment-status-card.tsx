@@ -170,11 +170,19 @@ export function AppointmentStatusCard() {
     }
   };
 
+  const blockedCheckInStatuses = new Set([
+    "In Progress",
+    "Waiting for Payment",
+    "Completed",
+    "Cancelled",
+  ]);
+
   const showCheckInButton =
     appointment &&
     (appointment.status === "Confirmed" || appointment.status === "Pending") &&
-    (appointment.examinationStatus === "Not Started" ||
-      !appointment.examinationStatus);
+    !blockedCheckInStatuses.has(
+      appointment.examinationStatus || "Not Started"
+    );
 
   if (loading) {
     return (

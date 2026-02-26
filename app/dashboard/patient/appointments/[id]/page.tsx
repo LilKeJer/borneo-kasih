@@ -191,10 +191,16 @@ export default function AppointmentDetailPage() {
   }
 
   const { date, time } = formatDateTime(appointment.date);
+  const blockedCheckInStatuses = new Set([
+    "In Progress",
+    "Waiting for Payment",
+    "Completed",
+    "Cancelled",
+  ]);
+
   const showCheckInButton =
     (appointment.status === "Confirmed" || appointment.status === "Pending") &&
-    (appointment.examinationStatus === "Not Started" ||
-      !appointment.examinationStatus);
+    !blockedCheckInStatuses.has(appointment.examinationStatus || "Not Started");
 
   return (
     <div className="space-y-6">
