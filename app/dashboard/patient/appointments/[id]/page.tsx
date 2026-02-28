@@ -125,14 +125,17 @@ export default function AppointmentDetailPage() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to check in");
+        const error = await response.json();
+        throw new Error(error.message || "Gagal melakukan check-in");
       }
 
       toast.success("Check-in berhasil");
       fetchAppointmentDetail(); // Refresh data
     } catch (error) {
       console.error("Error checking in:", error);
-      toast.error("Gagal melakukan check-in");
+      toast.error(
+        error instanceof Error ? error.message : "Gagal melakukan check-in"
+      );
     }
   };
 

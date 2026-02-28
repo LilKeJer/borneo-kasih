@@ -37,6 +37,7 @@ export const reservations = pgTable(
     complaint: text("complaint"),
     isPriority: boolean("is_priority").default(false),
     priorityReason: varchar("priority_reason", { length: 255 }),
+    cancellationReason: varchar("cancellation_reason", { length: 50 }),
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
     deletedAt: timestamp("deleted_at"),

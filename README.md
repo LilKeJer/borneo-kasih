@@ -57,6 +57,35 @@ Catatan:
 - `patient_pending` sengaja dibuat status `Pending` untuk skenario verifikasi admin.
 - Perintah reset/seed bersifat destruktif untuk data existing, gunakan untuk local/dev/testing.
 
+## Queue Policy + Auto-cancel (No-show)
+
+Fitur baru:
+- Strict window check-in (dinamis dari Admin Settings)
+- Auto-cancel no-show via cron job endpoint
+
+Aturan status:
+- `Pending/Confirmed` -> check-in -> `Waiting`
+- Tidak check-in sampai deadline -> `Cancelled` dengan `cancellationReason = NO_SHOW`
+
+Deadline no-show:
+- `min(reservationDate + checkInLateMinutes, sessionEnd + autoCancelGraceMinutes)`
+
+Konfigurasi dinamis (Admin > Pengaturan > Check-in & Auto-cancel):
+- `enableStrictCheckIn`
+- `checkInEarlyMinutes`
+- `checkInLateMinutes`
+- `enableAutoCancel`
+- `autoCancelGraceMinutes`
+
+Auto-cancel endpoint:
+- `GET /api/internal/jobs/auto-cancel`
+- Wajib header `Authorization: Bearer <CRON_SECRET>`
+- Saat local dev, endpoint tetap bisa dipanggil tanpa secret untuk kebutuhan testing.
+
+Vercel Cron:
+- Konfigurasi ada di `vercel.json` (setiap 5 menit)
+- Pastikan environment variable `CRON_SECRET` tersedia di project Vercel
+
 ## Panduan Blackbox Testing (Seed-based)
 
 Dokumen alur dan checklist blackbox testing berbasis seed tersedia di:

@@ -93,6 +93,7 @@ export async function POST(req: NextRequest) {
         queueNumber,
         status: "Pending",
         examinationStatus: null,
+        cancellationReason: null,
         complaint:
           typeof complaint === "string" && complaint.trim()
             ? complaint.trim()

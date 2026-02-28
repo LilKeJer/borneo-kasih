@@ -186,6 +186,7 @@ export async function PUT(
         queueNumber,
         status: "Pending", // Reset to pending as it needs to be confirmed again
         examinationStatus: null,
+        cancellationReason: null,
         updatedAt: new Date(),
       })
       .where(eq(reservations.id, appointmentId));

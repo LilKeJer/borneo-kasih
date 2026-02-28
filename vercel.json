@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/internal/jobs/auto-cancel",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}

@@ -100,6 +100,7 @@ export async function POST(req: NextRequest) {
         queueNumber,
         status: "Confirmed", // Walk-in langsung confirmed
         examinationStatus: "Waiting", // Dan langsung menunggu pemeriksaan
+        cancellationReason: null,
         createdAt: today,
         updatedAt: today,
       })

@@ -927,6 +927,11 @@ async function seed() {
         morningEnd: "12:00",
         eveningStart: "17:00",
         eveningEnd: "21:00",
+        enableStrictCheckIn: false,
+        checkInEarlyMinutes: 120,
+        checkInLateMinutes: 60,
+        enableAutoCancel: false,
+        autoCancelGraceMinutes: 30,
         createdAt: now,
         updatedAt: now,
       });
