@@ -139,7 +139,10 @@ export default function NewAppointmentPage() {
     try {
       setIsSubmitting(true);
 
-      const appointmentDate = new Date(selectedDate);
+      const [year, month, day] = selectedDate
+        .split("-")
+        .map((value) => Number(value));
+      const appointmentDate = new Date(year, month - 1, day);
       const timeComponents = new Date(selectedSlot.time);
 
       // Mengambil jam dan menit dari time slot
@@ -188,7 +191,10 @@ export default function NewAppointmentPage() {
 
   // Format tanggal untuk input date (YYYY-MM-DD)
   const formatDateForInput = (date: Date) => {
-    return date.toISOString().split("T")[0];
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
   };
 
   // Mendapatkan tanggal hari ini dan tanggal maksimal (30 hari ke depan)

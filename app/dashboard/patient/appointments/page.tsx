@@ -39,6 +39,7 @@ interface Appointment {
   date: string;
   queueNumber: number;
   status: string;
+  examinationStatus: string;
 }
 
 export default function AppointmentsPage() {
@@ -103,6 +104,36 @@ export default function AppointmentsPage() {
     }
   };
 
+  const handleCheckIn = async (appointment: Appointment) => {
+    try {
+      setIsProcessing(true);
+      const response = await fetch("/api/queue/checkin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          reservationId: appointment.id,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Gagal melakukan check-in");
+      }
+
+      toast.success("Check-in berhasil");
+      fetchAppointments();
+    } catch (error) {
+      console.error("Error checking in:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Gagal melakukan check-in"
+      );
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "Pending":
@@ -120,6 +151,24 @@ export default function AppointmentsPage() {
 
   const canModifyAppointment = (status: string) => {
     return status === "Pending";
+  };
+
+  const canCheckInAppointment = (
+    status: string,
+    examinationStatus?: string | null
+  ) => {
+    if (!["Pending", "Confirmed"].includes(status)) {
+      return false;
+    }
+
+    const blockedExamStatuses = new Set([
+      "In Progress",
+      "Waiting for Payment",
+      "Completed",
+      "Cancelled",
+    ]);
+
+    return !blockedExamStatuses.has(examinationStatus || "Not Started");
   };
 
   const formatDateTime = (dateString: string) => {
@@ -193,33 +242,62 @@ export default function AppointmentsPage() {
                   <TableCell>{appointment.queueNumber}</TableCell>
                   <TableCell>{getStatusBadge(appointment.status)}</TableCell>
                   <TableCell className="text-right">
-                    {canModifyAppointment(appointment.status) ? (
+                    {canModifyAppointment(appointment.status) ||
+                    canCheckInAppointment(
+                      appointment.status,
+                      appointment.examinationStatus
+                    ) ? (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
+                          <Button variant="ghost" size="sm" disabled={isProcessing}>
                             <MoreVertical className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem asChild>
                             <Link
-                              href={`/dashboard/patient/appointments/${appointment.id}/reschedule`}
+                              href={`/dashboard/patient/appointments/${appointment.id}`}
                             >
-                              <Calendar className="mr-2 h-4 w-4" />
-                              Ubah Jadwal
+                              Lihat Detail
                             </Link>
                           </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={() => {
-                              setSelectedAppointment(appointment);
-                              setIsCancelDialogOpen(true);
-                            }}
-                          >
-                            <X className="mr-2 h-4 w-4" />
-                            Batalkan
-                          </DropdownMenuItem>
+                          {canCheckInAppointment(
+                            appointment.status,
+                            appointment.examinationStatus
+                          ) && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => handleCheckIn(appointment)}
+                              >
+                                Check-in
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                          {canModifyAppointment(appointment.status) && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem asChild>
+                                <Link
+                                  href={`/dashboard/patient/appointments/${appointment.id}/reschedule`}
+                                >
+                                  <Calendar className="mr-2 h-4 w-4" />
+                                  Ubah Jadwal
+                                </Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-destructive"
+                                onClick={() => {
+                                  setSelectedAppointment(appointment);
+                                  setIsCancelDialogOpen(true);
+                                }}
+                              >
+                                <X className="mr-2 h-4 w-4" />
+                                Batalkan
+                              </DropdownMenuItem>
+                            </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     ) : (

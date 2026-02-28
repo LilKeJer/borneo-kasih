@@ -7,11 +7,14 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "db:seed": "ts-node --transpile-only ./db/seed.ts",
+    "db:reset": "node ./db/run-ts.cjs ./db/reset.ts && drizzle-kit push --config=drizzle.config.ts --force",
+    "db:seed": "node ./db/run-ts.cjs ./db/seed.ts",
+    "db:reset:seed": "npm run db:reset && npm run db:seed",
     "postinstall": "npm run db:generate",
-    "db:generate": "drizzle-kit generate:pg",
-    "db:migrate": "ts-node --transpile-only ./db/migrate.ts",
-    "db:push": "drizzle-kit push:pg",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit push --config=drizzle.config.ts --force",
+    "db:rebuild": "npm run db:reset:seed",
+    "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
@@ -68,6 +71,7 @@
     "eslint-config-next": "15.3.1",
     "pg-pool": "^3.9.6",
     "tailwindcss": "^4",
+    "ts-node": "^10.9.2",
     "tw-animate-css": "^1.2.8",
     "typescript": "^5"
   }

@@ -66,6 +66,7 @@ export async function PUT(
       // Tentukan status reservasi berdasarkan examinationStatus
       let reservationStatus = currentReservation.status;
       let finalExaminationStatus = examinationStatus;
+      let cancellationReason: string | null = null;
 
       if (examinationStatus === "Completed") {
         // Jika examination completed, check apakah sudah ada payment
@@ -90,9 +91,11 @@ export async function PUT(
         }
       } else if (examinationStatus === "Cancelled") {
         reservationStatus = "Cancelled";
+        cancellationReason = "STAFF_CANCELLED";
       } else {
         // Untuk "Waiting" dan "In Progress"
         reservationStatus = "Confirmed";
+        cancellationReason = null;
       }
 
       // Update kedua status
@@ -101,6 +104,7 @@ export async function PUT(
         .set({
           examinationStatus: finalExaminationStatus,
           status: reservationStatus,
+          cancellationReason,
           updatedAt: new Date(),
         })
         .where(eq(reservations.id, reservationId));

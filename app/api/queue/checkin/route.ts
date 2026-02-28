@@ -3,8 +3,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/db";
-import { reservations } from "@/db/schema";
-import { and, eq, isNull } from "drizzle-orm";
+import {
+  clinicSettings,
+  doctorSchedules,
+  practiceSessions,
+  reservations,
+} from "@/db/schema";
+import { and, asc, eq, isNull } from "drizzle-orm";
+import { calculateCheckInWindow, normalizeQueuePolicy } from "@/lib/queue-policy";
 
 export async function POST(req: NextRequest) {
   try {
@@ -28,13 +34,31 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Dapatkan reservasi
-    const reservation = await db.query.reservations.findFirst({
-      where: and(
-        eq(reservations.id, reservationIdNumber),
-        isNull(reservations.deletedAt)
-      ),
-    });
+    // Dapatkan reservasi + data sesi untuk strict check-in window.
+    const reservationRows = await db
+      .select({
+        id: reservations.id,
+        patientId: reservations.patientId,
+        status: reservations.status,
+        reservationDate: reservations.reservationDate,
+        sessionStartTime: practiceSessions.startTime,
+        sessionEndTime: practiceSessions.endTime,
+      })
+      .from(reservations)
+      .leftJoin(doctorSchedules, eq(reservations.scheduleId, doctorSchedules.id))
+      .leftJoin(
+        practiceSessions,
+        eq(doctorSchedules.sessionId, practiceSessions.id)
+      )
+      .where(
+        and(
+          eq(reservations.id, reservationIdNumber),
+          isNull(reservations.deletedAt)
+        )
+      )
+      .limit(1);
+
+    const reservation = reservationRows[0];
 
     if (!reservation) {
       return NextResponse.json(
@@ -65,12 +89,51 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const rawSettings = await db.query.clinicSettings.findFirst({
+      orderBy: [asc(clinicSettings.id)],
+    });
+    const queuePolicy = normalizeQueuePolicy(rawSettings);
+
+    if (queuePolicy.enableStrictCheckIn) {
+      const now = new Date();
+      const { startsAt, endsAt } = calculateCheckInWindow({
+        reservationDate: reservation.reservationDate,
+        sessionStartTime: reservation.sessionStartTime,
+        sessionEndTime: reservation.sessionEndTime,
+        policy: queuePolicy,
+      });
+
+      if (now < startsAt) {
+        return NextResponse.json(
+          {
+            message: "Belum masuk waktu check-in untuk janji temu ini",
+            windowStartsAt: startsAt.toISOString(),
+            windowEndsAt: endsAt.toISOString(),
+          },
+          { status: 400 }
+        );
+      }
+
+      if (now > endsAt) {
+        return NextResponse.json(
+          {
+            message:
+              "Waktu check-in sudah lewat. Janji temu ini dianggap no-show.",
+            windowStartsAt: startsAt.toISOString(),
+            windowEndsAt: endsAt.toISOString(),
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     // Update status reservasi dan status pemeriksaan
     await db
       .update(reservations)
       .set({
         status: "Confirmed",
         examinationStatus: "Waiting",
+        cancellationReason: null,
         updatedAt: new Date(),
       })
       .where(eq(reservations.id, reservationIdNumber));

@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 
 export default function AdminSettingsPage() {
@@ -26,6 +27,11 @@ export default function AdminSettingsPage() {
     morningEnd: "",
     eveningStart: "",
     eveningEnd: "",
+    enableStrictCheckIn: false,
+    checkInEarlyMinutes: 120,
+    checkInLateMinutes: 60,
+    enableAutoCancel: false,
+    autoCancelGraceMinutes: 30,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -39,7 +45,24 @@ export default function AdminSettingsPage() {
       const response = await fetch("/api/admin/settings");
       if (!response.ok) throw new Error("Failed to fetch settings");
       const data = await response.json();
-      setSettings(data);
+      setSettings((prev) => ({
+        ...prev,
+        ...data,
+        enableStrictCheckIn: Boolean(data.enableStrictCheckIn),
+        checkInEarlyMinutes:
+          typeof data.checkInEarlyMinutes === "number"
+            ? data.checkInEarlyMinutes
+            : prev.checkInEarlyMinutes,
+        checkInLateMinutes:
+          typeof data.checkInLateMinutes === "number"
+            ? data.checkInLateMinutes
+            : prev.checkInLateMinutes,
+        enableAutoCancel: Boolean(data.enableAutoCancel),
+        autoCancelGraceMinutes:
+          typeof data.autoCancelGraceMinutes === "number"
+            ? data.autoCancelGraceMinutes
+            : prev.autoCancelGraceMinutes,
+      }));
     } catch (error) {
       console.error("Error fetching settings:", error);
       toast.error("Gagal memuat pengaturan");
@@ -102,7 +125,35 @@ export default function AdminSettingsPage() {
     }
   };
 
-  const handleInputChange = (field: string, value: string) => {
+  const handleSaveQueuePolicy = async () => {
+    setSaving(true);
+    try {
+      const response = await fetch("/api/admin/settings", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          enableStrictCheckIn: settings.enableStrictCheckIn,
+          checkInEarlyMinutes: settings.checkInEarlyMinutes,
+          checkInLateMinutes: settings.checkInLateMinutes,
+          enableAutoCancel: settings.enableAutoCancel,
+          autoCancelGraceMinutes: settings.autoCancelGraceMinutes,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Failed to save queue policy");
+
+      toast.success("Aturan check-in dan auto-cancel berhasil disimpan");
+    } catch (error) {
+      console.error("Error saving queue policy:", error);
+      toast.error("Gagal menyimpan aturan check-in dan auto-cancel");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleInputChange = (field: string, value: string | number | boolean) => {
     setSettings((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -127,6 +178,7 @@ export default function AdminSettingsPage() {
         <TabsList>
           <TabsTrigger value="clinic">Informasi Klinik</TabsTrigger>
           <TabsTrigger value="schedule">Jam Praktek</TabsTrigger>
+          <TabsTrigger value="queue-policy">Check-in & Auto-cancel</TabsTrigger>
         </TabsList>
 
         <TabsContent value="clinic">
@@ -246,6 +298,114 @@ export default function AdminSettingsPage() {
                   {saving ? "Menyimpan..." : "Simpan Jadwal"}
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="queue-policy">
+          <Card>
+            <CardHeader>
+              <CardTitle>Aturan Check-in dan Auto-cancel</CardTitle>
+              <CardDescription>
+                Pengaturan ini untuk mode testing, UAT, dan live tanpa ubah kode.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="enableStrictCheckIn">Strict window check-in</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Jika aktif, pasien hanya bisa check-in pada rentang waktu yang diizinkan.
+                    </p>
+                  </div>
+                  <Switch
+                    id="enableStrictCheckIn"
+                    checked={settings.enableStrictCheckIn}
+                    onCheckedChange={(checked) =>
+                      handleInputChange("enableStrictCheckIn", checked)
+                    }
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="checkInEarlyMinutes">Early check-in (menit)</Label>
+                    <Input
+                      id="checkInEarlyMinutes"
+                      type="number"
+                      min={0}
+                      max={1440}
+                      value={settings.checkInEarlyMinutes}
+                      onChange={(e) =>
+                        handleInputChange(
+                          "checkInEarlyMinutes",
+                          Number(e.target.value)
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="checkInLateMinutes">Late check-in (menit)</Label>
+                    <Input
+                      id="checkInLateMinutes"
+                      type="number"
+                      min={0}
+                      max={1440}
+                      value={settings.checkInLateMinutes}
+                      onChange={(e) =>
+                        handleInputChange(
+                          "checkInLateMinutes",
+                          Number(e.target.value)
+                        )
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="enableAutoCancel">Enable auto-cancel no-show</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Jika aktif, sistem membatalkan otomatis pasien yang tidak check-in.
+                    </p>
+                  </div>
+                  <Switch
+                    id="enableAutoCancel"
+                    checked={settings.enableAutoCancel}
+                    onCheckedChange={(checked) =>
+                      handleInputChange("enableAutoCancel", checked)
+                    }
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="autoCancelGraceMinutes">Grace setelah sesi (menit)</Label>
+                  <Input
+                    id="autoCancelGraceMinutes"
+                    type="number"
+                    min={0}
+                    max={1440}
+                    value={settings.autoCancelGraceMinutes}
+                    onChange={(e) =>
+                      handleInputChange(
+                        "autoCancelGraceMinutes",
+                        Number(e.target.value)
+                      )
+                    }
+                  />
+                </div>
+              </div>
+
+              <Button
+                className="mt-4"
+                onClick={handleSaveQueuePolicy}
+                disabled={saving}
+              >
+                {saving ? "Menyimpan..." : "Simpan Aturan"}
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
