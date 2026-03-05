@@ -122,7 +122,11 @@ export async function GET() {
         uiStatusHint = "NO_SHOW_PENDING_AUTO_CANCEL";
       } else if (isCheckInWindowClosed && canCheckInByStatus) {
         uiStatusHint = "CHECK_IN_WINDOW_CLOSED";
-      } else if (queuePolicy.enableStrictCheckIn && isBeforeCheckInWindow) {
+      } else if (
+        canCheckInByStatus &&
+        queuePolicy.enableStrictCheckIn &&
+        isBeforeCheckInWindow
+      ) {
         uiStatusHint = "CHECK_IN_NOT_OPENED";
       }
 
@@ -219,11 +223,19 @@ export async function GET() {
           (!isBeforeCheckInWindow && !isAfterCheckInWindow));
 
       let uiStatusHint: string | null = null;
-      if (isAwaitingAutoCancel) {
+      if (canCheckInByStatus && isAwaitingAutoCancel) {
         uiStatusHint = "NO_SHOW_PENDING_AUTO_CANCEL";
-      } else if (queuePolicy.enableStrictCheckIn && isAfterCheckInWindow) {
+      } else if (
+        canCheckInByStatus &&
+        queuePolicy.enableStrictCheckIn &&
+        isAfterCheckInWindow
+      ) {
         uiStatusHint = "CHECK_IN_WINDOW_CLOSED";
-      } else if (queuePolicy.enableStrictCheckIn && isBeforeCheckInWindow) {
+      } else if (
+        canCheckInByStatus &&
+        queuePolicy.enableStrictCheckIn &&
+        isBeforeCheckInWindow
+      ) {
         uiStatusHint = "CHECK_IN_NOT_OPENED";
       }
 

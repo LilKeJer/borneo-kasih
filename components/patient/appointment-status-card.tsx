@@ -33,6 +33,14 @@ interface Appointment {
   isAwaitingAutoCancel?: boolean;
 }
 
+const CHECK_IN_BLOCKED_EXAM_STATUSES = new Set([
+  "In Progress",
+  "Waiting for Payment",
+  "Completed",
+  "Cancelled",
+  "Waiting",
+]);
+
 export function AppointmentStatusCard() {
   const [appointment, setAppointment] = useState<Appointment | null>(null);
   const [loading, setLoading] = useState(true);
@@ -184,20 +192,13 @@ export function AppointmentStatusCard() {
     }
   };
 
-  const blockedCheckInStatuses = new Set([
-    "In Progress",
-    "Waiting for Payment",
-    "Completed",
-    "Cancelled",
-  ]);
-
   const showCheckInButton = Boolean(
     appointment &&
       (typeof appointment.canCheckInNow === "boolean"
         ? appointment.canCheckInNow
         : (appointment.status === "Confirmed" ||
             appointment.status === "Pending") &&
-          !blockedCheckInStatuses.has(
+          !CHECK_IN_BLOCKED_EXAM_STATUSES.has(
             appointment.examinationStatus || "Not Started"
           ))
   );
@@ -208,13 +209,19 @@ export function AppointmentStatusCard() {
   };
 
   const getDisplayStatusBadge = (current: Appointment) => {
-    if (current.uiStatusHint === "NO_SHOW_PENDING_AUTO_CANCEL") {
+    const isCheckInEligible =
+      (current.status === "Pending" || current.status === "Confirmed") &&
+      !CHECK_IN_BLOCKED_EXAM_STATUSES.has(
+        current.examinationStatus || "Not Started"
+      );
+
+    if (isCheckInEligible && current.uiStatusHint === "NO_SHOW_PENDING_AUTO_CANCEL") {
       return <Badge variant="destructive">No-show (Menunggu Batal Otomatis)</Badge>;
     }
-    if (current.uiStatusHint === "CHECK_IN_WINDOW_CLOSED") {
+    if (isCheckInEligible && current.uiStatusHint === "CHECK_IN_WINDOW_CLOSED") {
       return <Badge variant="destructive">Lewat Batas Check-in</Badge>;
     }
-    if (current.uiStatusHint === "CHECK_IN_NOT_OPENED") {
+    if (isCheckInEligible && current.uiStatusHint === "CHECK_IN_NOT_OPENED") {
       return <Badge variant="outline">Belum Masuk Waktu Check-in</Badge>;
     }
 
@@ -224,7 +231,13 @@ export function AppointmentStatusCard() {
   const getQueueHintAlert = () => {
     if (!appointment) return null;
 
-    if (appointment.uiStatusHint === "NO_SHOW_PENDING_AUTO_CANCEL") {
+    const isCheckInEligible =
+      (appointment.status === "Pending" || appointment.status === "Confirmed") &&
+      !CHECK_IN_BLOCKED_EXAM_STATUSES.has(
+        appointment.examinationStatus || "Not Started"
+      );
+
+    if (isCheckInEligible && appointment.uiStatusHint === "NO_SHOW_PENDING_AUTO_CANCEL") {
       return (
         <Alert variant="destructive">
           <InfoIcon className="h-4 w-4" />
@@ -237,7 +250,7 @@ export function AppointmentStatusCard() {
       );
     }
 
-    if (appointment.uiStatusHint === "CHECK_IN_WINDOW_CLOSED") {
+    if (isCheckInEligible && appointment.uiStatusHint === "CHECK_IN_WINDOW_CLOSED") {
       return (
         <Alert variant="destructive">
           <InfoIcon className="h-4 w-4" />
@@ -249,7 +262,7 @@ export function AppointmentStatusCard() {
       );
     }
 
-    if (appointment.uiStatusHint === "CHECK_IN_NOT_OPENED") {
+    if (isCheckInEligible && appointment.uiStatusHint === "CHECK_IN_NOT_OPENED") {
       return (
         <Alert variant="default" className="bg-blue-50 border-blue-200">
           <InfoIcon className="h-4 w-4 text-blue-500" />

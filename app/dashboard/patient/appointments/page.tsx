@@ -48,6 +48,14 @@ interface Appointment {
     | null;
 }
 
+const CHECK_IN_BLOCKED_EXAM_STATUSES = new Set([
+  "In Progress",
+  "Waiting for Payment",
+  "Completed",
+  "Cancelled",
+  "Waiting",
+]);
+
 export default function AppointmentsPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -141,13 +149,28 @@ export default function AppointmentsPage() {
   };
 
   const getStatusBadge = (appointment: Appointment) => {
-    if (appointment.uiStatusHint === "NO_SHOW_PENDING_AUTO_CANCEL") {
+    const isCheckInEligible =
+      (appointment.status === "Pending" || appointment.status === "Confirmed") &&
+      !CHECK_IN_BLOCKED_EXAM_STATUSES.has(
+        appointment.examinationStatus || "Not Started"
+      );
+
+    if (
+      isCheckInEligible &&
+      appointment.uiStatusHint === "NO_SHOW_PENDING_AUTO_CANCEL"
+    ) {
       return <Badge variant="destructive">No-show (Menunggu Batal Otomatis)</Badge>;
     }
-    if (appointment.uiStatusHint === "CHECK_IN_WINDOW_CLOSED") {
+    if (
+      isCheckInEligible &&
+      appointment.uiStatusHint === "CHECK_IN_WINDOW_CLOSED"
+    ) {
       return <Badge variant="destructive">Lewat Batas Check-in</Badge>;
     }
-    if (appointment.uiStatusHint === "CHECK_IN_NOT_OPENED") {
+    if (
+      isCheckInEligible &&
+      appointment.uiStatusHint === "CHECK_IN_NOT_OPENED"
+    ) {
       return <Badge variant="outline">Belum Masuk Waktu Check-in</Badge>;
     }
 
@@ -182,14 +205,9 @@ export default function AppointmentsPage() {
       return false;
     }
 
-    const blockedExamStatuses = new Set([
-      "In Progress",
-      "Waiting for Payment",
-      "Completed",
-      "Cancelled",
-    ]);
-
-    return !blockedExamStatuses.has(examinationStatus || "Not Started");
+    return !CHECK_IN_BLOCKED_EXAM_STATUSES.has(
+      examinationStatus || "Not Started"
+    );
   };
 
   const formatDateTime = (dateString: string) => {
