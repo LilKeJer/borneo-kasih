@@ -40,6 +40,12 @@ interface Appointment {
   queueNumber: number;
   status: string;
   examinationStatus: string;
+  canCheckInNow?: boolean;
+  uiStatusHint?:
+    | "NO_SHOW_PENDING_AUTO_CANCEL"
+    | "CHECK_IN_WINDOW_CLOSED"
+    | "CHECK_IN_NOT_OPENED"
+    | null;
 }
 
 export default function AppointmentsPage() {
@@ -134,8 +140,18 @@ export default function AppointmentsPage() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
+  const getStatusBadge = (appointment: Appointment) => {
+    if (appointment.uiStatusHint === "NO_SHOW_PENDING_AUTO_CANCEL") {
+      return <Badge variant="destructive">No-show (Menunggu Batal Otomatis)</Badge>;
+    }
+    if (appointment.uiStatusHint === "CHECK_IN_WINDOW_CLOSED") {
+      return <Badge variant="destructive">Lewat Batas Check-in</Badge>;
+    }
+    if (appointment.uiStatusHint === "CHECK_IN_NOT_OPENED") {
+      return <Badge variant="outline">Belum Masuk Waktu Check-in</Badge>;
+    }
+
+    switch (appointment.status) {
       case "Pending":
         return <Badge variant="outline">Menunggu Konfirmasi</Badge>;
       case "Confirmed":
@@ -155,8 +171,13 @@ export default function AppointmentsPage() {
 
   const canCheckInAppointment = (
     status: string,
-    examinationStatus?: string | null
+    examinationStatus?: string | null,
+    canCheckInNow?: boolean
   ) => {
+    if (typeof canCheckInNow === "boolean") {
+      return canCheckInNow;
+    }
+
     if (!["Pending", "Confirmed"].includes(status)) {
       return false;
     }
@@ -240,12 +261,13 @@ export default function AppointmentsPage() {
                   </TableCell>
                   <TableCell>{appointment.doctor}</TableCell>
                   <TableCell>{appointment.queueNumber}</TableCell>
-                  <TableCell>{getStatusBadge(appointment.status)}</TableCell>
+                  <TableCell>{getStatusBadge(appointment)}</TableCell>
                   <TableCell className="text-right">
                     {canModifyAppointment(appointment.status) ||
                     canCheckInAppointment(
                       appointment.status,
-                      appointment.examinationStatus
+                      appointment.examinationStatus,
+                      appointment.canCheckInNow
                     ) ? (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -263,7 +285,8 @@ export default function AppointmentsPage() {
                           </DropdownMenuItem>
                           {canCheckInAppointment(
                             appointment.status,
-                            appointment.examinationStatus
+                            appointment.examinationStatus,
+                            appointment.canCheckInNow
                           ) && (
                             <>
                               <DropdownMenuSeparator />

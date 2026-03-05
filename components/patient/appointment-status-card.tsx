@@ -21,6 +21,16 @@ interface Appointment {
   queueNumber: number | null;
   status: string;
   examinationStatus: string | null;
+  canCheckInNow?: boolean;
+  uiStatusHint?:
+    | "NO_SHOW_PENDING_AUTO_CANCEL"
+    | "CHECK_IN_WINDOW_CLOSED"
+    | "CHECK_IN_NOT_OPENED"
+    | null;
+  checkInWindowStartsAt?: string;
+  checkInWindowEndsAt?: string;
+  noShowDeadline?: string;
+  isAwaitingAutoCancel?: boolean;
 }
 
 export function AppointmentStatusCard() {
@@ -37,9 +47,7 @@ export function AppointmentStatusCard() {
       }
 
       const data = await response.json();
-      console.log("Data janji temu hari ini:", data);
 
-      // Jika ada janji temu hari ini (nextAppointment) dan tidak dibatalkan
       if (data.nextAppointment && data.nextAppointment.status !== "Cancelled") {
         setAppointment({
           id: data.nextAppointment.id || "",
@@ -49,6 +57,12 @@ export function AppointmentStatusCard() {
           status: data.nextAppointment.status || "",
           examinationStatus:
             data.nextAppointment.examinationStatus || "Not Started",
+          canCheckInNow: data.nextAppointment.canCheckInNow,
+          uiStatusHint: data.nextAppointment.uiStatusHint ?? null,
+          checkInWindowStartsAt: data.nextAppointment.checkInWindowStartsAt,
+          checkInWindowEndsAt: data.nextAppointment.checkInWindowEndsAt,
+          noShowDeadline: data.nextAppointment.noShowDeadline,
+          isAwaitingAutoCancel: data.nextAppointment.isAwaitingAutoCancel,
         });
       } else {
         setAppointment(null);
@@ -177,12 +191,90 @@ export function AppointmentStatusCard() {
     "Cancelled",
   ]);
 
-  const showCheckInButton =
+  const showCheckInButton = Boolean(
     appointment &&
-    (appointment.status === "Confirmed" || appointment.status === "Pending") &&
-    !blockedCheckInStatuses.has(
-      appointment.examinationStatus || "Not Started"
-    );
+      (typeof appointment.canCheckInNow === "boolean"
+        ? appointment.canCheckInNow
+        : (appointment.status === "Confirmed" ||
+            appointment.status === "Pending") &&
+          !blockedCheckInStatuses.has(
+            appointment.examinationStatus || "Not Started"
+          ))
+  );
+
+  const formatDateTime = (dateString?: string) => {
+    if (!dateString) return "-";
+    return `${formatDate(dateString)} ${formatTime(dateString)}`;
+  };
+
+  const getDisplayStatusBadge = (current: Appointment) => {
+    if (current.uiStatusHint === "NO_SHOW_PENDING_AUTO_CANCEL") {
+      return <Badge variant="destructive">No-show (Menunggu Batal Otomatis)</Badge>;
+    }
+    if (current.uiStatusHint === "CHECK_IN_WINDOW_CLOSED") {
+      return <Badge variant="destructive">Lewat Batas Check-in</Badge>;
+    }
+    if (current.uiStatusHint === "CHECK_IN_NOT_OPENED") {
+      return <Badge variant="outline">Belum Masuk Waktu Check-in</Badge>;
+    }
+
+    return getExaminationStatusBadge(current.examinationStatus);
+  };
+
+  const getQueueHintAlert = () => {
+    if (!appointment) return null;
+
+    if (appointment.uiStatusHint === "NO_SHOW_PENDING_AUTO_CANCEL") {
+      return (
+        <Alert variant="destructive">
+          <InfoIcon className="h-4 w-4" />
+          <AlertDescription className="text-sm">
+            Waktu janji temu sudah lewat. Sistem menunggu job auto-cancel untuk
+            mengubah status menjadi dibatalkan. Deadline:{" "}
+            {formatDateTime(appointment.noShowDeadline)}.
+          </AlertDescription>
+        </Alert>
+      );
+    }
+
+    if (appointment.uiStatusHint === "CHECK_IN_WINDOW_CLOSED") {
+      return (
+        <Alert variant="destructive">
+          <InfoIcon className="h-4 w-4" />
+          <AlertDescription className="text-sm">
+            Waktu check-in sudah lewat (batas:{" "}
+            {formatDateTime(appointment.checkInWindowEndsAt)}).
+          </AlertDescription>
+        </Alert>
+      );
+    }
+
+    if (appointment.uiStatusHint === "CHECK_IN_NOT_OPENED") {
+      return (
+        <Alert variant="default" className="bg-blue-50 border-blue-200">
+          <InfoIcon className="h-4 w-4 text-blue-500" />
+          <AlertDescription className="text-sm text-blue-700">
+            Check-in dibuka mulai {formatDateTime(appointment.checkInWindowStartsAt)}.
+          </AlertDescription>
+        </Alert>
+      );
+    }
+
+    if (showCheckInButton) {
+      return (
+        <Alert variant="default" className="bg-blue-50 border-blue-200">
+          <InfoIcon className="h-4 w-4 text-blue-500" />
+          <AlertDescription className="text-sm text-blue-700">
+            {isAppointmentTime
+              ? "Sudah saatnya check-in! Silakan tekan tombol check-in ketika Anda sudah tiba di klinik."
+              : "Ingat untuk melakukan check-in saat Anda tiba di klinik sesuai waktu janji temu."}
+          </AlertDescription>
+        </Alert>
+      );
+    }
+
+    return null;
+  };
 
   if (loading) {
     return (
@@ -259,7 +351,7 @@ export function AppointmentStatusCard() {
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Status</p>
-            {getExaminationStatusBadge(appointment.examinationStatus)}
+            {getDisplayStatusBadge(appointment)}
           </div>
         </div>
 
@@ -350,17 +442,7 @@ export function AppointmentStatusCard() {
           </div>
         </div>
 
-        {/* Tambahkan Alert untuk petunjuk check-in */}
-        {showCheckInButton && (
-          <Alert variant="default" className="bg-blue-50 border-blue-200">
-            <InfoIcon className="h-4 w-4 text-blue-500" />
-            <AlertDescription className="text-sm text-blue-700">
-              {isAppointmentTime
-                ? "Sudah saatnya check-in! Silakan tekan tombol check-in ketika Anda sudah tiba di klinik."
-                : "Ingat untuk melakukan check-in saat Anda tiba di klinik sesuai waktu janji temu."}
-            </AlertDescription>
-          </Alert>
-        )}
+        {getQueueHintAlert()}
 
         <div className="flex items-center justify-between mt-2">
           <Button asChild variant="outline" size="sm">
