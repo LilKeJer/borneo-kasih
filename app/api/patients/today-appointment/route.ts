@@ -1,10 +1,28 @@
-// app/api/patients/today-appointment/route.ts
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/db";
-import { reservations, doctorDetails } from "@/db/schema";
-import { eq, and, isNull, gte, lte, not } from "drizzle-orm";
+import {
+  clinicSettings,
+  doctorDetails,
+  doctorSchedules,
+  practiceSessions,
+  reservations,
+} from "@/db/schema";
+import { and, asc, eq, gte, isNull, lte, not } from "drizzle-orm";
+import {
+  calculateCheckInWindow,
+  calculateNoShowDeadline,
+  normalizeQueuePolicy,
+} from "@/lib/queue-policy";
+
+const CHECK_IN_BLOCKED_EXAM_STATUSES = new Set([
+  "Waiting",
+  "In Progress",
+  "Waiting for Payment",
+  "Completed",
+  "Cancelled",
+]);
 
 export async function GET() {
   try {
@@ -16,15 +34,19 @@ export async function GET() {
 
     const patientId = parseInt(session.user.id);
 
-    // Ambil tanggal hari ini
+    const rawSettings = await db.query.clinicSettings.findFirst({
+      orderBy: [asc(clinicSettings.id)],
+    });
+    const queuePolicy = normalizeQueuePolicy(rawSettings);
+
+    const now = new Date();
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Hitung akhir hari (hari berikutnya)
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    // Pertama, cari appointment aktif hari ini yang belum selesai atau dibatalkan
     const activeAppointments = await db
       .select({
         id: reservations.id,
@@ -34,9 +56,16 @@ export async function GET() {
         queueNumber: reservations.queueNumber,
         status: reservations.status,
         examinationStatus: reservations.examinationStatus,
+        sessionStartTime: practiceSessions.startTime,
+        sessionEndTime: practiceSessions.endTime,
       })
       .from(reservations)
       .leftJoin(doctorDetails, eq(reservations.doctorId, doctorDetails.userId))
+      .leftJoin(doctorSchedules, eq(reservations.scheduleId, doctorSchedules.id))
+      .leftJoin(
+        practiceSessions,
+        eq(doctorSchedules.sessionId, practiceSessions.id)
+      )
       .where(
         and(
           eq(reservations.patientId, patientId),
@@ -49,28 +78,81 @@ export async function GET() {
         )
       )
       .orderBy(reservations.reservationDate)
-      .limit(5); // Ambil beberapa untuk memastikan
+      .limit(5);
 
-    // Jika ada appointment aktif, ambil yang pertama
     if (activeAppointments.length > 0) {
-      console.log("Ditemukan appointment aktif:", activeAppointments[0]);
+      const current = activeAppointments[0];
+
+      const normalizedExamStatus = current.examinationStatus || "Not Started";
+      const canCheckInByStatus =
+        (current.status === "Confirmed" || current.status === "Pending") &&
+        !CHECK_IN_BLOCKED_EXAM_STATUSES.has(normalizedExamStatus);
+
+      const checkInWindow = calculateCheckInWindow({
+        reservationDate: current.reservationDate,
+        policy: queuePolicy,
+      });
+
+      const noShowDeadline = calculateNoShowDeadline({
+        reservationDate: current.reservationDate,
+        sessionStartTime: current.sessionStartTime,
+        sessionEndTime: current.sessionEndTime,
+        checkInLateMinutes: queuePolicy.checkInLateMinutes,
+        autoCancelGraceMinutes: queuePolicy.autoCancelGraceMinutes,
+      });
+
+      const isBeforeCheckInWindow = now < checkInWindow.startsAt;
+      const isAfterCheckInWindow = now > checkInWindow.endsAt;
+      const isCheckInWindowClosed =
+        queuePolicy.enableStrictCheckIn && isAfterCheckInWindow;
+      const isPastNoShowDeadline = now > noShowDeadline;
+      const isAwaitingAutoCancel =
+        queuePolicy.enableAutoCancel &&
+        canCheckInByStatus &&
+        isPastNoShowDeadline &&
+        current.status !== "Cancelled";
+      const canCheckInNow =
+        canCheckInByStatus &&
+        !isAwaitingAutoCancel &&
+        (!queuePolicy.enableStrictCheckIn ||
+          (!isBeforeCheckInWindow && !isAfterCheckInWindow));
+
+      let uiStatusHint: string | null = null;
+      if (isAwaitingAutoCancel) {
+        uiStatusHint = "NO_SHOW_PENDING_AUTO_CANCEL";
+      } else if (isCheckInWindowClosed && canCheckInByStatus) {
+        uiStatusHint = "CHECK_IN_WINDOW_CLOSED";
+      } else if (queuePolicy.enableStrictCheckIn && isBeforeCheckInWindow) {
+        uiStatusHint = "CHECK_IN_NOT_OPENED";
+      }
 
       return NextResponse.json({
         nextAppointment: {
-          id: activeAppointments[0].id,
-          doctorId: activeAppointments[0].doctorId,
-          doctor: activeAppointments[0].doctorName || "Dokter",
-          date: activeAppointments[0].reservationDate,
-          queueNumber: activeAppointments[0].queueNumber,
-          status: activeAppointments[0].status,
-          examinationStatus:
-            activeAppointments[0].examinationStatus || "Not Started",
+          id: current.id,
+          doctorId: current.doctorId,
+          doctor: current.doctorName || "Dokter",
+          date: current.reservationDate,
+          queueNumber: current.queueNumber,
+          status: current.status,
+          examinationStatus: normalizedExamStatus,
+          canCheckInNow,
+          uiStatusHint,
+          checkInWindowStartsAt: checkInWindow.startsAt.toISOString(),
+          checkInWindowEndsAt: checkInWindow.endsAt.toISOString(),
+          noShowDeadline: noShowDeadline.toISOString(),
+          isBeforeCheckInWindow:
+            queuePolicy.enableStrictCheckIn && isBeforeCheckInWindow,
+          isAfterCheckInWindow:
+            queuePolicy.enableStrictCheckIn && isAfterCheckInWindow,
+          isAwaitingAutoCancel,
+          queuePolicy: {
+            enableStrictCheckIn: queuePolicy.enableStrictCheckIn,
+            enableAutoCancel: queuePolicy.enableAutoCancel,
+          },
         },
       });
     }
 
-    // Jika tidak ada appointment aktif, cek appointment baru untuk hari ini
-    // (ini untuk menangani kasus reservasi baru)
     const newAppointments = await db
       .select({
         id: reservations.id,
@@ -80,9 +162,16 @@ export async function GET() {
         queueNumber: reservations.queueNumber,
         status: reservations.status,
         examinationStatus: reservations.examinationStatus,
+        sessionStartTime: practiceSessions.startTime,
+        sessionEndTime: practiceSessions.endTime,
       })
       .from(reservations)
       .leftJoin(doctorDetails, eq(reservations.doctorId, doctorDetails.userId))
+      .leftJoin(doctorSchedules, eq(reservations.scheduleId, doctorSchedules.id))
+      .leftJoin(
+        practiceSessions,
+        eq(doctorSchedules.sessionId, practiceSessions.id)
+      )
       .where(
         and(
           eq(reservations.patientId, patientId),
@@ -96,24 +185,75 @@ export async function GET() {
       .limit(1);
 
     if (newAppointments.length > 0) {
-      console.log("Ditemukan appointment lain:", newAppointments[0]);
+      const current = newAppointments[0];
+      const normalizedExamStatus = current.examinationStatus || "Not Started";
+
+      const checkInWindow = calculateCheckInWindow({
+        reservationDate: current.reservationDate,
+        policy: queuePolicy,
+      });
+
+      const noShowDeadline = calculateNoShowDeadline({
+        reservationDate: current.reservationDate,
+        sessionStartTime: current.sessionStartTime,
+        sessionEndTime: current.sessionEndTime,
+        checkInLateMinutes: queuePolicy.checkInLateMinutes,
+        autoCancelGraceMinutes: queuePolicy.autoCancelGraceMinutes,
+      });
+
+      const canCheckInByStatus =
+        (current.status === "Confirmed" || current.status === "Pending") &&
+        !CHECK_IN_BLOCKED_EXAM_STATUSES.has(normalizedExamStatus);
+      const isBeforeCheckInWindow = now < checkInWindow.startsAt;
+      const isAfterCheckInWindow = now > checkInWindow.endsAt;
+      const isPastNoShowDeadline = now > noShowDeadline;
+      const isAwaitingAutoCancel =
+        queuePolicy.enableAutoCancel &&
+        canCheckInByStatus &&
+        isPastNoShowDeadline &&
+        current.status !== "Cancelled";
+      const canCheckInNow =
+        canCheckInByStatus &&
+        !isAwaitingAutoCancel &&
+        (!queuePolicy.enableStrictCheckIn ||
+          (!isBeforeCheckInWindow && !isAfterCheckInWindow));
+
+      let uiStatusHint: string | null = null;
+      if (isAwaitingAutoCancel) {
+        uiStatusHint = "NO_SHOW_PENDING_AUTO_CANCEL";
+      } else if (queuePolicy.enableStrictCheckIn && isAfterCheckInWindow) {
+        uiStatusHint = "CHECK_IN_WINDOW_CLOSED";
+      } else if (queuePolicy.enableStrictCheckIn && isBeforeCheckInWindow) {
+        uiStatusHint = "CHECK_IN_NOT_OPENED";
+      }
 
       return NextResponse.json({
         nextAppointment: {
-          id: newAppointments[0].id,
-          doctorId: newAppointments[0].doctorId,
-          doctor: newAppointments[0].doctorName || "Dokter",
-          date: newAppointments[0].reservationDate,
-          queueNumber: newAppointments[0].queueNumber,
-          status: newAppointments[0].status,
-          examinationStatus:
-            newAppointments[0].examinationStatus || "Not Started",
+          id: current.id,
+          doctorId: current.doctorId,
+          doctor: current.doctorName || "Dokter",
+          date: current.reservationDate,
+          queueNumber: current.queueNumber,
+          status: current.status,
+          examinationStatus: normalizedExamStatus,
+          canCheckInNow,
+          uiStatusHint,
+          checkInWindowStartsAt: checkInWindow.startsAt.toISOString(),
+          checkInWindowEndsAt: checkInWindow.endsAt.toISOString(),
+          noShowDeadline: noShowDeadline.toISOString(),
+          isBeforeCheckInWindow:
+            queuePolicy.enableStrictCheckIn && isBeforeCheckInWindow,
+          isAfterCheckInWindow:
+            queuePolicy.enableStrictCheckIn && isAfterCheckInWindow,
+          isAwaitingAutoCancel,
+          queuePolicy: {
+            enableStrictCheckIn: queuePolicy.enableStrictCheckIn,
+            enableAutoCancel: queuePolicy.enableAutoCancel,
+          },
         },
       });
     }
 
-    // Tidak ada appointment untuk hari ini
-    console.log("Tidak ada appointment aktif untuk hari ini");
     return NextResponse.json({ nextAppointment: null });
   } catch (error) {
     console.error("Error fetching today's appointment:", error);

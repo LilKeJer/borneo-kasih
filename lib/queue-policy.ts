@@ -70,6 +70,19 @@ function addMinutes(value: Date, minutes: number): Date {
   return new Date(value.getTime() + minutes * 60_000);
 }
 
+export function calculateCheckInDeadline(params: {
+  reservationDate: Date;
+  checkInLateMinutes: number;
+}): Date {
+  return addMinutes(
+    params.reservationDate,
+    clampMinutes(
+      params.checkInLateMinutes,
+      DEFAULT_QUEUE_POLICY.checkInLateMinutes
+    )
+  );
+}
+
 export function calculateSessionEndDateTime(
   reservationDate: Date,
   sessionStartTime: Date | null,
@@ -92,39 +105,35 @@ export function calculateNoShowDeadline(params: {
   reservationDate: Date;
   sessionStartTime: Date | null;
   sessionEndTime: Date | null;
-  checkInLateMinutes: number;
+  checkInLateMinutes?: number;
   autoCancelGraceMinutes: number;
 }): Date {
-  const appointmentLateDeadline = addMinutes(
-    params.reservationDate,
-    clampMinutes(params.checkInLateMinutes, DEFAULT_QUEUE_POLICY.checkInLateMinutes)
-  );
-
   const sessionEndAt = calculateSessionEndDateTime(
     params.reservationDate,
     params.sessionStartTime,
     params.sessionEndTime
   );
 
-  if (!sessionEndAt) return appointmentLateDeadline;
+  if (!sessionEndAt) {
+    // Fallback for legacy/broken schedule data without a mapped session.
+    return calculateCheckInDeadline({
+      reservationDate: params.reservationDate,
+      checkInLateMinutes:
+        params.checkInLateMinutes ?? DEFAULT_QUEUE_POLICY.checkInLateMinutes,
+    });
+  }
 
-  const sessionGraceDeadline = addMinutes(
+  return addMinutes(
     sessionEndAt,
     clampMinutes(
       params.autoCancelGraceMinutes,
       DEFAULT_QUEUE_POLICY.autoCancelGraceMinutes
     )
   );
-
-  return appointmentLateDeadline <= sessionGraceDeadline
-    ? appointmentLateDeadline
-    : sessionGraceDeadline;
 }
 
 export function calculateCheckInWindow(params: {
   reservationDate: Date;
-  sessionStartTime: Date | null;
-  sessionEndTime: Date | null;
   policy: QueuePolicySettings;
 }): { startsAt: Date; endsAt: Date } {
   const startsAt = addMinutes(
@@ -135,12 +144,9 @@ export function calculateCheckInWindow(params: {
     )
   );
 
-  const endsAt = calculateNoShowDeadline({
+  const endsAt = calculateCheckInDeadline({
     reservationDate: params.reservationDate,
-    sessionStartTime: params.sessionStartTime,
-    sessionEndTime: params.sessionEndTime,
     checkInLateMinutes: params.policy.checkInLateMinutes,
-    autoCancelGraceMinutes: params.policy.autoCancelGraceMinutes,
   });
 
   return { startsAt, endsAt };

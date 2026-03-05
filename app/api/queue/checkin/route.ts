@@ -98,8 +98,6 @@ export async function POST(req: NextRequest) {
       const now = new Date();
       const { startsAt, endsAt } = calculateCheckInWindow({
         reservationDate: reservation.reservationDate,
-        sessionStartTime: reservation.sessionStartTime,
-        sessionEndTime: reservation.sessionEndTime,
         policy: queuePolicy,
       });
 
