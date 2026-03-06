@@ -55,6 +55,9 @@ Akun demo dari seed (password semua akun: `test12345`):
 
 Catatan:
 - `patient_pending` sengaja dibuat status `Pending` untuk skenario verifikasi admin.
+- Waktu appointment pada seed bersifat dinamis (relatif terhadap waktu saat seed dijalankan) dan ditampilkan format 24 jam lokal.
+- Seed menambahkan sesi `AutoCancel Test` (durasi sekitar 2 jam) + 1 reservasi `patient2` sebagai kandidat no-show.
+- Default seed mengaktifkan `enableAutoCancel=true` dengan `autoCancelGraceMinutes=1` untuk mempercepat pengujian.
 - Perintah reset/seed bersifat destruktif untuk data existing, gunakan untuk local/dev/testing.
 
 ## Queue Policy + Auto-cancel (No-show)
@@ -68,7 +71,8 @@ Aturan status:
 - Tidak check-in sampai deadline -> `Cancelled` dengan `cancellationReason = NO_SHOW`
 
 Deadline no-show:
-- `min(reservationDate + checkInLateMinutes, sessionEnd + autoCancelGraceMinutes)`
+- `sessionEnd + autoCancelGraceMinutes`
+- Fallback: jika data sesi tidak tersedia, gunakan `reservationDate + checkInLateMinutes`
 
 Konfigurasi dinamis (Admin > Pengaturan > Check-in & Auto-cancel):
 - `enableStrictCheckIn`

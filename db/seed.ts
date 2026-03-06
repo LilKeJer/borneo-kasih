@@ -44,10 +44,45 @@ function addDays(value: Date, days: number): Date {
   return result;
 }
 
+function addMinutes(value: Date, minutes: number): Date {
+  const result = new Date(value);
+  result.setMinutes(result.getMinutes() + minutes);
+  return result;
+}
+
 function setTime(value: Date, hours: number, minutes: number): Date {
   const result = new Date(value);
   result.setHours(hours, minutes, 0, 0);
   return result;
+}
+
+function toSessionClockTime(value: Date): Date {
+  const base = new Date("2000-01-01T00:00:00");
+  return setTime(base, value.getHours(), value.getMinutes());
+}
+
+function isSameDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function setTimeFromNowOnDay(params: {
+  day: Date;
+  now: Date;
+  offsetMinutes: number;
+  fallbackHour: number;
+  fallbackMinute: number;
+}): Date {
+  const candidate = addMinutes(params.now, params.offsetMinutes);
+
+  if (isSameDay(candidate, params.day)) {
+    return candidate;
+  }
+
+  return setTime(params.day, params.fallbackHour, params.fallbackMinute);
 }
 
 function toDateOnly(value: Date): string {
@@ -80,6 +115,72 @@ async function seed() {
     const expiryIn90Days = addDays(today, 90);
     const expiryIn180Days = addDays(today, 180);
     const expired5DaysAgo = addDays(today, -5);
+
+    // Dynamic reservation times so seed remains useful at any execution time.
+    const waitingAt = setTimeFromNowOnDay({
+      day: today,
+      now,
+      offsetMinutes: -30,
+      fallbackHour: 9,
+      fallbackMinute: 0,
+    });
+    const inProgressAt = setTimeFromNowOnDay({
+      day: today,
+      now,
+      offsetMinutes: -15,
+      fallbackHour: 9,
+      fallbackMinute: 30,
+    });
+    const waitingPaymentAt = setTimeFromNowOnDay({
+      day: today,
+      now,
+      offsetMinutes: -60,
+      fallbackHour: 8,
+      fallbackMinute: 45,
+    });
+    const completedTodayAt = setTimeFromNowOnDay({
+      day: today,
+      now,
+      offsetMinutes: -180,
+      fallbackHour: 8,
+      fallbackMinute: 15,
+    });
+    const pendingTodayAt = setTimeFromNowOnDay({
+      day: today,
+      now,
+      offsetMinutes: 45,
+      fallbackHour: 10,
+      fallbackMinute: 30,
+    });
+
+    const autoCancelSessionStartAt = setTimeFromNowOnDay({
+      day: today,
+      now,
+      offsetMinutes: 5,
+      fallbackHour: 20,
+      fallbackMinute: 0,
+    });
+    const autoCancelSessionEndAt = setTimeFromNowOnDay({
+      day: today,
+      now,
+      offsetMinutes: 125,
+      fallbackHour: 22,
+      fallbackMinute: 0,
+    });
+    const autoCancelCandidateAt = setTimeFromNowOnDay({
+      day: today,
+      now,
+      offsetMinutes: 15,
+      fallbackHour: 20,
+      fallbackMinute: 15,
+    });
+    const autoCancelSessionStartClock = toSessionClockTime(autoCancelSessionStartAt);
+    const autoCancelSessionEndClock = toSessionClockTime(autoCancelSessionEndAt);
+    const autoCancelExpectedAt = addMinutes(autoCancelSessionEndAt, 1);
+
+    const tomorrowPendingAt = setTime(tomorrow, now.getHours(), now.getMinutes());
+    const completedYesterdayAt = setTime(yesterday, 10, 0);
+    const staleNoShowYesterdayAt = setTime(yesterday, 11, 0);
 
     const passwordHash = await bcrypt.hash(TEST_PASSWORD, 10);
 
@@ -305,7 +406,7 @@ async function seed() {
       gender: "P",
     });
 
-    const [morningSession, afternoonSession, standbySession] = await tx
+    const [morningSession, afternoonSession, standbySession, autoCancelTestSession] = await tx
       .insert(practiceSessions)
       .values([
         {
@@ -329,6 +430,14 @@ async function seed() {
           startTime: new Date("2000-01-01T00:00:00"),
           endTime: new Date("2099-12-31T23:59:00"),
           description: "Sesi jaga untuk testing",
+          createdAt: now,
+          updatedAt: now,
+        },
+        {
+          name: "AutoCancel Test",
+          startTime: autoCancelSessionStartClock,
+          endTime: autoCancelSessionEndClock,
+          description: "Sesi dinamis untuk uji auto-cancel cepat (2 jam)",
           createdAt: now,
           updatedAt: now,
         },
@@ -391,13 +500,26 @@ async function seed() {
       updatedAt: now,
     });
 
+    const [autoCancelTestSchedule] = await tx
+      .insert(doctorSchedules)
+      .values({
+        doctorId: doctorUser.id,
+        sessionId: autoCancelTestSession.id,
+        dayOfWeek: currentDay,
+        maxPatients: 5,
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning({ id: doctorSchedules.id });
+
     await tx.insert(dailyScheduleStatuses).values([
       {
         scheduleId: todayScheduleId,
         date: toDateOnly(today),
         isActive: true,
-        currentReservations: 4,
-        notes: "Seed hari ini",
+        currentReservations: 5,
+        notes: "Seed hari ini (dinamis)",
         createdAt: now,
         updatedAt: now,
       },
@@ -411,11 +533,20 @@ async function seed() {
         updatedAt: now,
       },
       {
+        scheduleId: autoCancelTestSchedule.id,
+        date: toDateOnly(today),
+        isActive: true,
+        currentReservations: 1,
+        notes: "Seed auto-cancel test (dinamis)",
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
         scheduleId: yesterdayScheduleId,
         date: toDateOnly(yesterday),
         isActive: true,
-        currentReservations: 1,
-        notes: "Seed kemarin",
+        currentReservations: 2,
+        notes: "Seed kemarin (dinamis)",
         createdAt: now,
         updatedAt: now,
       },
@@ -578,7 +709,7 @@ async function seed() {
         patientId: patientOneUser.id,
         doctorId: doctorUser.id,
         scheduleId: todayScheduleId,
-        reservationDate: setTime(today, 9, 0),
+        reservationDate: waitingAt,
         queueNumber: 1,
         status: "Confirmed",
         examinationStatus: "Waiting",
@@ -596,7 +727,7 @@ async function seed() {
         patientId: patientTwoUser.id,
         doctorId: doctorUser.id,
         scheduleId: todayScheduleId,
-        reservationDate: setTime(today, 9, 30),
+        reservationDate: inProgressAt,
         queueNumber: 2,
         status: "Confirmed",
         examinationStatus: "In Progress",
@@ -612,7 +743,7 @@ async function seed() {
         patientId: patientThreeUser.id,
         doctorId: doctorUser.id,
         scheduleId: todayScheduleId,
-        reservationDate: setTime(today, 10, 0),
+        reservationDate: waitingPaymentAt,
         queueNumber: 3,
         status: "Confirmed",
         examinationStatus: "Waiting for Payment",
@@ -628,11 +759,43 @@ async function seed() {
         patientId: patientOneUser.id,
         doctorId: doctorUser.id,
         scheduleId: todayScheduleId,
-        reservationDate: setTime(today, 8, 15),
+        reservationDate: completedTodayAt,
         queueNumber: 4,
         status: "Completed",
         examinationStatus: "Completed",
         complaint: "Flu dan nyeri tenggorokan",
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning({ id: reservations.id });
+
+    const [reservationPendingToday] = await tx
+      .insert(reservations)
+      .values({
+        patientId: patientOneUser.id,
+        doctorId: doctorUser.id,
+        scheduleId: todayScheduleId,
+        reservationDate: pendingTodayAt,
+        queueNumber: 5,
+        status: "Pending",
+        examinationStatus: null,
+        complaint: "Kontrol alergi",
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning({ id: reservations.id });
+
+    const [reservationAutoCancelCandidate] = await tx
+      .insert(reservations)
+      .values({
+        patientId: patientTwoUser.id,
+        doctorId: doctorUser.id,
+        scheduleId: autoCancelTestSchedule.id,
+        reservationDate: autoCancelCandidateAt,
+        queueNumber: 1,
+        status: "Confirmed",
+        examinationStatus: null,
+        complaint: "Skenario no-show untuk uji auto-cancel",
         createdAt: now,
         updatedAt: now,
       })
@@ -644,13 +807,29 @@ async function seed() {
         patientId: patientOneUser.id,
         doctorId: doctorUser.id,
         scheduleId: tomorrowScheduleId,
-        reservationDate: setTime(tomorrow, 10, 0),
+        reservationDate: tomorrowPendingAt,
         queueNumber: 1,
         status: "Pending",
-        examinationStatus: "Waiting",
+        examinationStatus: null,
         complaint: "Kontrol pasca obat",
         createdAt: now,
         updatedAt: now,
+      })
+      .returning({ id: reservations.id });
+
+    const [reservationNoShowYesterday] = await tx
+      .insert(reservations)
+      .values({
+        patientId: patientThreeUser.id,
+        doctorId: doctorUser.id,
+        scheduleId: yesterdayScheduleId,
+        reservationDate: staleNoShowYesterdayAt,
+        queueNumber: 2,
+        status: "Confirmed",
+        examinationStatus: null,
+        complaint: "Tidak hadir untuk kontrol",
+        createdAt: addDays(now, -1),
+        updatedAt: addDays(now, -1),
       })
       .returning({ id: reservations.id });
 
@@ -660,7 +839,7 @@ async function seed() {
         patientId: patientOneUser.id,
         doctorId: doctorUser.id,
         scheduleId: yesterdayScheduleId,
-        reservationDate: setTime(yesterday, 10, 0),
+        reservationDate: completedYesterdayAt,
         queueNumber: 1,
         status: "Completed",
         examinationStatus: "Completed",
@@ -673,7 +852,10 @@ async function seed() {
     // Avoid unused variable warnings in strict environments.
     void reservationWaiting;
     void reservationInProgress;
+    void reservationPendingToday;
+    void reservationAutoCancelCandidate;
     void reservationTomorrow;
+    void reservationNoShowYesterday;
 
     const [historyWaitingPayment] = await tx
       .insert(medicalHistories)
@@ -930,8 +1112,8 @@ async function seed() {
         enableStrictCheckIn: false,
         checkInEarlyMinutes: 120,
         checkInLateMinutes: 60,
-        enableAutoCancel: false,
-        autoCancelGraceMinutes: 30,
+        enableAutoCancel: true,
+        autoCancelGraceMinutes: 1,
         createdAt: now,
         updatedAt: now,
       });
@@ -949,6 +1131,56 @@ async function seed() {
     console.log(`- patient3 / ${TEST_PASSWORD}`);
     console.log(
       "- patient_pending (status Pending, intentionally blocked from login)"
+    );
+    console.log("Reservation timeline (local server time):");
+    console.log(`- Waiting: ${waitingAt.toLocaleString("id-ID", { hour12: false })}`);
+    console.log(
+      `- In Progress: ${inProgressAt.toLocaleString("id-ID", { hour12: false })}`
+    );
+    console.log(
+      `- Waiting for Payment: ${waitingPaymentAt.toLocaleString("id-ID", {
+        hour12: false,
+      })}`
+    );
+    console.log(
+      `- Completed Today: ${completedTodayAt.toLocaleString("id-ID", {
+        hour12: false,
+      })}`
+    );
+    console.log(
+      `- Pending Today: ${pendingTodayAt.toLocaleString("id-ID", {
+        hour12: false,
+      })}`
+    );
+    console.log(
+      `- Pending Tomorrow: ${tomorrowPendingAt.toLocaleString("id-ID", {
+        hour12: false,
+      })}`
+    );
+    console.log(
+      `- AutoCancel Test Session: ${autoCancelSessionStartAt.toLocaleString(
+        "id-ID",
+        { hour12: false }
+      )} -> ${autoCancelSessionEndAt.toLocaleString("id-ID", {
+        hour12: false,
+      })}`
+    );
+    console.log(
+      `- AutoCancel Candidate (patient2): ${autoCancelCandidateAt.toLocaleString(
+        "id-ID",
+        { hour12: false }
+      )}`
+    );
+    console.log(
+      `- AutoCancel Expected >= ${autoCancelExpectedAt.toLocaleString("id-ID", {
+        hour12: false,
+      })} (grace 1 menit)`
+    );
+    console.log(
+      `- No-show Candidate (Yesterday): ${staleNoShowYesterdayAt.toLocaleString(
+        "id-ID",
+        { hour12: false }
+      )}`
     );
   } finally {
     await pool.end();

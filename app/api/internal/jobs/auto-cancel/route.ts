@@ -14,6 +14,7 @@ import {
   inArray,
   isNull,
   lte,
+  sql,
 } from "drizzle-orm";
 import {
   calculateNoShowDeadline,
@@ -111,51 +112,35 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    await db.transaction(async (tx) => {
-      await tx
-        .update(reservations)
+    // neon-http driver does not support transaction().
+    await db
+      .update(reservations)
+      .set({
+        status: "Cancelled",
+        examinationStatus: "Cancelled",
+        cancellationReason: "NO_SHOW",
+        updatedAt: now,
+      })
+      .where(inArray(reservations.id, reservationIdsToCancel));
+
+    for (const [key, decrementCount] of decrementByScheduleDate) {
+      const [scheduleIdText, date] = key.split("|");
+      const scheduleId = Number(scheduleIdText);
+      if (!Number.isFinite(scheduleId)) continue;
+
+      await db
+        .update(dailyScheduleStatuses)
         .set({
-          status: "Cancelled",
-          examinationStatus: "Cancelled",
-          cancellationReason: "NO_SHOW",
+          currentReservations: sql`GREATEST(0, COALESCE(${dailyScheduleStatuses.currentReservations}, 0) - ${decrementCount})`,
           updatedAt: now,
         })
-        .where(inArray(reservations.id, reservationIdsToCancel));
-
-      for (const [key, decrementCount] of decrementByScheduleDate) {
-        const [scheduleIdText, date] = key.split("|");
-        const scheduleId = Number(scheduleIdText);
-        if (!Number.isFinite(scheduleId)) continue;
-
-        const [dailyStatus] = await tx
-          .select({
-            id: dailyScheduleStatuses.id,
-            currentReservations: dailyScheduleStatuses.currentReservations,
-          })
-          .from(dailyScheduleStatuses)
-          .where(
-            and(
-              eq(dailyScheduleStatuses.scheduleId, scheduleId),
-              eq(dailyScheduleStatuses.date, date)
-            )
+        .where(
+          and(
+            eq(dailyScheduleStatuses.scheduleId, scheduleId),
+            eq(dailyScheduleStatuses.date, date)
           )
-          .limit(1);
-
-        if (!dailyStatus) continue;
-
-        const currentReservations = dailyStatus.currentReservations ?? 0;
-        await tx
-          .update(dailyScheduleStatuses)
-          .set({
-            currentReservations: Math.max(
-              0,
-              currentReservations - decrementCount
-            ),
-            updatedAt: now,
-          })
-          .where(eq(dailyScheduleStatuses.id, dailyStatus.id));
-      }
-    });
+        );
+    }
 
     return NextResponse.json({
       ok: true,
