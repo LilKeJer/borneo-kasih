@@ -12,6 +12,7 @@ import {
   type FullMedicalRecordFormValues,
 } from "@/lib/validations/medical-record"; // Sesuaikan path jika berbeda
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -88,6 +89,35 @@ export function FullMedicalRecordForm({
     control: form.control,
     name: "prescriptions",
   });
+  const prescriptionValues = form.watch("prescriptions");
+
+  const getMedicineStockLabel = (medicine?: ApiMedicineType) => {
+    if (!medicine) return "Belum ada data stok";
+
+    if (medicine.status === "Out of Stock" || (medicine.totalStock ?? 0) <= 0) {
+      return "Stok habis";
+    }
+
+    if (medicine.status === "Low Stock") {
+      return "Stok rendah";
+    }
+
+    return "Stok aman";
+  };
+
+  const getMedicineStockBadgeClass = (medicine?: ApiMedicineType) => {
+    if (!medicine) return "bg-muted text-muted-foreground";
+
+    if (medicine.status === "Out of Stock" || (medicine.totalStock ?? 0) <= 0) {
+      return "bg-red-100 text-red-700";
+    }
+
+    if (medicine.status === "Low Stock") {
+      return "bg-yellow-100 text-yellow-700";
+    }
+
+    return "bg-emerald-100 text-emerald-700";
+  };
 
   useEffect(() => {
     initialize();
@@ -376,63 +406,173 @@ export function FullMedicalRecordForm({
             <CardTitle>Resep Obat</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {prescriptionFields.map((field, index) => (
-              <div
-                key={field.id}
-                className="space-y-3 border p-4 rounded-md relative"
-              >
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute top-1 right-1 h-6 w-6"
-                  onClick={() => removePrescription(index)}
+            {prescriptionFields.map((field, index) => {
+              const selectedMedicine = availableMedicines.find(
+                (medicine) =>
+                  medicine.id.toString() ===
+                  prescriptionValues?.[index]?.medicineId
+              );
+              const unitLabel = selectedMedicine?.unit?.trim() || "unit";
+
+              return (
+                <div
+                  key={field.id}
+                  className="space-y-3 border p-4 rounded-md relative"
                 >
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name={`prescriptions.${index}.medicineId`}
-                    render={({ field: medField }) => (
-                      <FormItem>
-                        <FormLabel>Obat</FormLabel>
-                        <Select
-                          onValueChange={medField.onChange}
-                          defaultValue={medField.value}
-                        >
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-1 right-1 h-6 w-6"
+                    onClick={() => removePrescription(index)}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name={`prescriptions.${index}.medicineId`}
+                      render={({ field: medField }) => (
+                        <FormItem>
+                          <FormLabel>Obat</FormLabel>
+                          <Select
+                            onValueChange={medField.onChange}
+                            defaultValue={medField.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Pilih obat" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {availableMedicines.map((med) => (
+                                <SelectItem
+                                  key={med.id}
+                                  value={med.id.toString()}
+                                >
+                                  {med.name}
+                                  {typeof med.totalStock === "number"
+                                    ? ` - ${med.totalStock} ${med.unit || "unit"}`
+                                    : ""}
+                                  {med.status === "Low Stock"
+                                    ? " - stok rendah"
+                                    : med.status === "Out of Stock"
+                                      ? " - stok habis"
+                                      : ""}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name={`prescriptions.${index}.quantity`}
+                      render={({ field: qtyField }) => (
+                        <FormItem>
+                          <FormLabel>Kuantitas</FormLabel>
                           <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Pilih obat" />
-                            </SelectTrigger>
+                            <Input
+                              type="number"
+                              min="1"
+                              {...qtyField}
+                              className="w-full"
+                            />
                           </FormControl>
-                          <SelectContent>
-                            {availableMedicines.map((med) => (
-                              <SelectItem
-                                key={med.id}
-                                value={med.id.toString()}
-                              >
-                                {med.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  {selectedMedicine && (
+                    <div className="rounded-md border bg-muted/40 p-3 text-sm">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">
+                          {selectedMedicine.name}
+                        </span>
+                        <Badge
+                          variant="secondary"
+                          className={getMedicineStockBadgeClass(selectedMedicine)}
+                        >
+                          {getMedicineStockLabel(selectedMedicine)}
+                        </Badge>
+                      </div>
+                      <div className="mt-2 grid grid-cols-1 gap-1 text-muted-foreground md:grid-cols-3">
+                        <p>
+                          Stok tersedia:{" "}
+                          <span className="font-medium text-foreground">
+                            {selectedMedicine.totalStock ?? 0} {unitLabel}
+                          </span>
+                        </p>
+                        <p>
+                          Satuan:{" "}
+                          <span className="font-medium text-foreground">
+                            {unitLabel}
+                          </span>
+                        </p>
+                        <p>
+                          Minimum stok:{" "}
+                          <span className="font-medium text-foreground">
+                            {selectedMedicine.minimumStock ?? 0} {unitLabel}
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <FormField
+                      control={form.control}
+                      name={`prescriptions.${index}.dosage`}
+                      render={({ field: f }) => (
+                        <FormItem>
+                          <FormLabel>Dosis</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Misal: 1 tablet" {...f} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name={`prescriptions.${index}.frequency`}
+                      render={({ field: f }) => (
+                        <FormItem>
+                          <FormLabel>Frekuensi</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Misal: 3x sehari" {...f} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name={`prescriptions.${index}.duration`}
+                      render={({ field: f }) => (
+                        <FormItem>
+                          <FormLabel>Durasi</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Misal: 5 hari" {...f} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                   <FormField
                     control={form.control}
-                    name={`prescriptions.${index}.quantity`}
-                    render={({ field: qtyField }) => (
+                    name={`prescriptions.${index}.notes`}
+                    render={({ field: f }) => (
                       <FormItem>
-                        <FormLabel>Kuantitas</FormLabel>
+                        <FormLabel>Catatan Obat (Opsional)</FormLabel>
                         <FormControl>
-                          <Input
-                            type="number"
-                            min="1"
-                            {...qtyField}
-                            className="w-full"
+                          <Textarea
+                            placeholder="Misal: Diminum sesudah makan"
+                            {...f}
+                            rows={1}
                           />
                         </FormControl>
                         <FormMessage />
@@ -440,66 +580,8 @@ export function FullMedicalRecordForm({
                     )}
                   />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <FormField
-                    control={form.control}
-                    name={`prescriptions.${index}.dosage`}
-                    render={({ field: f }) => (
-                      <FormItem>
-                        <FormLabel>Dosis</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Misal: 1 tablet" {...f} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name={`prescriptions.${index}.frequency`}
-                    render={({ field: f }) => (
-                      <FormItem>
-                        <FormLabel>Frekuensi</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Misal: 3x sehari" {...f} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name={`prescriptions.${index}.duration`}
-                    render={({ field: f }) => (
-                      <FormItem>
-                        <FormLabel>Durasi</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Misal: 5 hari" {...f} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <FormField
-                  control={form.control}
-                  name={`prescriptions.${index}.notes`}
-                  render={({ field: f }) => (
-                    <FormItem>
-                      <FormLabel>Catatan Obat (Opsional)</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Misal: Diminum sesudah makan"
-                          {...f}
-                          rows={1}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            ))}
+              );
+            })}
             <Button
               type="button"
               variant="outline"

@@ -13,12 +13,23 @@ import {
   medicineStocks, // Untuk validasi stok
   serviceCatalog,
 } from "@/db/schema";
+import { allocateStockByFEFO, groupRequestedMedicineQuantities } from "@/lib/fefo";
 import {
   fullMedicalRecordSchema,
   type PrescriptionItemFormValues, // Menggunakan tipe dari validasi
 } from "@/lib/validations/medical-record"; // Sesuaikan path
-import { eq, and, gte, isNull, sql, desc, inArray } from "drizzle-orm";
+import { eq, and, isNull, sql, desc, inArray, asc, gt } from "drizzle-orm";
 // import { encryptData, generateEncryptionKey } from "@/lib/utils/encryption"; // Jika enkripsi dilakukan di backend
+
+class MedicalRecordRequestError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number = 400
+  ) {
+    super(message);
+    this.name = "MedicalRecordRequestError";
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -65,254 +76,292 @@ export async function POST(req: NextRequest) {
     }
 
     let newPrescriptionId: number | undefined = undefined;
-    let medicalRecordId: number;
+    const { medicalRecordId } = await db.transaction(async (tx) => {
+      let medicalRecordId: number;
 
-    const existingRecord =
-      reservationIdValue === null
-        ? null
-        : await db.query.medicalHistories.findFirst({
-            where: and(
-              eq(medicalHistories.reservationId, reservationIdValue),
-              isNull(medicalHistories.deletedAt)
-            ),
-            orderBy: [desc(medicalHistories.updatedAt)],
-          });
+      const existingRecord =
+        reservationIdValue === null
+          ? null
+          : await tx.query.medicalHistories.findFirst({
+              where: and(
+                eq(medicalHistories.reservationId, reservationIdValue),
+                isNull(medicalHistories.deletedAt)
+              ),
+              orderBy: [desc(medicalHistories.updatedAt)],
+            });
 
-    // 1. Simpan atau perbarui Medical History
-    if (existingRecord) {
-      await db
-        .update(medicalHistories)
-        .set({
-          doctorId: doctorId,
-          dateOfDiagnosis: new Date().toISOString().split("T")[0],
-          encryptedCondition: condition,
-          encryptedDescription: description,
-          encryptedTreatment: treatment,
-          encryptedDoctorNotes: doctorNotes || null,
-          encryptionIvDoctor: encryptionIvDoctor ?? null,
-          updatedAt: new Date(),
-        })
-        .where(eq(medicalHistories.id, existingRecord.id));
+      // 1. Simpan atau perbarui Medical History
+      if (existingRecord) {
+        await tx
+          .update(medicalHistories)
+          .set({
+            doctorId: doctorId,
+            dateOfDiagnosis: new Date().toISOString().split("T")[0],
+            encryptedCondition: condition,
+            encryptedDescription: description,
+            encryptedTreatment: treatment,
+            encryptedDoctorNotes: doctorNotes || null,
+            encryptionIvDoctor: encryptionIvDoctor ?? null,
+            updatedAt: new Date(),
+          })
+          .where(eq(medicalHistories.id, existingRecord.id));
 
-      medicalRecordId = existingRecord.id;
-    } else {
-      const [newMedicalRecord] = await db
-        .insert(medicalHistories)
-        .values({
-          patientId: parseInt(patientId),
-          reservationId: reservationIdValue,
-          doctorId: doctorId,
-          nurseId: doctorId, // Fallback untuk memenuhi NOT NULL
-          encryptedNurseNotes: null,
-          encryptionIvNurse: null,
-          nurseCheckupTimestamp: null,
-          dateOfDiagnosis: new Date().toISOString().split("T")[0],
-          encryptedCondition: condition,
-          encryptedDescription: description,
-          encryptedTreatment: treatment,
-          encryptedDoctorNotes: doctorNotes || null,
-          encryptionIvDoctor: encryptionIvDoctor ?? null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .returning({ id: medicalHistories.id });
+        medicalRecordId = existingRecord.id;
+      } else {
+        const [newMedicalRecord] = await tx
+          .insert(medicalHistories)
+          .values({
+            patientId: parseInt(patientId),
+            reservationId: reservationIdValue,
+            doctorId: doctorId,
+            nurseId: doctorId, // Fallback untuk memenuhi NOT NULL
+            encryptedNurseNotes: null,
+            encryptionIvNurse: null,
+            nurseCheckupTimestamp: null,
+            dateOfDiagnosis: new Date().toISOString().split("T")[0],
+            encryptedCondition: condition,
+            encryptedDescription: description,
+            encryptedTreatment: treatment,
+            encryptedDoctorNotes: doctorNotes || null,
+            encryptionIvDoctor: encryptionIvDoctor ?? null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning({ id: medicalHistories.id });
 
-      medicalRecordId = newMedicalRecord.id;
-    }
-
-    const normalizedServices = (serviceItems ?? []).map((service) => {
-      const serviceId = Number.parseInt(service.serviceId, 10);
-      if (Number.isNaN(serviceId)) {
-        throw new Error("Layanan tidak valid");
+        medicalRecordId = newMedicalRecord.id;
       }
-      return {
-        serviceId,
-        quantity: service.quantity,
-        notes: service.notes || null,
-      };
-    });
 
-    if (normalizedServices.length > 0) {
-      const uniqueServiceIds = Array.from(
-        new Set(normalizedServices.map((service) => service.serviceId))
-      );
-      const validServices = await db
-        .select({ id: serviceCatalog.id })
-        .from(serviceCatalog)
+      const normalizedServices = (serviceItems ?? []).map((service) => {
+        const serviceId = Number.parseInt(service.serviceId, 10);
+        if (Number.isNaN(serviceId)) {
+          throw new MedicalRecordRequestError("Layanan tidak valid");
+        }
+        return {
+          serviceId,
+          quantity: service.quantity,
+          notes: service.notes || null,
+        };
+      });
+
+      if (normalizedServices.length > 0) {
+        const uniqueServiceIds = Array.from(
+          new Set(normalizedServices.map((service) => service.serviceId))
+        );
+        const validServices = await tx
+          .select({ id: serviceCatalog.id })
+          .from(serviceCatalog)
+          .where(
+            and(
+              inArray(serviceCatalog.id, uniqueServiceIds),
+              eq(serviceCatalog.isActive, true),
+              isNull(serviceCatalog.deletedAt)
+            )
+          );
+
+        if (validServices.length !== uniqueServiceIds.length) {
+          throw new MedicalRecordRequestError("Ada layanan yang tidak tersedia");
+        }
+      }
+
+      await tx
+        .update(medicalHistoryServices)
+        .set({
+          deletedAt: new Date(),
+          updatedAt: new Date(),
+        })
         .where(
           and(
-            inArray(serviceCatalog.id, uniqueServiceIds),
-            eq(serviceCatalog.isActive, true),
-            isNull(serviceCatalog.deletedAt)
+            eq(medicalHistoryServices.medicalHistoryId, medicalRecordId),
+            isNull(medicalHistoryServices.deletedAt)
           )
         );
 
-      if (validServices.length !== uniqueServiceIds.length) {
-        throw new Error("Ada layanan yang tidak tersedia");
+      if (normalizedServices.length > 0) {
+        await tx.insert(medicalHistoryServices).values(
+          normalizedServices.map((service) => ({
+            medicalHistoryId: medicalRecordId,
+            serviceId: service.serviceId,
+            quantity: service.quantity,
+            notes: service.notes,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }))
+        );
       }
-    }
 
-    await db
-      .update(medicalHistoryServices)
-      .set({
-        deletedAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(medicalHistoryServices.medicalHistoryId, medicalRecordId),
-          isNull(medicalHistoryServices.deletedAt)
-        )
-      );
+      // 2. Proses Resep jika ada
+      if (prescriptionItems && prescriptionItems.length > 0) {
+        const normalizedPrescriptionItems = prescriptionItems.map(
+          (item: PrescriptionItemFormValues) => {
+            const medicineId = Number.parseInt(item.medicineId, 10);
 
-    if (normalizedServices.length > 0) {
-      await db.insert(medicalHistoryServices).values(
-        normalizedServices.map((service) => ({
-          medicalHistoryId: medicalRecordId,
-          serviceId: service.serviceId,
-          quantity: service.quantity,
-          notes: service.notes,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        }))
-      );
-    }
+            if (Number.isNaN(medicineId)) {
+              throw new MedicalRecordRequestError("Obat tidak valid");
+            }
 
-    // 2. Proses Resep jika ada
-    if (prescriptionItems && prescriptionItems.length > 0) {
-      // Validasi Stok Obat sebelum membuat entri resep
-      for (const item of prescriptionItems) {
-        const medicineIdNum = parseInt(item.medicineId);
-        const requiredQuantity = item.quantity;
+            return {
+              ...item,
+              medicineId,
+            };
+          }
+        );
 
-        // Ambil total stok yang tersedia untuk obat ini dari semua batch yang belum kadaluarsa
-        const totalAvailableStockResult = await db
+        const requestedQuantitiesByMedicine = groupRequestedMedicineQuantities(
+          normalizedPrescriptionItems.map((item) => ({
+            medicineId: item.medicineId,
+            quantity: item.quantity,
+          }))
+        );
+        const requestedMedicineIds = Array.from(
+          requestedQuantitiesByMedicine.keys()
+        );
+
+        const medicineInfoRows = await tx
           .select({
-            total: sql<number>`SUM(${medicineStocks.remainingQuantity})`,
+            id: medicines.id,
+            name: medicines.name,
+          })
+          .from(medicines)
+          .where(
+            and(
+              inArray(medicines.id, requestedMedicineIds),
+              eq(medicines.isActive, true),
+              isNull(medicines.deletedAt)
+            )
+          );
+
+        const medicineInfoMap = new Map(
+          medicineInfoRows.map((medicine) => [medicine.id, medicine.name])
+        );
+
+        if (medicineInfoMap.size !== requestedMedicineIds.length) {
+          throw new MedicalRecordRequestError(
+            "Ada obat yang tidak tersedia untuk diresepkan"
+          );
+        }
+
+        const stockRows = await tx
+          .select({
+            id: medicineStocks.id,
+            medicineId: medicineStocks.medicineId,
+            remainingQuantity: medicineStocks.remainingQuantity,
+            expiryDate: medicineStocks.expiryDate,
           })
           .from(medicineStocks)
           .where(
             and(
-              eq(medicineStocks.medicineId, medicineIdNum),
-              gte(medicineStocks.remainingQuantity, 0), // Stok harus ada
-              // Anda bisa tambahkan filter expiryDate di sini jika perlu
-              // gte(medicineStocks.expiryDate, new Date().toISOString().split('T')[0]),
-              isNull(medicineStocks.deletedAt)
+              inArray(medicineStocks.medicineId, requestedMedicineIds),
+              isNull(medicineStocks.deletedAt),
+              gt(medicineStocks.remainingQuantity, 0),
+              gt(medicineStocks.expiryDate, sql`CURRENT_DATE`)
             )
-          );
+          )
+          .orderBy(asc(medicineStocks.expiryDate), asc(medicineStocks.id));
 
-        const totalAvailableStock =
-          Number(totalAvailableStockResult[0]?.total) || 0;
+        const batchesByMedicine = new Map<
+          number,
+          Array<{
+            id: number;
+            medicineId: number;
+            remainingQuantity: number;
+            expiryDate: string;
+          }>
+        >();
 
-        if (totalAvailableStock < requiredQuantity) {
-          const medicineInfo = await db
-            .select({ name: medicines.name })
-            .from(medicines)
-            .where(eq(medicines.id, medicineIdNum))
-            .limit(1);
-          const medicineName =
-            medicineInfo.length > 0
-              ? medicineInfo[0].name
-              : `Obat ID ${medicineIdNum}`;
-          // Jika menggunakan transaksi, di sini Anda akan melakukan tx.rollback()
-          return NextResponse.json(
-            {
-              message: `Stok untuk ${medicineName} tidak mencukupi (tersisa: ${totalAvailableStock}, dibutuhkan: ${requiredQuantity})`,
-            },
-            { status: 400 }
-          );
+        for (const stock of stockRows) {
+          const existingBatches = batchesByMedicine.get(stock.medicineId) ?? [];
+          existingBatches.push({
+            id: stock.id,
+            medicineId: stock.medicineId,
+            remainingQuantity: stock.remainingQuantity,
+            expiryDate: stock.expiryDate,
+          });
+          batchesByMedicine.set(stock.medicineId, existingBatches);
         }
-      }
 
-      // Jika semua stok valid, buat entri resep
-      const [createdPrescription] = await db
-        .insert(prescriptions)
-        .values({
-          medicalHistoryId: medicalRecordId,
-          paymentStatus: "Unpaid",
-          dispenseStatus: "Pending",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .returning({ id: prescriptions.id });
-      newPrescriptionId = createdPrescription.id;
+        const primaryStockIdByMedicine = new Map<number, number>();
 
-      const prescriptionMedicineValues = await Promise.all(
-        prescriptionItems.map(async (item: PrescriptionItemFormValues) => {
-          // Logika pemilihan stockId (batch) yang lebih canggih (misal FEFO/FIFO) bisa ditambahkan di sini.
-          // Untuk MVP, kita bisa ambil batch pertama yang stoknya mencukupi dan belum kadaluarsa.
-          // Ini adalah penyederhanaan dan perlu di-review untuk kasus produksi.
-          const suitableStock = await db
-            .select({
-              id: medicineStocks.id,
-              remainingQuantity: medicineStocks.remainingQuantity,
-            })
-            .from(medicineStocks)
-            .where(
-              and(
-                eq(medicineStocks.medicineId, parseInt(item.medicineId)),
-                gte(medicineStocks.remainingQuantity, item.quantity),
-                // gte(medicineStocks.expiryDate, new Date().toISOString().split('T')[0]), // Opsional: pastikan belum expired
-                isNull(medicineStocks.deletedAt)
-              )
-            )
-            .orderBy(medicineStocks.expiryDate) // Prioritaskan yang lebih dulu kadaluarsa (FEFO)
-            .limit(1);
+        for (const [medicineId, requiredQuantity] of requestedQuantitiesByMedicine) {
+          const fefoPlan = allocateStockByFEFO(
+            batchesByMedicine.get(medicineId) ?? [],
+            requiredQuantity
+          );
+          const medicineName =
+            medicineInfoMap.get(medicineId) ?? `Obat ID ${medicineId}`;
 
-          if (suitableStock.length === 0) {
-            // Ini seharusnya tidak terjadi jika validasi stok di atas berhasil, tapi sebagai fallback.
-            const medicineInfo = await db
-              .select({ name: medicines.name })
-              .from(medicines)
-              .where(eq(medicines.id, parseInt(item.medicineId)))
-              .limit(1);
-            const medicineName =
-              medicineInfo.length > 0
-                ? medicineInfo[0].name
-                : `Obat ID ${item.medicineId}`;
-            throw new Error(
-              `Tidak ditemukan batch stok yang sesuai untuk ${medicineName} setelah validasi awal.`
+          if (
+            fefoPlan.remainingRequiredQuantity > 0 ||
+            fefoPlan.allocations.length === 0
+          ) {
+            throw new MedicalRecordRequestError(
+              `Stok FEFO untuk ${medicineName} tidak mencukupi (tersedia layak pakai: ${fefoPlan.totalAvailableQuantity}, dibutuhkan: ${requiredQuantity})`
             );
           }
 
-          return {
+          primaryStockIdByMedicine.set(
+            medicineId,
+            fefoPlan.allocations[0].stockId
+          );
+        }
+
+        // Simpan resep setelah validasi FEFO berhasil. Pengurangan stok fisik
+        // tetap dilakukan saat dispense agar tidak ada potong stok sebelum obat diserahkan.
+        const [createdPrescription] = await tx
+          .insert(prescriptions)
+          .values({
+            medicalHistoryId: medicalRecordId,
+            paymentStatus: "Unpaid",
+            dispenseStatus: "Pending",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning({ id: prescriptions.id });
+        newPrescriptionId = createdPrescription.id;
+
+        const prescriptionMedicineValues = normalizedPrescriptionItems.map(
+          (item) => ({
             prescriptionId: newPrescriptionId!,
-            medicineId: parseInt(item.medicineId),
-            stockId: suitableStock[0].id, // Gunakan ID batch yang terpilih
-            encryptedDosage: item.dosage, // ciphertext dari client
-            encryptedFrequency: item.frequency, // ciphertext dari client
-            encryptedDuration: item.duration, // ciphertext dari client
+            medicineId: item.medicineId,
+            // FEFO reference batch saat resep dibuat. Alokasi fisik final
+            // dihitung ulang dengan FEFO ketika proses dispense.
+            stockId: primaryStockIdByMedicine.get(item.medicineId)!,
+            encryptedDosage: item.dosage,
+            encryptedFrequency: item.frequency,
+            encryptedDuration: item.duration,
             encryptionIv: item.encryptionIv ?? null,
             quantityUsed: item.quantity,
             notes: item.notes || null,
             createdAt: new Date(),
             updatedAt: new Date(),
-          };
-        })
-      );
-      await db.insert(prescriptionMedicines).values(prescriptionMedicineValues);
-    }
-
-    // 4. Update status reservasi jika ada reservationId
-    if (reservationIdValue !== null) {
-      const reservation = await db.query.reservations.findFirst({
-        where: and(
-          eq(reservations.id, reservationIdValue),
-          isNull(reservations.deletedAt)
-        ),
-      });
-
-      if (reservation && reservation.examinationStatus !== "Completed") {
-        await db
-          .update(reservations)
-          .set({
-            status: "Confirmed",
-            examinationStatus: "Waiting for Payment",
-            updatedAt: new Date(),
           })
-          .where(eq(reservations.id, reservationIdValue));
+        );
+        await tx.insert(prescriptionMedicines).values(prescriptionMedicineValues);
       }
-    }
+
+      // 4. Update status reservasi jika ada reservationId
+      if (reservationIdValue !== null) {
+        const reservation = await tx.query.reservations.findFirst({
+          where: and(
+            eq(reservations.id, reservationIdValue),
+            isNull(reservations.deletedAt)
+          ),
+        });
+
+        if (reservation && reservation.examinationStatus !== "Completed") {
+          await tx
+            .update(reservations)
+            .set({
+              status: "Confirmed",
+              examinationStatus: "Waiting for Payment",
+              updatedAt: new Date(),
+            })
+            .where(eq(reservations.id, reservationIdValue));
+        }
+      }
+
+      return { medicalRecordId };
+    });
 
     return NextResponse.json(
       {
@@ -325,6 +374,15 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
+    if (error instanceof MedicalRecordRequestError) {
+      return NextResponse.json(
+        {
+          message: error.message,
+        },
+        { status: error.status }
+      );
+    }
+
     console.error("Error creating full medical record:", error);
     return NextResponse.json(
       {
