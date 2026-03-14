@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/db";
 import { medicalHistories, users } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 
 // GET - Get single medical record detail
 export async function GET(
@@ -30,6 +30,7 @@ export async function GET(
         condition: medicalHistories.encryptedCondition,
         description: medicalHistories.encryptedDescription,
         treatment: medicalHistories.encryptedTreatment,
+        doctorNotes: medicalHistories.encryptedDoctorNotes,
         encryptionIvDoctor: medicalHistories.encryptionIvDoctor,
         createdAt: medicalHistories.createdAt,
         doctorName: users.username,
@@ -39,7 +40,8 @@ export async function GET(
       .where(
         and(
           eq(medicalHistories.id, recordId),
-          eq(medicalHistories.patientId, patientId)
+          eq(medicalHistories.patientId, patientId),
+          isNull(medicalHistories.deletedAt)
         )
       )
       .limit(1);
@@ -58,6 +60,7 @@ export async function GET(
       diagnosis: record[0].condition || "Pemeriksaan Umum",
       description: record[0].description || "Tidak ada deskripsi",
       treatment: record[0].treatment || "Tidak ada penanganan",
+      doctorNotes: record[0].doctorNotes || null,
       encryptionIvDoctor: record[0].encryptionIvDoctor || null,
     });
   } catch (error) {

@@ -11,10 +11,8 @@ import {
   doctorDetails,
   medicalHistories,
   prescriptions,
-  prescriptionMedicines,
-  medicineStocks,
 } from "@/db/schema";
-import { eq, and, isNull, desc, gte, lte, sql } from "drizzle-orm";
+import { eq, and, isNull, desc, gte, lte } from "drizzle-orm";
 import { type CreatePaymentRequest, type PaymentMethod } from "@/types/payment";
 
 // POST - Buat pembayaran baru
@@ -179,42 +177,6 @@ export async function POST(req: NextRequest) {
 
       if (totalAmount <= 0) {
         throw new Error("Total pembayaran harus lebih dari 0");
-      }
-
-      if (paymentPrescriptionId) {
-        const prescriptionMedicineRows = await tx
-          .select({
-            stockId: prescriptionMedicines.stockId,
-            quantityUsed: prescriptionMedicines.quantityUsed,
-          })
-          .from(prescriptionMedicines)
-          .where(
-            and(
-              eq(prescriptionMedicines.prescriptionId, paymentPrescriptionId),
-              isNull(prescriptionMedicines.deletedAt)
-            )
-          );
-
-        for (const row of prescriptionMedicineRows) {
-          const updatedStock = await tx
-            .update(medicineStocks)
-            .set({
-              remainingQuantity: sql`${medicineStocks.remainingQuantity} - ${row.quantityUsed}`,
-              updatedAt: new Date(),
-            })
-            .where(
-              and(
-                eq(medicineStocks.id, row.stockId),
-                isNull(medicineStocks.deletedAt),
-                gte(medicineStocks.remainingQuantity, row.quantityUsed)
-              )
-            )
-            .returning({ id: medicineStocks.id });
-
-          if (updatedStock.length === 0) {
-            throw new Error("Stok obat tidak cukup untuk resep ini");
-          }
-        }
       }
 
       // Buat payment record

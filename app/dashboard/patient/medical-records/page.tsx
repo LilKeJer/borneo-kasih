@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogDescription,
@@ -35,7 +36,9 @@ import {
   Activity,
   ClipboardList,
   Pill,
+  Download,
 } from "lucide-react";
+import { createMedicalRecordPdfBlob } from "@/lib/utils/pdf";
 
 interface MedicalRecord {
   id: string;
@@ -48,6 +51,7 @@ interface MedicalRecord {
 interface MedicalRecordDetail extends MedicalRecord {
   description?: string;
   treatment?: string;
+  doctorNotes?: string | null;
   encryptionIvDoctor?: string | null;
 }
 
@@ -180,6 +184,14 @@ export default function PatientMedicalRecordsPage() {
             "treatment"
           )
         : null;
+      const decryptedDoctorNotes =
+        hasIv && data.doctorNotes
+          ? await decryptField(
+              data.doctorNotes,
+              data.encryptionIvDoctor,
+              "doctorNotes"
+            )
+          : data.doctorNotes || null;
       setRecordDetail({
         ...data,
         diagnosis: hasIv
@@ -191,6 +203,10 @@ export default function PatientMedicalRecordsPage() {
         treatment: hasIv
           ? decryptedTreatment || "Data terenkripsi"
           : data.treatment,
+        doctorNotes:
+          hasIv && data.doctorNotes
+            ? decryptedDoctorNotes || "Data terenkripsi"
+            : decryptedDoctorNotes,
       });
     } catch (error) {
       console.error("Error fetching record detail:", error);
@@ -219,6 +235,39 @@ export default function PatientMedicalRecordsPage() {
       return "destructive";
     }
     return "outline";
+  };
+
+  const handleDownloadRecord = (record: MedicalRecordDetail) => {
+    const downloadDate = new Date().toLocaleString("id-ID");
+    const diagnosis = record.diagnosis || "Tidak ada diagnosis";
+    const description =
+      record.description?.trim() || "Tidak ada deskripsi pemeriksaan";
+    const treatment =
+      record.treatment?.trim() || "Tidak ada penanganan atau pengobatan";
+    const doctorNotes = record.doctorNotes?.trim() || "Tidak ada catatan dokter";
+
+    const blob = createMedicalRecordPdfBlob({
+      clinicName: "Klinik Borneo Kasih",
+      documentTitle: "Ringkasan Rekam Medis Pasien",
+      recordId: String(record.id),
+      examinationDate: formatDate(record.date),
+      doctorName: record.doctor,
+      generatedAt: downloadDate,
+      diagnosis,
+      description,
+      treatment,
+      doctorNotes,
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    const safeDate = String(record.date).split("T")[0];
+
+    anchor.href = url;
+    anchor.download = `rekam-medis-${safeDate}-${record.id}.pdf`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -423,12 +472,33 @@ export default function PatientMedicalRecordsPage() {
                 </div>
               )}
 
-              {!recordDetail.description && !recordDetail.treatment && (
+              {recordDetail.doctorNotes && (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <FileText className="h-4 w-4" />
+                    Catatan Dokter
+                  </div>
+                  <p className="text-sm leading-relaxed">
+                    {recordDetail.doctorNotes}
+                  </p>
+                </div>
+              )}
+
+              {!recordDetail.description &&
+                !recordDetail.treatment &&
+                !recordDetail.doctorNotes && (
                 <div className="text-center py-4 text-muted-foreground">
                   <Activity className="h-8 w-8 mx-auto mb-2" />
                   <p className="text-sm">Detail pemeriksaan tidak tersedia</p>
                 </div>
-              )}
+                )}
+
+              <DialogFooter>
+                <Button onClick={() => handleDownloadRecord(recordDetail)}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Unduh Rekam Medis
+                </Button>
+              </DialogFooter>
             </div>
           ) : (
             <div className="text-center py-8 text-muted-foreground">

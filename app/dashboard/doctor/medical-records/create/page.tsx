@@ -84,7 +84,7 @@ function CreateMedicalRecordContent() {
 
         // Fetch Available Medicines
         setLoadingMedicines(true);
-        const medicinesRes = await fetch("/api/medicines?limit=1000"); // Ambil semua obat
+        const medicinesRes = await fetch("/api/medicines?limit=1000&isActive=true");
         if (!medicinesRes.ok) throw new Error("Gagal memuat daftar obat.");
         const medicinesData = await medicinesRes.json();
         setAvailableMedicines(medicinesData.data || []);

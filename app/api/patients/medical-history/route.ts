@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/db";
 import { medicalHistories, users } from "@/db/schema";
-import { eq, desc, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 
 // GET - Get patient medical history
 export async function GET(req: NextRequest) {
@@ -34,7 +34,12 @@ export async function GET(req: NextRequest) {
       })
       .from(medicalHistories)
       .leftJoin(users, eq(medicalHistories.doctorId, users.id))
-      .where(eq(medicalHistories.patientId, patientId))
+      .where(
+        and(
+          eq(medicalHistories.patientId, patientId),
+          isNull(medicalHistories.deletedAt)
+        )
+      )
       .orderBy(desc(medicalHistories.createdAt))
       .limit(limit)
       .offset(offset);
@@ -43,7 +48,12 @@ export async function GET(req: NextRequest) {
     const totalCount = await db
       .select({ count: sql<number>`count(*)` })
       .from(medicalHistories)
-      .where(eq(medicalHistories.patientId, patientId));
+      .where(
+        and(
+          eq(medicalHistories.patientId, patientId),
+          isNull(medicalHistories.deletedAt)
+        )
+      );
 
     return NextResponse.json({
       data: histories.map((history) => ({
