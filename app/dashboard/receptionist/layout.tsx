@@ -2,35 +2,9 @@
 import { ReactNode } from "react";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
-import { Home, ClipboardList, CreditCard, User, UserPlus } from "lucide-react";
+import { getDashboardNavByRole } from "@/lib/dashboard-navigation";
 
-const navItems = [
-  {
-    title: "Dashboard",
-    href: "/dashboard/receptionist",
-    icon: <Home className="h-4 w-4" />,
-  },
-  {
-    title: "Antrian",
-    href: "/dashboard/receptionist/queue",
-    icon: <ClipboardList className="h-4 w-4" />,
-  },
-  {
-    title: "Walk-in",
-    href: "/dashboard/receptionist/walk-in",
-    icon: <UserPlus className="h-4 w-4" />,
-  },
-  {
-    title: "Pembayaran", // Menu baru
-    href: "/dashboard/receptionist/payments",
-    icon: <CreditCard className="h-4 w-4" />,
-  },
-  {
-    title: "Profil",
-    href: "/dashboard/profile",
-    icon: <User className="h-4 w-4" />,
-  },
-];
+const navItems = getDashboardNavByRole("Receptionist");
 
 export default function ReceptionistLayout({
   children,

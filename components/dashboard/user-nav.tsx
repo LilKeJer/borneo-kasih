@@ -1,6 +1,7 @@
 // components/dashboard/user-nav.tsx
 "use client";
 
+import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,10 +14,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/use-auth";
+import {
+  getProfileHrefByRole,
+  getSettingsHrefByRole,
+} from "@/lib/dashboard-navigation";
 import { signOut } from "next-auth/react";
 
 export function UserNav() {
   const { user } = useAuth();
+  const profileHref = getProfileHrefByRole(user?.role);
+  const settingsHref = getSettingsHrefByRole(user?.role);
 
   const getRoleLabel = (role?: string) => {
     switch (role) {
@@ -69,10 +76,18 @@ export function UserNav() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuItem>Profil</DropdownMenuItem>
-          <DropdownMenuItem>Pengaturan</DropdownMenuItem>
+          {profileHref ? (
+            <DropdownMenuItem asChild>
+              <Link href={profileHref}>Profil</Link>
+            </DropdownMenuItem>
+          ) : null}
+          {settingsHref ? (
+            <DropdownMenuItem asChild>
+              <Link href={settingsHref}>Pengaturan</Link>
+            </DropdownMenuItem>
+          ) : null}
         </DropdownMenuGroup>
-        <DropdownMenuSeparator />
+        {(profileHref || settingsHref) && <DropdownMenuSeparator />}
         <DropdownMenuItem
           className="text-red-600"
           onClick={() => signOut({ callbackUrl: "/" })}

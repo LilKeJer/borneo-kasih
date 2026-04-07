@@ -2,30 +2,9 @@
 import { ReactNode } from "react";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
-import { Home, Package, ClipboardList, User } from "lucide-react";
+import { getDashboardNavByRole } from "@/lib/dashboard-navigation";
 
-const navItems = [
-  {
-    title: "Dashboard",
-    href: "/dashboard/pharmacist",
-    icon: <Home className="h-4 w-4" />,
-  },
-  {
-    title: "Inventaris",
-    href: "/dashboard/pharmacist/inventory",
-    icon: <Package className="h-4 w-4" />,
-  },
-  {
-    title: "Resep",
-    href: "/dashboard/pharmacist/prescription",
-    icon: <ClipboardList className="h-4 w-4" />,
-  },
-  {
-    title: "Profil",
-    href: "/dashboard/profile",
-    icon: <User className="h-4 w-4" />,
-  },
-];
+const navItems = getDashboardNavByRole("Pharmacist");
 
 export default function PharmacistLayout({
   children,
