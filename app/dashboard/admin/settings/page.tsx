@@ -43,7 +43,7 @@ export default function AdminSettingsPage() {
   const fetchSettings = async () => {
     try {
       const response = await fetch("/api/admin/settings");
-      if (!response.ok) throw new Error("Failed to fetch settings");
+      if (!response.ok) throw new Error("Gagal memuat pengaturan");
       const data = await response.json();
       setSettings((prev) => ({
         ...prev,
@@ -87,7 +87,7 @@ export default function AdminSettingsPage() {
         }),
       });
 
-      if (!response.ok) throw new Error("Failed to save settings");
+      if (!response.ok) throw new Error("Gagal menyimpan pengaturan");
 
       toast.success("Pengaturan berhasil disimpan");
     } catch (error) {
@@ -114,7 +114,7 @@ export default function AdminSettingsPage() {
         }),
       });
 
-      if (!response.ok) throw new Error("Failed to save schedule");
+      if (!response.ok) throw new Error("Gagal menyimpan jadwal");
 
       toast.success("Jadwal berhasil disimpan");
     } catch (error) {
@@ -142,12 +142,12 @@ export default function AdminSettingsPage() {
         }),
       });
 
-      if (!response.ok) throw new Error("Failed to save queue policy");
+      if (!response.ok) throw new Error("Gagal menyimpan aturan check-in");
 
-      toast.success("Aturan check-in dan auto-cancel berhasil disimpan");
+      toast.success("Aturan check-in dan batal otomatis berhasil disimpan");
     } catch (error) {
       console.error("Error saving queue policy:", error);
-      toast.error("Gagal menyimpan aturan check-in dan auto-cancel");
+      toast.error("Gagal menyimpan aturan check-in dan batal otomatis");
     } finally {
       setSaving(false);
     }
@@ -163,7 +163,7 @@ export default function AdminSettingsPage() {
         <PageHeader title="Pengaturan" description="Kelola pengaturan klinik" />
         <Card>
           <CardContent className="p-6">
-            <div className="text-center">Loading...</div>
+            <div className="text-center">Memuat pengaturan...</div>
           </CardContent>
         </Card>
       </div>
@@ -178,7 +178,9 @@ export default function AdminSettingsPage() {
         <TabsList>
           <TabsTrigger value="clinic">Informasi Klinik</TabsTrigger>
           <TabsTrigger value="schedule">Jam Praktek</TabsTrigger>
-          <TabsTrigger value="queue-policy">Check-in & Auto-cancel</TabsTrigger>
+          <TabsTrigger value="queue-policy">
+            Check-in & Batal Otomatis
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="clinic">
@@ -305,16 +307,19 @@ export default function AdminSettingsPage() {
         <TabsContent value="queue-policy">
           <Card>
             <CardHeader>
-              <CardTitle>Aturan Check-in dan Auto-cancel</CardTitle>
+              <CardTitle>Aturan Check-in dan Batal Otomatis</CardTitle>
               <CardDescription>
-                Pengaturan ini untuk mode testing, UAT, dan live tanpa ubah kode.
+                Pengaturan ini dipakai untuk mode testing, UAT, dan live tanpa
+                perlu mengubah kode.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <Label htmlFor="enableStrictCheckIn">Strict window check-in</Label>
+                    <Label htmlFor="enableStrictCheckIn">
+                      Batasi check-in ke rentang waktu
+                    </Label>
                     <p className="text-sm text-muted-foreground">
                       Jika aktif, pasien hanya bisa check-in pada rentang waktu yang diizinkan.
                     </p>
@@ -330,7 +335,9 @@ export default function AdminSettingsPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="checkInEarlyMinutes">Early check-in (menit)</Label>
+                    <Label htmlFor="checkInEarlyMinutes">
+                      Batas check-in lebih awal (menit)
+                    </Label>
                     <Input
                       id="checkInEarlyMinutes"
                       type="number"
@@ -346,7 +353,9 @@ export default function AdminSettingsPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="checkInLateMinutes">Late check-in (menit)</Label>
+                    <Label htmlFor="checkInLateMinutes">
+                      Batas check-in terlambat (menit)
+                    </Label>
                     <Input
                       id="checkInLateMinutes"
                       type="number"
@@ -367,9 +376,12 @@ export default function AdminSettingsPage() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <Label htmlFor="enableAutoCancel">Enable auto-cancel no-show</Label>
+                    <Label htmlFor="enableAutoCancel">
+                      Aktifkan batal otomatis untuk pasien tidak hadir
+                    </Label>
                     <p className="text-sm text-muted-foreground">
-                      Jika aktif, sistem membatalkan otomatis pasien yang tidak check-in.
+                      Jika aktif, sistem akan membatalkan otomatis pasien yang
+                      tidak check-in.
                     </p>
                   </div>
                   <Switch
@@ -382,7 +394,9 @@ export default function AdminSettingsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="autoCancelGraceMinutes">Grace setelah sesi (menit)</Label>
+                  <Label htmlFor="autoCancelGraceMinutes">
+                    Tenggang waktu setelah sesi (menit)
+                  </Label>
                   <Input
                     id="autoCancelGraceMinutes"
                     type="number"

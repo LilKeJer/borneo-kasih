@@ -16,7 +16,7 @@ const navItems = [
     icon: <Clock className="h-4 w-4" />,
   },
   {
-    title: "Profile",
+    title: "Profil",
     href: "/dashboard/profile",
     icon: <User className="h-4 w-4" />,
   },
@@ -26,8 +26,8 @@ export default function DoctorLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col">
       <DashboardHeader
-        title="Doctor Dashboard"
-        description="Manage patient appointments and medical records"
+        title="Dashboard Dokter"
+        description="Kelola antrian pasien dan rekam medis"
         navItems={navItems}
       />
       <div className="flex flex-1">

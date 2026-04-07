@@ -1,0 +1,1 @@
+ALTER TABLE "Medicine" ADD COLUMN "dosage_form" varchar(50);

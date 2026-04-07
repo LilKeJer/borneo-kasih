@@ -1,18 +1,89 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import {
+  formatClinicOperatingHours,
+  getOrCreateClinicSettings,
+} from "@/lib/clinic-settings";
 
-export default function Home() {
+export default async function Home() {
+  const settings = await getOrCreateClinicSettings();
+  const operatingHours = formatClinicOperatingHours(settings);
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-4 text-center">
-      <h1 className="text-4xl font-bold mb-4">Sistem Informasi Rekam Medis</h1>
-      <h2 className="text-2xl mb-8">Klinik Borneo Kasih</h2>
-      <div className="flex gap-4">
-        <Button asChild>
-          <Link href="/auth/login">Login</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/auth/register">Daftar Pasien Baru</Link>
-        </Button>
+    <main className="min-h-screen bg-slate-50 px-6 py-10 text-slate-900">
+      <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[1.4fr_0.9fr]">
+        <section className="rounded-3xl bg-[linear-gradient(135deg,#0f172a,#1d4ed8)] p-8 text-white shadow-xl md:p-12">
+          <p className="text-sm uppercase tracking-[0.3em] text-sky-200">
+            Sistem Rekam Medis Klinik
+          </p>
+          <h1 className="mt-4 text-4xl font-semibold leading-tight md:text-5xl">
+            {settings.clinicName}
+          </h1>
+          <p className="mt-4 max-w-2xl text-base text-sky-100 md:text-lg">
+            Akses pendaftaran pasien, verifikasi admin, dan layanan janji temu
+            dengan informasi klinik yang selalu mengikuti pengaturan terbaru.
+          </p>
+
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Button asChild size="lg" className="bg-white text-slate-900 hover:bg-slate-100">
+              <Link href="/auth/login">Masuk</Link>
+            </Button>
+            <Button
+              asChild
+              size="lg"
+              variant="outline"
+              className="border-white/40 bg-white/10 text-white hover:bg-white/20"
+            >
+              <Link href="/auth/register">Daftar Pasien Baru</Link>
+            </Button>
+          </div>
+
+          <div className="mt-10 grid gap-4 border-t border-white/15 pt-6 text-sm text-sky-100 md:grid-cols-2">
+            <div>
+              <p className="font-medium text-white">Alamat Klinik</p>
+              <p className="mt-1">{settings.address}</p>
+            </div>
+            <div>
+              <p className="font-medium text-white">Jam Layanan</p>
+              <p className="mt-1">{operatingHours}</p>
+            </div>
+          </div>
+        </section>
+
+        <aside className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+          <h2 className="text-lg font-semibold">Informasi Kontak</h2>
+          <p className="mt-2 text-sm text-slate-600">
+            Data berikut diambil langsung dari pengaturan klinik dan tampil
+            konsisten untuk pasien maupun admin.
+          </p>
+
+          <dl className="mt-6 space-y-5 text-sm">
+            <div>
+              <dt className="font-medium text-slate-500">Nama Klinik</dt>
+              <dd className="mt-1 text-base text-slate-900">
+                {settings.clinicName}
+              </dd>
+            </div>
+            <div>
+              <dt className="font-medium text-slate-500">Telepon</dt>
+              <dd className="mt-1 text-base text-slate-900">
+                {settings.phone}
+              </dd>
+            </div>
+            <div>
+              <dt className="font-medium text-slate-500">Email</dt>
+              <dd className="mt-1 text-base text-slate-900">
+                {settings.email}
+              </dd>
+            </div>
+            <div>
+              <dt className="font-medium text-slate-500">Alamat</dt>
+              <dd className="mt-1 text-base text-slate-900">
+                {settings.address}
+              </dd>
+            </div>
+          </dl>
+        </aside>
       </div>
     </main>
   );

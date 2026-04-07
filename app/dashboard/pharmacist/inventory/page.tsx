@@ -66,6 +66,9 @@ interface MedicineWithStock {
   id: number;
   name: string;
   description?: string | null;
+  category?: string | null;
+  dosageForm?: string | null;
+  unit?: string | null;
   price: string;
   minimumStock: number;
   reorderThresholdPercentage: number;
@@ -156,6 +159,19 @@ function InventoryContent() {
               medicine.description === undefined
                 ? null
                 : String(medicine.description),
+            category:
+              medicine.category === null || medicine.category === undefined
+                ? null
+                : String(medicine.category),
+            dosageForm:
+              medicine.dosageForm === null ||
+              medicine.dosageForm === undefined
+                ? null
+                : String(medicine.dosageForm),
+            unit:
+              medicine.unit === null || medicine.unit === undefined
+                ? null
+                : String(medicine.unit),
             price: String(medicine.price ?? "0"),
             minimumStock,
             reorderThresholdPercentage,
@@ -391,7 +407,7 @@ function InventoryContent() {
         </div>
         <Button variant="outline" onClick={handleRefresh} className="shrink-0">
           <RefreshCw className="mr-2 h-4 w-4" />
-          Refresh Data
+          Muat Ulang Data
         </Button>
       </div>
 
@@ -514,6 +530,17 @@ function InventoryContent() {
                         <div className="font-medium">{medicine.name}</div>
                         <div className="text-xs text-muted-foreground truncate max-w-xs">
                           {medicine.description || "-"}
+                        </div>
+                        <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                          {medicine.dosageForm ? (
+                            <span>Bentuk: {medicine.dosageForm}</span>
+                          ) : null}
+                          {medicine.unit ? (
+                            <span>Satuan stok: {medicine.unit}</span>
+                          ) : null}
+                          {medicine.category ? (
+                            <span>Kategori: {medicine.category}</span>
+                          ) : null}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -655,6 +682,7 @@ function InventoryContent() {
                 ? {
                     id: selectedMedicine.id,
                     name: selectedMedicine.name,
+                    dosageForm: selectedMedicine.dosageForm || "",
                     description: selectedMedicine.description || "",
                     price: parseFloat(selectedMedicine.price),
                     minimumStock: selectedMedicine.minimumStock,

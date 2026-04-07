@@ -238,7 +238,7 @@ export default function NursePatientsPage() {
       >
         <Button variant="outline" onClick={fetchQueueData}>
           <RefreshCw className="mr-2 h-4 w-4" />
-          Refresh
+          Muat Ulang
         </Button>
       </PageHeader>
 

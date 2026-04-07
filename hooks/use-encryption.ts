@@ -1,19 +1,28 @@
-// hooks/use-encryption.ts
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
-  generateEncryptionKey,
-  encryptData,
+  DEFAULT_DEMO_ENCRYPTION_JWK,
   decryptData,
-  exportPublicKey,
+  encryptData,
   importEncryptionKey,
 } from "@/lib/utils/encryption";
 
 export function useEncryption() {
-  const [key, setKey] = useState<CryptoKey | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const keyRef = useRef<CryptoKey | null>(null);
+  const keyJwkRef = useRef<string | null>(null);
+  const demoKeyRef = useRef<CryptoKey | null>(null);
+
+  const getDemoKey = useCallback(async () => {
+    if (!demoKeyRef.current) {
+      demoKeyRef.current = await importEncryptionKey(
+        DEFAULT_DEMO_ENCRYPTION_JWK
+      );
+    }
+
+    return demoKeyRef.current;
+  }, []);
 
   const initialize = useCallback(async () => {
     if (keyRef.current) {
@@ -25,33 +34,25 @@ export function useEncryption() {
     }
 
     try {
-      // Check if we have a stored key in localStorage
-      const storedKey = localStorage.getItem("encryptionKey");
+      const storedKey =
+        localStorage.getItem("encryptionKey") || DEFAULT_DEMO_ENCRYPTION_JWK;
+      const importedKey = await importEncryptionKey(storedKey);
 
-      if (storedKey) {
-        // Import the stored key
-        const importedKey = await importEncryptionKey(storedKey);
-        keyRef.current = importedKey;
-        setKey(importedKey);
-      } else {
-        // Generate a new key
-        const newKey = await generateEncryptionKey();
+      keyRef.current = importedKey;
+      keyJwkRef.current = storedKey;
+      demoKeyRef.current = await getDemoKey();
 
-        // Export the key to JWK format and store it
-        const exportedKey = await exportPublicKey(newKey);
-        localStorage.setItem("encryptionKey", exportedKey);
-
-        keyRef.current = newKey;
-        setKey(newKey);
+      if (!localStorage.getItem("encryptionKey")) {
+        localStorage.setItem("encryptionKey", DEFAULT_DEMO_ENCRYPTION_JWK);
       }
 
       setIsInitialized(true);
-      return keyRef.current;
+      return importedKey;
     } catch (error) {
       console.error("Error initializing encryption:", error);
       return null;
     }
-  }, []);
+  }, [getDemoKey]);
 
   const encrypt = useCallback(
     async (data: string) => {
@@ -72,9 +73,18 @@ export function useEncryption() {
         throw new Error("Encryption key not initialized");
       }
 
-      return await decryptData(ciphertext, iv, activeKey);
+      try {
+        return await decryptData(ciphertext, iv, activeKey);
+      } catch (activeKeyError) {
+        if (keyJwkRef.current === DEFAULT_DEMO_ENCRYPTION_JWK) {
+          throw activeKeyError;
+        }
+
+        const demoKey = await getDemoKey();
+        return await decryptData(ciphertext, iv, demoKey);
+      }
     },
-    [initialize]
+    [getDemoKey, initialize]
   );
 
   return {

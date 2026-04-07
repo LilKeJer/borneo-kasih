@@ -11,7 +11,7 @@ const navItems = [
     icon: <Home className="h-4 w-4" />,
   },
   {
-    title: "Staff",
+    title: "Staf",
     href: "/dashboard/admin/staff",
     icon: <Users className="h-4 w-4" />,
   },
@@ -31,12 +31,12 @@ const navItems = [
     icon: <Tag className="h-4 w-4" />,
   },
   {
-    title: "Settings",
+    title: "Pengaturan",
     href: "/dashboard/admin/settings",
     icon: <Settings className="h-4 w-4" />,
   },
   {
-    title: "Profile",
+    title: "Profil",
     href: "/dashboard/profile",
     icon: <User className="h-4 w-4" />,
   },
@@ -46,8 +46,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col">
       <DashboardHeader
-        title="Admin Dashboard"
-        description="Manage clinic users and settings"
+        title="Dashboard Admin"
+        description="Kelola pengguna dan pengaturan klinik"
         navItems={navItems}
       />
       <div className="flex flex-1">

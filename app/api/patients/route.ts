@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/db";
 import { users, patientDetails } from "@/db/schema";
-import { eq, and, isNull, like, or } from "drizzle-orm";
+import { eq, and, isNull, like, or, count } from "drizzle-orm";
 
 // GET - List all patients with search and filters
 export async function GET(req: NextRequest) {
@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
 
     // Count query
     const totalCountQuery = db
-      .select({ count: users.id })
+      .select({ count: count() })
       .from(users)
       .leftJoin(patientDetails, eq(users.id, patientDetails.userId))
       .where(whereClause);

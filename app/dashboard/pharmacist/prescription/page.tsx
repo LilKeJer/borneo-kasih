@@ -36,7 +36,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils/date";
-import { useEncryption } from "@/hooks/use-encryption"; // Asumsi hook enkripsi sudah ada
+import { useEncryption } from "@/hooks/use-encryption";
 
 interface MedicineInPrescription {
   prescriptionMedicineId: number;
@@ -79,7 +79,8 @@ interface DecryptedMedicine
 
 export default function PrescriptionsPage() {
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingPrescriptions, setLoadingPrescriptions] = useState(true);
+  const [loadingDetails, setLoadingDetails] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedPrescription, setSelectedPrescription] =
@@ -89,12 +90,16 @@ export default function PrescriptionsPage() {
   >([]);
   const [processing, setProcessing] = useState(false);
 
-  const { decrypt, isInitialized: encryptionInitialized } = useEncryption();
+  const {
+    decrypt,
+    initialize,
+    isInitialized: encryptionInitialized,
+  } = useEncryption();
 
   const fetchPrescriptions = useCallback(async () => {
-    setLoading(true);
+    setLoadingPrescriptions(true);
     try {
-      const params = new URLSearchParams({ search: searchTerm, limit: "50" }); // Ambil lebih banyak untuk filtering client-side jika perlu
+      const params = new URLSearchParams({ search: searchTerm, limit: "50" });
       const response = await fetch(`/api/prescriptions?${params.toString()}`);
       if (!response.ok) throw new Error("Gagal memuat data resep");
       const data = await response.json();
@@ -103,7 +108,7 @@ export default function PrescriptionsPage() {
       toast.error("Gagal memuat data resep.");
       console.error(error);
     } finally {
-      setLoading(false);
+      setLoadingPrescriptions(false);
     }
   }, [searchTerm]);
 
@@ -111,9 +116,13 @@ export default function PrescriptionsPage() {
     fetchPrescriptions();
   }, [fetchPrescriptions]);
 
+  useEffect(() => {
+    void initialize();
+  }, [initialize]);
+
   const decryptPrescriptionDetails = async (prescription: Prescription) => {
-    if (!encryptionInitialized || !prescription) return;
-    setLoading(true);
+    if (!prescription) return;
+    setLoadingDetails(true);
     try {
       const resolveIv = (ivString: string | null, key: string) => {
         if (!ivString) return null;
@@ -128,33 +137,51 @@ export default function PrescriptionsPage() {
         return ivString;
       };
 
+      const decryptField = async (
+        value: string | null,
+        ivString: string | null,
+        key: string
+      ) => {
+        if (!value) {
+          return "-";
+        }
+
+        const iv = resolveIv(ivString, key);
+        if (!iv) {
+          return value;
+        }
+
+        try {
+          return await decrypt(value, iv);
+        } catch (error) {
+          console.warn("Gagal mendekripsi data resep.", {
+            key,
+            error,
+          });
+          return ivString ? "Data terenkripsi" : value;
+        }
+      };
+
       const decrypted: DecryptedMedicine[] = await Promise.all(
         prescription.medicines.map(async (med) => {
-          if (
-            med.encryptedDosage &&
-            med.encryptedFrequency &&
-            med.encryptedDuration &&
-            med.encryptionIv
-          ) {
-            const dosageIv = resolveIv(med.encryptionIv, "dosage");
-            const frequencyIv = resolveIv(med.encryptionIv, "frequency");
-            const durationIv = resolveIv(med.encryptionIv, "duration");
-
-            if (!dosageIv || !frequencyIv || !durationIv) {
-              return { ...med, dosage: "-", frequency: "-", duration: "-" };
-            }
-
-            return {
-              ...med,
-              dosage: await decrypt(med.encryptedDosage, dosageIv),
-              frequency: await decrypt(
-                med.encryptedFrequency,
-                frequencyIv
-              ),
-              duration: await decrypt(med.encryptedDuration, durationIv),
-            };
-          }
-          return { ...med, dosage: "-", frequency: "-", duration: "-" }; // Fallback
+          return {
+            ...med,
+            dosage: await decryptField(
+              med.encryptedDosage,
+              med.encryptionIv,
+              "dosage"
+            ),
+            frequency: await decryptField(
+              med.encryptedFrequency,
+              med.encryptionIv,
+              "frequency"
+            ),
+            duration: await decryptField(
+              med.encryptedDuration,
+              med.encryptionIv,
+              "duration"
+            ),
+          };
         })
       );
       setDecryptedMedicines(decrypted);
@@ -170,20 +197,22 @@ export default function PrescriptionsPage() {
         }))
       );
     } finally {
-      setLoading(false);
+      setLoadingDetails(false);
     }
   };
 
   const handleViewDetails = async (prescription: Prescription) => {
     setSelectedPrescription(prescription);
+    setDecryptedMedicines([]);
     setIsDetailOpen(true);
-    if (encryptionInitialized) {
-      await decryptPrescriptionDetails(prescription);
-    } else {
-      // Handle case where encryption is not yet ready (e.g., show a message or retry)
-      toast.info("Menyiapkan enkripsi, silakan coba lagi sebentar.");
-      // Optionally, you can trigger initialization here if needed, though useEncryption should handle it.
+
+    const key = encryptionInitialized ? true : await initialize();
+    if (!key) {
+      toast.error("Kunci enkripsi tidak dapat disiapkan.");
+      return;
     }
+
+    await decryptPrescriptionDetails(prescription);
   };
 
   const handleDispensePrescription = async (prescriptionId: number) => {
@@ -214,7 +243,7 @@ export default function PrescriptionsPage() {
   const getStatusBadge = (status: Prescription["status"]) => {
     switch (status) {
       case "Pending":
-        return <Badge variant="outline">Pending</Badge>;
+        return <Badge variant="outline">Menunggu</Badge>;
       case "Processed":
       case "Dispensed":
         return (
@@ -236,14 +265,14 @@ export default function PrescriptionsPage() {
         <Button
           variant="outline"
           onClick={fetchPrescriptions}
-          disabled={loading}
+          disabled={loadingPrescriptions}
         >
-          {loading ? (
+          {loadingPrescriptions ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           ) : (
             <RefreshCw className="mr-2 h-4 w-4" />
           )}
-          Refresh
+          Muat Ulang
         </Button>
       </PageHeader>
 
@@ -268,11 +297,11 @@ export default function PrescriptionsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          {loading && prescriptions.length === 0 ? (
+          {loadingPrescriptions && prescriptions.length === 0 ? (
             <div className="p-6 text-center">
               <Loader2 className="h-6 w-6 animate-spin mx-auto" /> Memuat...
             </div>
-          ) : !loading && prescriptions.length === 0 ? (
+          ) : !loadingPrescriptions && prescriptions.length === 0 ? (
             <div className="p-6 text-center text-muted-foreground">
               Tidak ada resep yang perlu diproses.
             </div>
@@ -349,7 +378,7 @@ export default function PrescriptionsPage() {
               </DialogDescription>
             )}
           </DialogHeader>
-          {loading ? (
+          {loadingDetails ? (
             <div className="py-6 text-center">
               <Loader2 className="h-6 w-6 animate-spin" /> Memuat detail...
             </div>

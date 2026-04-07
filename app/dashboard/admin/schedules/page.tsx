@@ -605,7 +605,7 @@ export default function DoctorSchedulesPage() {
             </div>
             <div className="flex gap-2 ml-2">
               <Button variant="outline" onClick={fetchSchedules}>
-                Refresh
+                Muat Ulang
               </Button>
               <Button onClick={() => setIsAddDialogOpen(true)}>
                 <Plus className="mr-2 h-4 w-4" />
@@ -689,7 +689,7 @@ export default function DoctorSchedulesPage() {
                                     }}
                                   >
                                     <Edit className="mr-2 h-4 w-4" />
-                                    Edit
+                                    Ubah
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
                                     onClick={() => {
@@ -783,7 +783,7 @@ export default function DoctorSchedulesPage() {
                                 }}
                               >
                                 <Edit className="mr-2 h-4 w-4" />
-                                Edit
+                                Ubah
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => {
@@ -955,7 +955,7 @@ export default function DoctorSchedulesPage() {
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Jadwal Dokter</DialogTitle>
+            <DialogTitle>Ubah Jadwal Dokter</DialogTitle>
           </DialogHeader>
           {selectedSchedule && (
             <div className="py-4 space-y-4">
@@ -1218,7 +1218,7 @@ export default function DoctorSchedulesPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Sesi Praktik</DialogTitle>
+            <DialogTitle>Ubah Sesi Praktik</DialogTitle>
           </DialogHeader>
           <div className="py-4 space-y-4">
             <div className="space-y-2">

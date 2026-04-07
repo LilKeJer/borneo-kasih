@@ -145,7 +145,9 @@ export function PendingPatientList({ onUpdate }: PendingPatientListProps) {
 
   const handleReject = async (patientId: string) => {
     if (
-      !confirm("Apakah Anda yakin ingin menolak pasien ini? Data akan dihapus.")
+      !confirm(
+        "Apakah Anda yakin ingin menolak pasien ini? Akun akan diarsipkan dari daftar aktif."
+      )
     )
       return;
 
@@ -178,7 +180,7 @@ export function PendingPatientList({ onUpdate }: PendingPatientListProps) {
     return (
       <Card>
         <CardContent className="py-8 text-center">
-          <p>Loading...</p>
+          <p>Memuat data pasien...</p>
         </CardContent>
       </Card>
     );
@@ -207,8 +209,12 @@ export function PendingPatientList({ onUpdate }: PendingPatientListProps) {
                 <CardDescription>
                   Username: {patient.username} | NIK: {patient.nik}
                 </CardDescription>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Periksa kesesuaian identitas pasien dengan arsip klinik sebelum
+                  akun disetujui.
+                </p>
               </div>
-              <Badge variant="outline">Pending</Badge>
+              <Badge variant="outline">Menunggu Verifikasi</Badge>
             </div>
           </CardHeader>
           <CardContent>
@@ -218,7 +224,7 @@ export function PendingPatientList({ onUpdate }: PendingPatientListProps) {
                   <span className="text-muted-foreground">Email:</span>{" "}
                   {patient.email || (
                     <Badge variant="destructive" className="h-5">
-                      Missing
+                      Belum diisi
                     </Badge>
                   )}
                 </div>
@@ -226,7 +232,7 @@ export function PendingPatientList({ onUpdate }: PendingPatientListProps) {
                   <span className="text-muted-foreground">Telepon:</span>{" "}
                   {patient.phone || (
                     <Badge variant="destructive" className="h-5">
-                      Missing
+                      Belum diisi
                     </Badge>
                   )}
                 </div>
@@ -244,7 +250,7 @@ export function PendingPatientList({ onUpdate }: PendingPatientListProps) {
                 <span className="text-sm text-muted-foreground">Alamat:</span>{" "}
                 {patient.address || (
                   <Badge variant="destructive" className="h-5">
-                    Missing
+                    Belum diisi
                   </Badge>
                 )}
               </div>

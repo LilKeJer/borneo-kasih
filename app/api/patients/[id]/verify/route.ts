@@ -33,7 +33,7 @@ export async function PUT(
 
     if (!existingPatient) {
       return NextResponse.json(
-        { message: "Patient not found" },
+        { message: "Pasien tidak ditemukan" },
         { status: 404 }
       );
     }
@@ -63,7 +63,7 @@ export async function PUT(
         .where(eq(users.id, patientId));
 
       return NextResponse.json({
-        message: "Patient approved successfully",
+        message: "Pasien berhasil disetujui",
         status: "Verified",
       });
     } else if (action === "reject") {
@@ -77,19 +77,19 @@ export async function PUT(
         .where(eq(users.id, patientId));
 
       return NextResponse.json({
-        message: "Patient rejected and removed",
+        message: "Pasien ditolak dan arsip akun disembunyikan",
         status: "Rejected",
       });
     } else {
       return NextResponse.json(
-        { message: "Invalid action. Use 'approve' or 'reject'" },
+        { message: "Aksi tidak valid. Gunakan 'approve' atau 'reject'" },
         { status: 400 }
       );
     }
   } catch (error) {
     console.error("Error verifying patient:", error);
     return NextResponse.json(
-      { message: "Internal server error" },
+      { message: "Terjadi kesalahan internal server" },
       { status: 500 }
     );
   }

@@ -7,6 +7,15 @@ export default withAuth(
     const { pathname } = req.nextUrl;
     const token = req.nextauth.token;
 
+    if (
+      token?.status &&
+      ["Inactive", "Suspended", "Rejected"].includes(token.status)
+    ) {
+      return NextResponse.redirect(
+        new URL("/auth/login?blocked=inactive", req.url)
+      );
+    }
+
     // Define protected paths and allowed roles
     const protectedPaths = [
       { path: "/dashboard/admin", roles: ["Admin"] },

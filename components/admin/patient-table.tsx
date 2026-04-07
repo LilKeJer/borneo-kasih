@@ -1,4 +1,3 @@
-// components/admin/patient-table.tsx
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -16,10 +15,35 @@ import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Search, Eye, Check, X } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Check,
+  Eye,
+  Loader2,
+  MoreHorizontal,
+  Pencil,
+  Search,
+  UserRoundX,
+  UserRoundCheck,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/utils/date";
 
@@ -37,7 +61,31 @@ interface Patient {
   createdAt: string;
 }
 
-export function PatientTable() {
+interface PatientTableProps {
+  onUpdate?: () => void;
+}
+
+interface PatientFormValues {
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  dateOfBirth: string;
+  gender: string;
+}
+
+const statusLabels: Record<string, string> = {
+  Pending: "Menunggu Verifikasi",
+  Verified: "Terverifikasi",
+  Active: "Aktif",
+  Inactive: "Nonaktif",
+  Suspended: "Ditangguhkan",
+  Rejected: "Ditolak",
+};
+
+const editableStatuses = ["Verified", "Suspended", "Inactive"];
+
+export function PatientTable({ onUpdate }: PatientTableProps) {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -45,6 +93,17 @@ export function PatientTable() {
   const [totalPages, setTotalPages] = useState(1);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editForm, setEditForm] = useState<PatientFormValues>({
+    name: "",
+    email: "",
+    phone: "",
+    address: "",
+    dateOfBirth: "",
+    gender: "",
+  });
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [statusActionId, setStatusActionId] = useState<string | null>(null);
 
   const fetchPatients = useCallback(async () => {
     try {
@@ -56,7 +115,9 @@ export function PatientTable() {
       });
 
       const response = await fetch(`/api/patients?${params.toString()}`);
-      if (!response.ok) throw new Error("Failed to fetch patients");
+      if (!response.ok) {
+        throw new Error("Gagal memuat data pasien");
+      }
 
       const data = await response.json();
       setPatients(data.data);
@@ -73,9 +134,60 @@ export function PatientTable() {
     fetchPatients();
   }, [fetchPatients]);
 
+  const notifyUpdated = useCallback(() => {
+    fetchPatients();
+    onUpdate?.();
+  }, [fetchPatients, onUpdate]);
+
+  const getStatusBadge = (status: string) => {
+    const label = statusLabels[status] ?? status;
+
+    switch (status) {
+      case "Verified":
+      case "Active":
+        return (
+          <Badge variant="secondary" className="bg-green-100 text-green-700">
+            {label}
+          </Badge>
+        );
+      case "Pending":
+        return <Badge variant="outline">{label}</Badge>;
+      case "Suspended":
+        return (
+          <Badge variant="secondary" className="bg-amber-100 text-amber-700">
+            {label}
+          </Badge>
+        );
+      case "Inactive":
+      case "Rejected":
+        return <Badge variant="destructive">{label}</Badge>;
+      default:
+        return <Badge>{label}</Badge>;
+    }
+  };
+
+  const getGenderLabel = (gender: string) => {
+    return gender === "L" ? "Laki-laki" : gender === "P" ? "Perempuan" : "-";
+  };
+
   const handleView = (patient: Patient) => {
     setSelectedPatient(patient);
     setIsViewModalOpen(true);
+  };
+
+  const handleOpenEdit = (patient: Patient) => {
+    setSelectedPatient(patient);
+    setEditForm({
+      name: patient.name || "",
+      email: patient.email || "",
+      phone: patient.phone || "",
+      address: patient.address || "",
+      dateOfBirth: patient.dateOfBirth
+        ? String(patient.dateOfBirth).split("T")[0]
+        : "",
+      gender: patient.gender || "",
+    });
+    setIsEditModalOpen(true);
   };
 
   const handleVerify = async (
@@ -84,10 +196,12 @@ export function PatientTable() {
   ) => {
     const confirmMessage =
       action === "approve"
-        ? "Apakah Anda yakin ingin menyetujui pasien ini?"
-        : "Apakah Anda yakin ingin menolak pasien ini?";
+        ? "Setujui pasien ini?"
+        : "Tolak pasien ini? Akun akan diarsipkan dari daftar aktif.";
 
-    if (!confirm(confirmMessage)) return;
+    if (!confirm(confirmMessage)) {
+      return;
+    }
 
     try {
       const response = await fetch(`/api/patients/${patientId}/verify`, {
@@ -98,32 +212,101 @@ export function PatientTable() {
         body: JSON.stringify({ action }),
       });
 
-      if (!response.ok) throw new Error("Failed to verify patient");
-
       const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.message || "Gagal memproses verifikasi pasien");
+      }
+
       toast.success(result.message);
-      fetchPatients();
+      notifyUpdated();
     } catch (error) {
       console.error("Error verifying patient:", error);
-      toast.error("Gagal memverifikasi pasien");
+      toast.error(
+        error instanceof Error ? error.message : "Gagal memverifikasi pasien"
+      );
     }
   };
 
-  const getStatusBadgeVariant = (status: string) => {
-    switch (status) {
-      case "Verified":
-        return "secondary";
-      case "Pending":
-        return "outline";
-      case "Active":
-        return "secondary";
-      default:
-        return "destructive";
+  const handleSaveEdit = async () => {
+    if (!selectedPatient) {
+      return;
+    }
+
+    if (!editForm.name.trim()) {
+      toast.error("Nama pasien wajib diisi");
+      return;
+    }
+
+    setSavingEdit(true);
+    try {
+      const response = await fetch(`/api/patients/${selectedPatient.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(editForm),
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.message || "Gagal memperbarui pasien");
+      }
+
+      toast.success(result.message);
+      setIsEditModalOpen(false);
+      notifyUpdated();
+    } catch (error) {
+      console.error("Error updating patient:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Gagal memperbarui pasien"
+      );
+    } finally {
+      setSavingEdit(false);
     }
   };
 
-  const getGenderLabel = (gender: string) => {
-    return gender === "L" ? "Laki-laki" : "Perempuan";
+  const handleStatusChange = async (patient: Patient, status: string) => {
+    if (patient.status === status) {
+      return;
+    }
+
+    if (patient.status === "Pending" && status === "Verified") {
+      toast.info(
+        "Gunakan tab verifikasi pasien untuk menyetujui akun yang masih pending."
+      );
+      return;
+    }
+
+    const label = statusLabels[status] ?? status;
+    if (!confirm(`Ubah status akun ${patient.name} menjadi ${label}?`)) {
+      return;
+    }
+
+    setStatusActionId(patient.id);
+    try {
+      const response = await fetch(`/api/patients/${patient.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.message || "Gagal mengubah status pasien");
+      }
+
+      toast.success(result.message);
+      notifyUpdated();
+    } catch (error) {
+      console.error("Error updating patient status:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Gagal mengubah status pasien"
+      );
+    } finally {
+      setStatusActionId(null);
+    }
   };
 
   return (
@@ -133,10 +316,13 @@ export function PatientTable() {
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="Cari pasien..."
+            placeholder="Cari nama, NIK, email, atau username pasien"
             className="pl-8"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setPage(1);
+            }}
           />
         </div>
       </div>
@@ -157,8 +343,11 @@ export function PatientTable() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center">
-                  Loading...
+                <TableCell colSpan={7} className="h-24 text-center">
+                  <div className="flex items-center justify-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Memuat data pasien...
+                  </div>
                 </TableCell>
               </TableRow>
             ) : patients.length === 0 ? (
@@ -176,16 +365,10 @@ export function PatientTable() {
                   <TableCell>{patient.nik || "-"}</TableCell>
                   <TableCell>{patient.email || "-"}</TableCell>
                   <TableCell>{patient.phone || "-"}</TableCell>
-                  <TableCell>
-                    {patient.gender ? getGenderLabel(patient.gender) : "-"}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={getStatusBadgeVariant(patient.status)}>
-                      {patient.status}
-                    </Badge>
-                  </TableCell>
+                  <TableCell>{getGenderLabel(patient.gender)}</TableCell>
+                  <TableCell>{getStatusBadge(patient.status)}</TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
+                    <div className="flex items-center justify-end gap-2">
                       <Button
                         variant="outline"
                         size="sm"
@@ -193,6 +376,15 @@ export function PatientTable() {
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenEdit(patient)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+
                       {patient.status === "Pending" && (
                         <>
                           <Button
@@ -213,6 +405,45 @@ export function PatientTable() {
                           </Button>
                         </>
                       )}
+
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={statusActionId === patient.id}
+                          >
+                            {statusActionId === patient.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <MoreHorizontal className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            disabled={patient.status === "Pending"}
+                            onClick={() => handleStatusChange(patient, "Verified")}
+                          >
+                            <UserRoundCheck className="h-4 w-4" />
+                            {patient.status === "Pending"
+                              ? "Verifikasi lewat tab pending"
+                              : "Tandai Terverifikasi"}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleStatusChange(patient, "Suspended")}
+                          >
+                            <UserRoundX className="h-4 w-4" />
+                            Tangguhkan Akun
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleStatusChange(patient, "Inactive")}
+                          >
+                            <UserRoundX className="h-4 w-4" />
+                            Nonaktifkan Akun
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -244,7 +475,6 @@ export function PatientTable() {
         </Button>
       </div>
 
-      {/* View Patient Modal */}
       <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -276,9 +506,7 @@ export function PatientTable() {
                     Gender
                   </p>
                   <p className="font-medium">
-                    {selectedPatient.gender
-                      ? getGenderLabel(selectedPatient.gender)
-                      : "-"}
+                    {getGenderLabel(selectedPatient.gender)}
                   </p>
                 </div>
                 <div>
@@ -307,11 +535,7 @@ export function PatientTable() {
                   <p className="text-sm font-medium text-muted-foreground">
                     Status
                   </p>
-                  <Badge
-                    variant={getStatusBadgeVariant(selectedPatient.status)}
-                  >
-                    {selectedPatient.status}
-                  </Badge>
+                  {getStatusBadge(selectedPatient.status)}
                 </div>
               </div>
               <div>
@@ -330,6 +554,160 @@ export function PatientTable() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Edit Data Pasien</DialogTitle>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-2">
+            <div className="grid gap-2">
+              <Label htmlFor="patient-name">Nama Lengkap</Label>
+              <Input
+                id="patient-name"
+                value={editForm.name}
+                onChange={(event) =>
+                  setEditForm((current) => ({
+                    ...current,
+                    name: event.target.value,
+                  }))
+                }
+              />
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-2">
+                <Label htmlFor="patient-email">Email</Label>
+                <Input
+                  id="patient-email"
+                  type="email"
+                  value={editForm.email}
+                  onChange={(event) =>
+                    setEditForm((current) => ({
+                      ...current,
+                      email: event.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="patient-phone">Nomor Telepon</Label>
+                <Input
+                  id="patient-phone"
+                  value={editForm.phone}
+                  onChange={(event) =>
+                    setEditForm((current) => ({
+                      ...current,
+                      phone: event.target.value,
+                    }))
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-2">
+                <Label htmlFor="patient-date-of-birth">Tanggal Lahir</Label>
+                <Input
+                  id="patient-date-of-birth"
+                  type="date"
+                  value={editForm.dateOfBirth}
+                  onChange={(event) =>
+                    setEditForm((current) => ({
+                      ...current,
+                      dateOfBirth: event.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Jenis Kelamin</Label>
+                <Select
+                  value={editForm.gender}
+                  onValueChange={(value) =>
+                    setEditForm((current) => ({
+                      ...current,
+                      gender: value,
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih jenis kelamin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="L">Laki-laki</SelectItem>
+                    <SelectItem value="P">Perempuan</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="patient-address">Alamat</Label>
+              <Input
+                id="patient-address"
+                value={editForm.address}
+                onChange={(event) =>
+                  setEditForm((current) => ({
+                    ...current,
+                    address: event.target.value,
+                  }))
+                }
+              />
+            </div>
+
+            {selectedPatient && (
+              <div className="grid gap-2">
+                <Label>Status Akun Saat Ini</Label>
+                <div className="flex flex-wrap gap-2">
+                  {getStatusBadge(selectedPatient.status)}
+                  {editableStatuses.map((status) => (
+                    <Button
+                      key={status}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        handleStatusChange(selectedPatient, status)
+                      }
+                      disabled={
+                        statusActionId === selectedPatient.id ||
+                        selectedPatient.status === status ||
+                        (selectedPatient.status === "Pending" &&
+                          status === "Verified")
+                      }
+                    >
+                      {statusLabels[status]}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsEditModalOpen(false)}
+              disabled={savingEdit}
+            >
+              Batal
+            </Button>
+            <Button type="button" onClick={handleSaveEdit} disabled={savingEdit}>
+              {savingEdit ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Menyimpan...
+                </>
+              ) : (
+                "Simpan Perubahan"
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

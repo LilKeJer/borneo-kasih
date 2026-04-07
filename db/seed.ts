@@ -3,6 +3,11 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import * as dotenv from "dotenv";
 import * as bcrypt from "bcrypt";
 import { Pool } from "pg";
+import {
+  DEFAULT_DEMO_ENCRYPTION_JWK,
+  encryptData,
+  importEncryptionKey,
+} from "../lib/utils/encryption";
 import * as schema from "./schema";
 import {
   adminDetails,
@@ -90,6 +95,76 @@ function toDateOnly(value: Date): string {
   const month = String(value.getMonth() + 1).padStart(2, "0");
   const day = String(value.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+async function encryptNamedFields(
+  key: CryptoKey,
+  values: Record<string, string>
+) {
+  const encryptedValues: Record<string, string> = {};
+  const ivMap: Record<string, string> = {};
+
+  for (const [field, value] of Object.entries(values)) {
+    const { ciphertext, iv } = await encryptData(value, key);
+    encryptedValues[field] = ciphertext;
+    ivMap[field] = iv;
+  }
+
+  return {
+    encryptedValues,
+    ivMap,
+  };
+}
+
+async function encryptMedicalHistorySeed(
+  key: CryptoKey,
+  values: {
+    nurseNotes: string;
+    condition: string;
+    description: string;
+    treatment: string;
+    doctorNotes: string;
+  }
+) {
+  const nurse = await encryptData(values.nurseNotes, key);
+  const doctor = await encryptNamedFields(key, {
+    condition: values.condition,
+    description: values.description,
+    treatment: values.treatment,
+    doctorNotes: values.doctorNotes,
+  });
+
+  return {
+    encryptedNurseNotes: nurse.ciphertext,
+    encryptionIvNurse: nurse.iv,
+    encryptedCondition: doctor.encryptedValues.condition,
+    encryptedDescription: doctor.encryptedValues.description,
+    encryptedTreatment: doctor.encryptedValues.treatment,
+    encryptedDoctorNotes: doctor.encryptedValues.doctorNotes,
+    encryptionIvDoctor: JSON.stringify(doctor.ivMap),
+  };
+}
+
+async function encryptPrescriptionSeed(
+  key: CryptoKey,
+  values: {
+    dosage: string;
+    frequency: string;
+    duration: string;
+  }
+) {
+  const encrypted = await encryptNamedFields(key, {
+    dosage: values.dosage,
+    frequency: values.frequency,
+    duration: values.duration,
+  });
+
+  return {
+    encryptedDosage: encrypted.encryptedValues.dosage,
+    encryptedFrequency: encrypted.encryptedValues.frequency,
+    encryptedDuration: encrypted.encryptedValues.duration,
+    encryptionIv: JSON.stringify(encrypted.ivMap),
+  };
 }
 
 async function seed() {
@@ -183,6 +258,9 @@ async function seed() {
     const staleNoShowYesterdayAt = setTime(yesterday, 11, 0);
 
     const passwordHash = await bcrypt.hash(TEST_PASSWORD, 10);
+    const demoEncryptionKey = await importEncryptionKey(
+      DEFAULT_DEMO_ENCRYPTION_JWK
+    );
 
     await db.transaction(async (tx) => {
       // For local/dev testing only. This clears all app data.
@@ -606,6 +684,7 @@ async function seed() {
           name: "Paracetamol 500mg",
           description: "Obat penurun demam dan nyeri",
           category: "Analgesik",
+          dosageForm: "Tablet",
           unit: "tablet",
           pharmacistId: pharmacistUser.id,
           price: "5000.00",
@@ -619,6 +698,7 @@ async function seed() {
           name: "Amoxicillin 500mg",
           description: "Antibiotik oral",
           category: "Antibiotik",
+          dosageForm: "Kapsul",
           unit: "kapsul",
           pharmacistId: pharmacistUser.id,
           price: "7000.00",
@@ -632,6 +712,7 @@ async function seed() {
           name: "Vitamin C 500mg",
           description: "Suplemen vitamin C",
           category: "Suplemen",
+          dosageForm: "Tablet",
           unit: "tablet",
           pharmacistId: pharmacistUser.id,
           price: "3000.00",
@@ -857,19 +938,56 @@ async function seed() {
     void reservationTomorrow;
     void reservationNoShowYesterday;
 
+    const historyWaitingPaymentEncrypted = await encryptMedicalHistorySeed(
+      demoEncryptionKey,
+      {
+        nurseNotes: "Tekanan darah 120/80, suhu 37.3C",
+        condition: "Cephalgia",
+        description: "Sakit kepala tegang",
+        treatment: "Istirahat dan analgesik",
+        doctorNotes: "Kontrol jika nyeri berlanjut lebih dari 3 hari",
+      }
+    );
+
+    const historyCompletedTodayEncrypted = await encryptMedicalHistorySeed(
+      demoEncryptionKey,
+      {
+        nurseNotes: "Suhu 38.1C, batuk ringan",
+        condition: "ISPA ringan",
+        description: "Flu dan radang tenggorokan",
+        treatment: "Obat simptomatik dan antibiotik",
+        doctorNotes: "Perbanyak minum air hangat",
+      }
+    );
+
+    const historyCompletedYesterdayEncrypted = await encryptMedicalHistorySeed(
+      demoEncryptionKey,
+      {
+        nurseNotes: "Tekanan darah 140/90",
+        condition: "Hipertensi",
+        description: "Kontrol tekanan darah",
+        treatment: "Lanjutkan terapi rutin",
+        doctorNotes: "Monitoring tekanan darah harian",
+      }
+    );
+
     const [historyWaitingPayment] = await tx
       .insert(medicalHistories)
       .values({
         patientId: patientThreeUser.id,
         reservationId: reservationWaitingPayment.id,
         nurseId: nurseUser.id,
-        encryptedNurseNotes: "Tekanan darah 120/80, suhu 37.3C",
+        encryptedNurseNotes: historyWaitingPaymentEncrypted.encryptedNurseNotes,
+        encryptionIvNurse: historyWaitingPaymentEncrypted.encryptionIvNurse,
         nurseCheckupTimestamp: setTime(today, 10, 15),
         doctorId: doctorUser.id,
-        encryptedCondition: "Cephalgia",
-        encryptedDescription: "Sakit kepala tegang",
-        encryptedTreatment: "Istirahat dan analgesik",
-        encryptedDoctorNotes: "Kontrol jika nyeri berlanjut lebih dari 3 hari",
+        encryptedCondition: historyWaitingPaymentEncrypted.encryptedCondition,
+        encryptedDescription:
+          historyWaitingPaymentEncrypted.encryptedDescription,
+        encryptedTreatment: historyWaitingPaymentEncrypted.encryptedTreatment,
+        encryptedDoctorNotes:
+          historyWaitingPaymentEncrypted.encryptedDoctorNotes,
+        encryptionIvDoctor: historyWaitingPaymentEncrypted.encryptionIvDoctor,
         dateOfDiagnosis: toDateOnly(today),
         createdAt: now,
         updatedAt: now,
@@ -882,13 +1000,17 @@ async function seed() {
         patientId: patientOneUser.id,
         reservationId: reservationCompletedToday.id,
         nurseId: nurseUser.id,
-        encryptedNurseNotes: "Suhu 38.1C, batuk ringan",
+        encryptedNurseNotes: historyCompletedTodayEncrypted.encryptedNurseNotes,
+        encryptionIvNurse: historyCompletedTodayEncrypted.encryptionIvNurse,
         nurseCheckupTimestamp: setTime(today, 8, 30),
         doctorId: doctorUser.id,
-        encryptedCondition: "ISPA ringan",
-        encryptedDescription: "Flu dan radang tenggorokan",
-        encryptedTreatment: "Obat simptomatik dan antibiotik",
-        encryptedDoctorNotes: "Perbanyak minum air hangat",
+        encryptedCondition: historyCompletedTodayEncrypted.encryptedCondition,
+        encryptedDescription:
+          historyCompletedTodayEncrypted.encryptedDescription,
+        encryptedTreatment: historyCompletedTodayEncrypted.encryptedTreatment,
+        encryptedDoctorNotes:
+          historyCompletedTodayEncrypted.encryptedDoctorNotes,
+        encryptionIvDoctor: historyCompletedTodayEncrypted.encryptionIvDoctor,
         dateOfDiagnosis: toDateOnly(today),
         createdAt: now,
         updatedAt: now,
@@ -901,13 +1023,21 @@ async function seed() {
         patientId: patientOneUser.id,
         reservationId: reservationCompletedYesterday.id,
         nurseId: nurseUser.id,
-        encryptedNurseNotes: "Tekanan darah 140/90",
+        encryptedNurseNotes:
+          historyCompletedYesterdayEncrypted.encryptedNurseNotes,
+        encryptionIvNurse: historyCompletedYesterdayEncrypted.encryptionIvNurse,
         nurseCheckupTimestamp: setTime(yesterday, 10, 10),
         doctorId: doctorUser.id,
-        encryptedCondition: "Hipertensi",
-        encryptedDescription: "Kontrol tekanan darah",
-        encryptedTreatment: "Lanjutkan terapi rutin",
-        encryptedDoctorNotes: "Monitoring tekanan darah harian",
+        encryptedCondition:
+          historyCompletedYesterdayEncrypted.encryptedCondition,
+        encryptedDescription:
+          historyCompletedYesterdayEncrypted.encryptedDescription,
+        encryptedTreatment:
+          historyCompletedYesterdayEncrypted.encryptedTreatment,
+        encryptedDoctorNotes:
+          historyCompletedYesterdayEncrypted.encryptedDoctorNotes,
+        encryptionIvDoctor:
+          historyCompletedYesterdayEncrypted.encryptionIvDoctor,
         dateOfDiagnosis: toDateOnly(yesterday),
         createdAt: addDays(now, -1),
         updatedAt: addDays(now, -1),
@@ -977,14 +1107,45 @@ async function seed() {
         ])
         .returning({ id: prescriptions.id });
 
+    const prescriptionWaitingPaymentEncrypted = await encryptPrescriptionSeed(
+      demoEncryptionKey,
+      {
+        dosage: "500 mg",
+        frequency: "3x sehari",
+        duration: "5 hari",
+      }
+    );
+
+    const prescriptionPaidReadyEncrypted = await encryptPrescriptionSeed(
+      demoEncryptionKey,
+      {
+        dosage: "500 mg",
+        frequency: "3x sehari",
+        duration: "7 hari",
+      }
+    );
+
+    const prescriptionDoneEncrypted = await encryptPrescriptionSeed(
+      demoEncryptionKey,
+      {
+        dosage: "500 mg",
+        frequency: "1x sehari",
+        duration: "5 hari",
+      }
+    );
+
     await tx.insert(prescriptionMedicines).values([
       {
         prescriptionId: prescriptionWaitingPayment.id,
         medicineId: paracetamol.id,
         stockId: paracetamolStock.id,
-        encryptedDosage: "500 mg",
-        encryptedFrequency: "3x sehari",
-        encryptedDuration: "5 hari",
+        encryptedDosage:
+          prescriptionWaitingPaymentEncrypted.encryptedDosage,
+        encryptedFrequency:
+          prescriptionWaitingPaymentEncrypted.encryptedFrequency,
+        encryptedDuration:
+          prescriptionWaitingPaymentEncrypted.encryptedDuration,
+        encryptionIv: prescriptionWaitingPaymentEncrypted.encryptionIv,
         quantityUsed: 10,
         createdAt: now,
         updatedAt: now,
@@ -993,9 +1154,10 @@ async function seed() {
         prescriptionId: prescriptionPaidReady.id,
         medicineId: amoxicillin.id,
         stockId: amoxicillinStock.id,
-        encryptedDosage: "500 mg",
-        encryptedFrequency: "3x sehari",
-        encryptedDuration: "7 hari",
+        encryptedDosage: prescriptionPaidReadyEncrypted.encryptedDosage,
+        encryptedFrequency: prescriptionPaidReadyEncrypted.encryptedFrequency,
+        encryptedDuration: prescriptionPaidReadyEncrypted.encryptedDuration,
+        encryptionIv: prescriptionPaidReadyEncrypted.encryptionIv,
         quantityUsed: 14,
         createdAt: now,
         updatedAt: now,
@@ -1004,9 +1166,10 @@ async function seed() {
         prescriptionId: prescriptionDone.id,
         medicineId: vitaminC.id,
         stockId: vitaminCStock.id,
-        encryptedDosage: "500 mg",
-        encryptedFrequency: "1x sehari",
-        encryptedDuration: "5 hari",
+        encryptedDosage: prescriptionDoneEncrypted.encryptedDosage,
+        encryptedFrequency: prescriptionDoneEncrypted.encryptedFrequency,
+        encryptedDuration: prescriptionDoneEncrypted.encryptedDuration,
+        encryptionIv: prescriptionDoneEncrypted.encryptionIv,
         quantityUsed: 5,
         createdAt: addDays(now, -1),
         updatedAt: addDays(now, -1),

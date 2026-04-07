@@ -6,6 +6,15 @@ import { db } from "@/db";
 import { medicines, medicineStocks } from "@/db/schema";
 import { eq, and, isNull, ne, gte, sql } from "drizzle-orm";
 
+const normalizeOptionalText = (value: unknown) => {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
 // GET - Get medicine detail dengan semua stock batches
 export async function GET(
   req: NextRequest,
@@ -120,6 +129,7 @@ export async function PUT(
       name,
       description,
       category,
+      dosageForm,
       unit,
       price,
       minimumStock,
@@ -169,24 +179,23 @@ export async function PUT(
     }
 
     // Update medicine data
-    const updateData: Partial<{
-      name: string;
-      description: string;
-      category: string;
-      unit: string;
-      price: string;
-      minimumStock: number;
-      reorderThresholdPercentage: number;
-      isActive: boolean;
-      updatedAt: Date;
-    }> = {
+    const updateData: Partial<typeof medicines.$inferInsert> = {
       updatedAt: new Date(),
     };
 
     if (name !== undefined) updateData.name = name;
-    if (description !== undefined) updateData.description = description;
-    if (category !== undefined) updateData.category = category;
-    if (unit !== undefined) updateData.unit = unit;
+    if (description !== undefined) {
+      updateData.description = normalizeOptionalText(description);
+    }
+    if (category !== undefined) {
+      updateData.category = normalizeOptionalText(category);
+    }
+    if (dosageForm !== undefined) {
+      updateData.dosageForm = normalizeOptionalText(dosageForm);
+    }
+    if (unit !== undefined) {
+      updateData.unit = normalizeOptionalText(unit);
+    }
     if (price !== undefined) updateData.price = price.toString();
     if (minimumStock !== undefined) updateData.minimumStock = minimumStock;
     if (reorderThresholdPercentage !== undefined) {

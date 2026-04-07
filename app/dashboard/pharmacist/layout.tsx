@@ -11,17 +11,17 @@ const navItems = [
     icon: <Home className="h-4 w-4" />,
   },
   {
-    title: "Inventory",
+    title: "Inventaris",
     href: "/dashboard/pharmacist/inventory",
     icon: <Package className="h-4 w-4" />,
   },
   {
-    title: "Prescriptions",
+    title: "Resep",
     href: "/dashboard/pharmacist/prescription",
     icon: <ClipboardList className="h-4 w-4" />,
   },
   {
-    title: "Profile",
+    title: "Profil",
     href: "/dashboard/profile",
     icon: <User className="h-4 w-4" />,
   },
@@ -35,8 +35,8 @@ export default function PharmacistLayout({
   return (
     <div className="flex min-h-screen flex-col">
       <DashboardHeader
-        title="Pharmacist Dashboard"
-        description="Manage medicines and inventory"
+        title="Dashboard Apoteker"
+        description="Kelola obat dan persediaan farmasi"
         navItems={navItems}
       />
       <div className="flex flex-1">

@@ -78,7 +78,12 @@ export function MedicineStockForm({
         throw new Error(error.message || "Gagal menambah stok obat");
       }
 
-      toast.success("Stok obat berhasil ditambahkan.");
+      const result = await response.json();
+      toast.success(
+        result?.data?.batchNumberGenerated
+          ? `Stok obat berhasil ditambahkan dengan batch internal ${result.data.batchNumber}.`
+          : "Stok obat berhasil ditambahkan."
+      );
       form.reset();
       onSuccess?.();
     } catch (error) {
@@ -112,11 +117,15 @@ export function MedicineStockForm({
               <FormLabel>Nomor Batch (Opsional)</FormLabel>
               <FormControl>
                 <Input
-                  placeholder="Contoh: BATCH123"
+                  placeholder="Contoh: AMOX-2026-01"
                   {...field}
                   value={field.value || ""}
                 />
               </FormControl>
+              <FormDescription>
+                Gunakan nomor batch dari kemasan asli. Jika dikosongkan, sistem
+                akan membuat nomor batch internal otomatis.
+              </FormDescription>
               <FormMessage />
             </FormItem>
           )}

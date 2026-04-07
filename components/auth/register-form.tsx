@@ -1,21 +1,20 @@
-// components/auth/register-form.tsx
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
-  FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -30,7 +29,13 @@ import { registerPatientSchema } from "@/lib/validations/auth";
 
 type FormData = z.infer<typeof registerPatientSchema>;
 
-export function RegisterForm() {
+interface RegisterFormProps {
+  clinicName?: string;
+}
+
+export function RegisterForm({
+  clinicName = "Klinik Borneo Kasih",
+}: RegisterFormProps) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -83,7 +88,6 @@ export function RegisterForm() {
       }
 
       setSuccess(data.message);
-      // Tunggu 3 detik sebelum redirect
       setTimeout(() => {
         router.push("/auth/login?registered=true");
       }, 3000);
@@ -100,7 +104,9 @@ export function RegisterForm() {
     <div className="w-full max-w-md space-y-4">
       <div className="text-center">
         <h1 className="text-2xl font-bold">Registrasi Pasien Baru</h1>
-        <p className="text-muted-foreground">Buat akun pasien Anda</p>
+        <p className="text-muted-foreground">
+          Buat akun pasien untuk {clinicName}
+        </p>
       </div>
 
       {error && (
@@ -129,7 +135,8 @@ export function RegisterForm() {
                   <Input placeholder="Buat username" {...field} />
                 </FormControl>
                 <FormDescription>
-                  Gunakan huruf, angka, atau underscore (min. 3 karakter)
+                  Gunakan huruf, angka, atau underscore dengan minimal 3
+                  karakter.
                 </FormDescription>
                 <FormMessage />
               </FormItem>
@@ -142,11 +149,15 @@ export function RegisterForm() {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Password</FormLabel>
+                  <FormLabel>Kata Sandi</FormLabel>
                   <FormControl>
-                    <Input type="password" placeholder="••••••••" {...field} />
+                    <Input
+                      type="password"
+                      placeholder="Minimal 6 karakter"
+                      {...field}
+                    />
                   </FormControl>
-                  <FormDescription>Min. 6 karakter</FormDescription>
+                  <FormDescription>Minimal 6 karakter</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -157,9 +168,13 @@ export function RegisterForm() {
               name="confirmPassword"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Konfirmasi Password</FormLabel>
+                  <FormLabel>Konfirmasi Kata Sandi</FormLabel>
                   <FormControl>
-                    <Input type="password" placeholder="••••••••" {...field} />
+                    <Input
+                      type="password"
+                      placeholder="Ulangi kata sandi"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -176,7 +191,7 @@ export function RegisterForm() {
                 <FormControl>
                   <Input placeholder="Masukkan nama lengkap" {...field} />
                 </FormControl>
-                <FormDescription>Sesuai dengan KTP/Identitas</FormDescription>
+                <FormDescription>Sesuai dengan KTP atau identitas</FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -192,7 +207,7 @@ export function RegisterForm() {
                   <Input placeholder="16 digit NIK" maxLength={16} {...field} />
                 </FormControl>
                 <FormDescription>
-                  Nomor Induk Kependudukan (16 digit)
+                  Nomor Induk Kependudukan sebanyak 16 digit
                 </FormDescription>
                 <FormMessage />
               </FormItem>
@@ -291,11 +306,11 @@ export function RegisterForm() {
             )}
           />
 
-          <Alert className="bg-blue-50 border-blue-200">
+          <Alert className="border-blue-200 bg-blue-50">
             <AlertDescription className="text-blue-800">
               <strong>Penting:</strong> Setelah registrasi, akun Anda akan
-              menunggu verifikasi dari admin klinik. Anda akan menerima
-              notifikasi setelah akun diverifikasi.
+              menunggu verifikasi admin klinik sebagai bagian dari pencocokan
+              data pasien baru dengan arsip klinik.
             </AlertDescription>
           </Alert>
 
