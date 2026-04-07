@@ -2,53 +2,9 @@
 import { ReactNode } from "react";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
-import {
-  FileText,
-  Calendar,
-  Home,
-  Clock,
-  CreditCard,
-  Pill,
-  User,
-} from "lucide-react";
+import { getDashboardNavByRole } from "@/lib/dashboard-navigation";
 
-const navItems = [
-  {
-    title: "Dashboard",
-    href: "/dashboard/patient",
-    icon: <Home className="h-4 w-4" />,
-  },
-  {
-    title: "Appointments",
-    href: "/dashboard/patient/appointments",
-    icon: <Calendar className="h-4 w-4" />,
-  },
-  {
-    title: "Antrian",
-    href: "/queue-display",
-    icon: <Clock className="h-4 w-4" />,
-  },
-  {
-    title: "Medical Records",
-    href: "/dashboard/patient/medical-records",
-    icon: <FileText className="h-4 w-4" />,
-  },
-  {
-    title: "Prescriptions",
-    href: "/dashboard/patient/prescriptions",
-    icon: <Pill className="h-4 w-4" />,
-  },
-  {
-    title: "Payments",
-    href: "/dashboard/patient/payments",
-    icon: <CreditCard className="h-4 w-4" />,
-  },
-  {
-    title: "Profile",
-    href: "/dashboard/profile",
-    icon: <User className="h-4 w-4" />,
-  },
-];
+const navItems = getDashboardNavByRole("Patient");
 
 export default function PatientLayout({ children }: { children: ReactNode }) {
   return (

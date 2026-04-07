@@ -2,25 +2,9 @@
 import { ReactNode } from "react";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
-import { Home, User, Clock } from "lucide-react";
+import { getDashboardNavByRole } from "@/lib/dashboard-navigation";
 
-const navItems = [
-  {
-    title: "Dashboard",
-    href: "/dashboard/doctor",
-    icon: <Home className="h-4 w-4" />,
-  },
-  {
-    title: "Antrian",
-    href: "/dashboard/doctor/queue", // Menambahkan link ke antrian
-    icon: <Clock className="h-4 w-4" />,
-  },
-  {
-    title: "Profil",
-    href: "/dashboard/profile",
-    icon: <User className="h-4 w-4" />,
-  },
-];
+const navItems = getDashboardNavByRole("Doctor");
 
 export default function DoctorLayout({ children }: { children: ReactNode }) {
   return (

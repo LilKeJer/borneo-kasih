@@ -2,45 +2,9 @@
 import { ReactNode } from "react";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
-import { Users, Settings, Home, User, Calendar, Tag } from "lucide-react";
+import { getDashboardNavByRole } from "@/lib/dashboard-navigation";
 
-const navItems = [
-  {
-    title: "Dashboard",
-    href: "/dashboard/admin",
-    icon: <Home className="h-4 w-4" />,
-  },
-  {
-    title: "Staf",
-    href: "/dashboard/admin/staff",
-    icon: <Users className="h-4 w-4" />,
-  },
-  {
-    title: "Pasien",
-    href: "/dashboard/admin/patients",
-    icon: <Users className="h-4 w-4" />,
-  },
-  {
-    title: "Jadwal Dokter",
-    href: "/dashboard/admin/schedules",
-    icon: <Calendar className="h-4 w-4" />,
-  },
-  {
-    title: "Layanan Medis", // Menambahkan menu baru
-    href: "/dashboard/admin/services",
-    icon: <Tag className="h-4 w-4" />,
-  },
-  {
-    title: "Pengaturan",
-    href: "/dashboard/admin/settings",
-    icon: <Settings className="h-4 w-4" />,
-  },
-  {
-    title: "Profil",
-    href: "/dashboard/profile",
-    icon: <User className="h-4 w-4" />,
-  },
-];
+const navItems = getDashboardNavByRole("Admin");
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
