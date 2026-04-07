@@ -21,12 +21,12 @@ const navItems = [
     icon: <UserPlus className="h-4 w-4" />,
   },
   {
-    title: "Payments", // Menu baru
+    title: "Pembayaran", // Menu baru
     href: "/dashboard/receptionist/payments",
     icon: <CreditCard className="h-4 w-4" />,
   },
   {
-    title: "Profile",
+    title: "Profil",
     href: "/dashboard/profile",
     icon: <User className="h-4 w-4" />,
   },
@@ -40,8 +40,8 @@ export default function ReceptionistLayout({
   return (
     <div className="flex min-h-screen flex-col">
       <DashboardHeader
-        title="Receptionist Dashboard"
-        description="Manage appointments, queue, payments and walk-ins"
+        title="Dashboard Resepsionis"
+        description="Kelola reservasi, antrian, pembayaran, dan pasien walk-in"
         navItems={navItems}
       />
       <div className="flex flex-1">

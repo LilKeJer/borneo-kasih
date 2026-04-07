@@ -5,6 +5,7 @@ export interface Medicine {
   name: string;
   description?: string | null;
   category?: string | null;
+  dosageForm?: string | null;
   unit?: string | null;
   price: string;
   minimumStock?: number;

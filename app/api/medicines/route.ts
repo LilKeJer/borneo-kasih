@@ -6,6 +6,15 @@ import { db } from "@/db";
 import { medicines, medicineStocks } from "@/db/schema";
 import { eq, and, isNull, sql, like, or } from "drizzle-orm";
 
+const normalizeOptionalText = (value: unknown) => {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
 // GET - List medicines dengan pagination, search, dan filter
 export async function GET(req: NextRequest) {
   try {
@@ -34,7 +43,8 @@ export async function GET(req: NextRequest) {
       conditions.push(
         or(
           like(medicines.name, `%${search}%`),
-          like(medicines.description, `%${search}%`)
+          like(medicines.description, `%${search}%`),
+          like(medicines.dosageForm, `%${search}%`)
         )!
       );
     }
@@ -54,6 +64,7 @@ export async function GET(req: NextRequest) {
         name: medicines.name,
         description: medicines.description,
         category: medicines.category,
+        dosageForm: medicines.dosageForm,
         unit: medicines.unit,
         price: medicines.price,
         minimumStock: medicines.minimumStock,
@@ -148,6 +159,7 @@ export async function POST(req: NextRequest) {
       name,
       description,
       category,
+      dosageForm,
       unit,
       price,
       minimumStock = 10,
@@ -187,9 +199,10 @@ export async function POST(req: NextRequest) {
       .insert(medicines)
       .values({
         name,
-        description,
-        category,
-        unit,
+        description: normalizeOptionalText(description),
+        category: normalizeOptionalText(category),
+        dosageForm: normalizeOptionalText(dosageForm),
+        unit: normalizeOptionalText(unit),
         pharmacistId: parseInt(session.user.id),
         price: price.toString(),
         minimumStock,

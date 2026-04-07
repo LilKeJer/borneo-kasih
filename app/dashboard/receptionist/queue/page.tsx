@@ -324,7 +324,7 @@ export default function QueueManagementPage() {
           />
         </div>
         <Button variant="outline" className="ml-2" onClick={fetchQueueData}>
-          Refresh
+          Muat Ulang
         </Button>
       </div>
       <Tabs defaultValue="all" className="w-full">

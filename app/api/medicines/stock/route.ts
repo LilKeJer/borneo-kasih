@@ -6,6 +6,17 @@ import { db } from "@/db";
 import { medicines, medicineStocks } from "@/db/schema";
 import { eq, and, isNull, sql } from "drizzle-orm";
 
+function createInternalBatchNumber(medicineId: number, attempt = 0) {
+  const dateStamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const suffix = Math.random()
+    .toString(36)
+    .slice(2, 6)
+    .toUpperCase();
+  const retrySuffix = attempt > 0 ? `-${attempt}` : "";
+
+  return `INT-${medicineId}-${dateStamp}-${suffix}${retrySuffix}`;
+}
+
 // POST - Add new stock batch
 export async function POST(req: NextRequest) {
   try {
@@ -24,13 +35,17 @@ export async function POST(req: NextRequest) {
       supplier,
       purchasePrice,
     } = body;
+    const normalizedBatchNumber =
+      typeof batchNumber === "string" && batchNumber.trim().length > 0
+        ? batchNumber.trim()
+        : null;
 
     // Validasi input
-    if (!medicineId || !batchNumber || !quantity || !expiryDate) {
+    if (!medicineId || !quantity || !expiryDate) {
       return NextResponse.json(
         {
           message:
-            "MedicineId, batchNumber, quantity, dan expiryDate wajib diisi",
+            "medicineId, quantity, dan expiryDate wajib diisi",
         },
         { status: 400 }
       );
@@ -43,22 +58,50 @@ export async function POST(req: NextRequest) {
 
     if (!medicine) {
       return NextResponse.json(
-        { message: "Medicine tidak ditemukan" },
+        { message: "Obat tidak ditemukan" },
         { status: 404 }
       );
     }
 
-    // Check duplicate batch number
+    let finalBatchNumber = normalizedBatchNumber;
+    let generatedBatchNumber = false;
+
+    if (!finalBatchNumber) {
+      generatedBatchNumber = true;
+
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const candidate = createInternalBatchNumber(medicineId, attempt);
+        const existingCandidate = await db.query.medicineStocks.findFirst({
+          where: and(
+            eq(medicineStocks.batchNumber, candidate),
+            isNull(medicineStocks.deletedAt)
+          ),
+        });
+
+        if (!existingCandidate) {
+          finalBatchNumber = candidate;
+          break;
+        }
+      }
+    }
+
+    if (!finalBatchNumber) {
+      return NextResponse.json(
+        { message: "Gagal membuat nomor batch internal. Silakan coba lagi." },
+        { status: 500 }
+      );
+    }
+
     const existingBatch = await db.query.medicineStocks.findFirst({
       where: and(
-        eq(medicineStocks.batchNumber, batchNumber),
+        eq(medicineStocks.batchNumber, finalBatchNumber),
         isNull(medicineStocks.deletedAt)
       ),
     });
 
     if (existingBatch) {
       return NextResponse.json(
-        { message: "Batch number sudah ada" },
+        { message: "Nomor batch sudah digunakan" },
         { status: 409 }
       );
     }
@@ -80,7 +123,7 @@ export async function POST(req: NextRequest) {
       .insert(medicineStocks)
       .values({
         medicineId,
-        batchNumber,
+        batchNumber: finalBatchNumber,
         quantity,
         remainingQuantity: quantity, // Set remainingQuantity = quantity untuk stock baru
         expiryDate,
@@ -130,11 +173,13 @@ export async function POST(req: NextRequest) {
       );
 
     return NextResponse.json({
-      message: "Stock batch berhasil ditambahkan",
+      message: "Batch stok berhasil ditambahkan",
       data: {
         ...newStock,
         totalStock,
         isBelowThreshold,
+        batchNumber: finalBatchNumber,
+        batchNumberGenerated: generatedBatchNumber,
       },
     });
   } catch (error) {
@@ -160,7 +205,7 @@ export async function GET(req: NextRequest) {
 
     if (!medicineId) {
       return NextResponse.json(
-        { message: "MedicineId diperlukan" },
+        { message: "medicineId diperlukan" },
         { status: 400 }
       );
     }
@@ -175,7 +220,7 @@ export async function GET(req: NextRequest) {
 
     if (!medicine) {
       return NextResponse.json(
-        { message: "Medicine tidak ditemukan" },
+        { message: "Obat tidak ditemukan" },
         { status: 404 }
       );
     }
@@ -233,6 +278,7 @@ export async function GET(req: NextRequest) {
       medicine: {
         id: medicine.id,
         name: medicine.name,
+        dosageForm: medicine.dosageForm,
         unit: medicine.unit,
         minimumStock: medicine.minimumStock,
         reorderThresholdPercentage: medicine.reorderThresholdPercentage,

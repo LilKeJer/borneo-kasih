@@ -113,7 +113,7 @@ export default function NurseMedicalRecordsPage() {
       >
         <Button variant="outline" onClick={fetchRecords}>
           <RefreshCw className="mr-2 h-4 w-4" />
-          Refresh
+          Muat Ulang
         </Button>
       </PageHeader>
 

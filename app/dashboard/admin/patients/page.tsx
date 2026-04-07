@@ -38,6 +38,16 @@ export default function PatientManagementPage() {
         description="Kelola data pasien dan verifikasi pendaftar baru"
       />
 
+      <Card className="border-amber-200 bg-amber-50/80">
+        <CardContent className="py-5 text-sm text-amber-900">
+          Verifikasi pasien dipakai untuk rekonsiliasi manual akun pasien baru
+          dengan arsip atau catatan lama klinik. Admin dapat melengkapi data
+          identitas sebelum menyetujui akun, lalu mengubah status pasien menjadi
+          nonaktif atau ditangguhkan bila diperlukan tanpa menghapus histori
+          medisnya.
+        </CardContent>
+      </Card>
+
       <Tabs defaultValue="all" className="space-y-4">
         <TabsList>
           <TabsTrigger value="all">Semua Pasien</TabsTrigger>
@@ -52,7 +62,7 @@ export default function PatientManagementPage() {
         </TabsList>
 
         <TabsContent value="all">
-          <PatientTable />
+          <PatientTable onUpdate={handlePendingUpdate} />
         </TabsContent>
 
         <TabsContent value="pending">

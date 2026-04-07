@@ -1,13 +1,11 @@
-// components/auth/login-form.tsx
 "use client";
 
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { signIn } from "next-auth/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { useRouter } from "next/navigation";
-import { signIn } from "next-auth/react";
-import { useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -24,16 +22,38 @@ import { loginSchema } from "@/lib/validations/auth";
 
 type FormData = z.infer<typeof loginSchema>;
 
-export function LoginForm() {
+interface LoginFormProps {
+  clinicName?: string;
+}
+
+const mapAuthError = (errorMessage: string) => {
+  switch (errorMessage) {
+    case "CredentialsSignin":
+      return "Username atau kata sandi tidak sesuai";
+    default:
+      return decodeURIComponent(errorMessage);
+  }
+};
+
+export function LoginForm({
+  clinicName = "Klinik Borneo Kasih",
+}: LoginFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
+  const [blockedMessage, setBlockedMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (searchParams.get("registered") === "true") {
       setRegistrationSuccess(true);
+    }
+
+    if (searchParams.get("blocked") === "inactive") {
+      setBlockedMessage(
+        "Akun Anda sedang dinonaktifkan atau ditangguhkan oleh admin."
+      );
     }
   }, [searchParams]);
 
@@ -57,11 +77,10 @@ export function LoginForm() {
       });
 
       if (result?.error) {
-        setError("Username atau password salah");
+        setError(mapAuthError(result.error));
         return;
       }
 
-      // Redirect based on user role
       const session = await fetch("/api/auth/session");
       const sessionData = await session.json();
 
@@ -92,8 +111,8 @@ export function LoginForm() {
       } else {
         router.push("/");
       }
-    } catch (error) {
-      setError(`${error}Terjadi kesalahan, silakan coba lagi`);
+    } catch {
+      setError("Terjadi kesalahan, silakan coba lagi");
     } finally {
       setIsPending(false);
     }
@@ -102,16 +121,22 @@ export function LoginForm() {
   return (
     <div className="w-full max-w-md space-y-4">
       <div className="text-center">
-        <h1 className="text-2xl font-bold">Login Klinik Borneo Kasih</h1>
+        <h1 className="text-2xl font-bold">Masuk ke {clinicName}</h1>
         <p className="text-muted-foreground">Masuk ke akun Anda</p>
       </div>
 
       {registrationSuccess && (
         <Alert className="border-green-500 bg-green-50">
           <AlertDescription className="text-green-900">
-            Registrasi berhasil! Akun Anda sedang menunggu verifikasi admin.
-            Silakan coba login nanti setelah akun diverifikasi.
+            Registrasi berhasil. Akun Anda sedang menunggu verifikasi admin.
+            Silakan login kembali setelah akun disetujui.
           </AlertDescription>
+        </Alert>
+      )}
+
+      {blockedMessage && (
+        <Alert variant="destructive">
+          <AlertDescription>{blockedMessage}</AlertDescription>
         </Alert>
       )}
 
@@ -141,16 +166,20 @@ export function LoginForm() {
             name="password"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Password</FormLabel>
+                <FormLabel>Kata Sandi</FormLabel>
                 <FormControl>
-                  <Input type="password" placeholder="••••••••" {...field} />
+                  <Input
+                    type="password"
+                    placeholder="Masukkan kata sandi"
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
           <Button type="submit" className="w-full" disabled={isPending}>
-            {isPending ? "Masuk..." : "Login"}
+            {isPending ? "Masuk..." : "Masuk"}
           </Button>
         </form>
       </Form>

@@ -168,7 +168,7 @@ export default function ServiceCatalogPage() {
 
         <Button variant="outline" onClick={handleRefresh} className="shrink-0">
           <RefreshCw className="mr-2 h-4 w-4" />
-          Refresh
+          Muat Ulang
         </Button>
       </div>
 
@@ -197,7 +197,7 @@ export default function ServiceCatalogPage() {
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Edit Layanan</DialogTitle>
+            <DialogTitle>Ubah Layanan</DialogTitle>
           </DialogHeader>
           {selectedService && (
             <ServiceForm

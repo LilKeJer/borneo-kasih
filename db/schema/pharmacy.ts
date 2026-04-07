@@ -52,6 +52,7 @@ export const medicines = pgTable(
     name: varchar("name", { length: 100 }).notNull(),
     description: text("description"),
     category: varchar("category", { length: 50 }), // Tambahan: kategori obat
+    dosageForm: varchar("dosage_form", { length: 50 }),
     unit: varchar("unit", { length: 20 }), // Tambahan: unit (tablet, ml, botol, dll)
     pharmacistId: integer("pharmacist_id")
       .notNull()

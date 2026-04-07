@@ -56,19 +56,18 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
+        const normalizedStatus = foundUser.status ?? "Active";
+
         // Check user status
-        if (foundUser.role === "Patient" && foundUser.status === "Pending") {
+        if (foundUser.role === "Patient" && normalizedStatus === "Pending") {
           throw new Error("Akun Anda sedang menunggu verifikasi admin");
         }
 
-        if (foundUser.status === "Rejected") {
+        if (normalizedStatus === "Rejected") {
           throw new Error("Akun Anda ditolak");
         }
 
-        if (
-          foundUser.status === "Suspended" ||
-          foundUser.status === "Inactive"
-        ) {
+        if (normalizedStatus === "Suspended" || normalizedStatus === "Inactive") {
           throw new Error("Akun Anda tidak aktif");
         }
 
@@ -100,7 +99,7 @@ export const authOptions: NextAuthOptions = {
           id: foundUser.id.toString(),
           username: foundUser.username,
           role: foundUser.role,
-          status: foundUser.status,
+          status: normalizedStatus,
           name: details?.name || undefined,
           email: details?.email || undefined,
         };
@@ -113,6 +112,7 @@ export const authOptions: NextAuthOptions = {
         token.id = authUser.id;
         token.role = authUser.role;
         token.username = authUser.username;
+        token.status = authUser.status ?? "Active";
         token.name = authUser.name;
       }
       return token;
@@ -122,6 +122,7 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id;
         session.user.role = token.role;
         session.user.username = token.username;
+        session.user.status = token.status;
       }
       return session;
     },

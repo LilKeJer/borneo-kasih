@@ -4,13 +4,11 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/db";
 import { clinicSettings } from "@/db/schema";
-import { asc, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { normalizeQueuePolicy } from "@/lib/queue-policy";
+import { getOrCreateClinicSettings } from "@/lib/clinic-settings";
 
-function parseBoolean(
-  value: unknown,
-  fallback: boolean
-): boolean {
+function parseBoolean(value: unknown, fallback: boolean): boolean {
   if (typeof value === "boolean") return value;
   if (typeof value === "string") {
     const normalized = value.trim().toLowerCase();
@@ -18,43 +16,6 @@ function parseBoolean(
     if (normalized === "false") return false;
   }
   return fallback;
-}
-
-const defaultSettings = {
-  clinicName: "Klinik Borneo Kasih",
-  address: "Jl. Klinik No. 123, Banjarmasin",
-  phone: "0541-123456",
-  email: "info@borneokasih.com",
-  morningStart: "08:00",
-  morningEnd: "12:00",
-  eveningStart: "17:00",
-  eveningEnd: "21:00",
-  enableStrictCheckIn: false,
-  checkInEarlyMinutes: 120,
-  checkInLateMinutes: 60,
-  enableAutoCancel: false,
-  autoCancelGraceMinutes: 30,
-};
-
-async function getOrCreateSettings() {
-  const existing = await db.query.clinicSettings.findFirst({
-    orderBy: [asc(clinicSettings.id)],
-  });
-
-  if (existing) {
-    return existing;
-  }
-
-  const [created] = await db
-    .insert(clinicSettings)
-    .values({
-      ...defaultSettings,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    })
-    .returning();
-
-  return created;
 }
 
 export async function GET() {
@@ -65,12 +26,12 @@ export async function GET() {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    const settings = await getOrCreateSettings();
+    const settings = await getOrCreateClinicSettings();
     return NextResponse.json(settings);
   } catch (error) {
     console.error("Error fetching settings:", error);
     return NextResponse.json(
-      { message: "Internal server error" },
+      { message: "Terjadi kesalahan internal server" },
       { status: 500 }
     );
   }
@@ -85,7 +46,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    const settings = await getOrCreateSettings();
+    const settings = await getOrCreateClinicSettings();
     const queuePolicy = normalizeQueuePolicy({
       enableStrictCheckIn:
         body.enableStrictCheckIn !== undefined
@@ -144,7 +105,7 @@ export async function PUT(req: NextRequest) {
       !updatedSettings.email
     ) {
       return NextResponse.json(
-        { message: "All clinic information fields are required" },
+        { message: "Semua informasi klinik wajib diisi" },
         { status: 400 }
       );
     }
@@ -159,13 +120,13 @@ export async function PUT(req: NextRequest) {
       .returning();
 
     return NextResponse.json({
-      message: "Settings updated successfully",
+      message: "Pengaturan berhasil diperbarui",
       data: saved,
     });
   } catch (error) {
     console.error("Error updating settings:", error);
     return NextResponse.json(
-      { message: "Internal server error" },
+      { message: "Terjadi kesalahan internal server" },
       { status: 500 }
     );
   }

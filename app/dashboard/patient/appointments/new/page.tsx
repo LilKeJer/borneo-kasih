@@ -1,6 +1,5 @@
 // app/dashboard/patient/appointments/new/page.tsx
 "use client";
-import React from "react";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -32,12 +31,21 @@ interface TimeSlot {
   available: boolean;
 }
 
+interface ClinicSettingsInfo {
+  clinicName: string;
+  address: string;
+  phone: string;
+  email: string;
+  operatingHours: string;
+}
+
 export default function NewAppointmentPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
 
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [loadingDoctors, setLoadingDoctors] = useState(false);
+  const [clinicInfo, setClinicInfo] = useState<ClinicSettingsInfo | null>(null);
 
   const [selectedDoctor, setSelectedDoctor] = useState<string>("");
   const [selectedDate, setSelectedDate] = useState<string>("");
@@ -68,9 +76,24 @@ export default function NewAppointmentPage() {
     }
   }, []);
 
+  const fetchClinicInfo = useCallback(async () => {
+    try {
+      const response = await fetch("/api/clinic-settings");
+      if (!response.ok) {
+        throw new Error("Gagal memuat informasi klinik");
+      }
+
+      const data = await response.json();
+      setClinicInfo(data);
+    } catch (error) {
+      console.error("Error fetching clinic settings:", error);
+    }
+  }, []);
+
   useEffect(() => {
     fetchDoctors();
-  }, [fetchDoctors]);
+    fetchClinicInfo();
+  }, [fetchDoctors, fetchClinicInfo]);
 
   const fetchTimeSlots = useCallback(async () => {
     if (!selectedDoctor || !selectedDate) return;
@@ -220,6 +243,43 @@ export default function NewAppointmentPage() {
         title="Buat Janji Temu Baru"
         description={`Langkah ${step} dari 4`}
       />
+
+      {clinicInfo && (
+        <Card className="border-sky-200 bg-sky-50/70">
+          <CardContent className="grid gap-4 py-6 md:grid-cols-2">
+            <div>
+              <p className="text-sm font-medium text-sky-700">
+                Informasi Klinik
+              </p>
+              <h2 className="mt-1 text-xl font-semibold text-slate-900">
+                {clinicInfo.clinicName}
+              </h2>
+              <p className="mt-2 text-sm text-slate-600">
+                Pastikan tanggal kunjungan dan data kontak klinik sesuai sebelum
+                melanjutkan pendaftaran appointment.
+              </p>
+            </div>
+            <div className="grid gap-3 text-sm text-slate-700">
+              <p>
+                <span className="font-medium text-slate-900">Alamat:</span>{" "}
+                {clinicInfo.address}
+              </p>
+              <p>
+                <span className="font-medium text-slate-900">Telepon:</span>{" "}
+                {clinicInfo.phone}
+              </p>
+              <p>
+                <span className="font-medium text-slate-900">Email:</span>{" "}
+                {clinicInfo.email}
+              </p>
+              <p>
+                <span className="font-medium text-slate-900">Jam layanan:</span>{" "}
+                {clinicInfo.operatingHours}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardContent className="py-6">

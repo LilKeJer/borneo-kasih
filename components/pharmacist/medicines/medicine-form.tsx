@@ -23,6 +23,10 @@ import { Loader2 } from "lucide-react";
 // Schema with optional for fields defaulted by RHF
 const medicineFormSchema = z.object({
   name: z.string().min(1, "Nama obat wajib diisi"),
+  dosageForm: z
+    .string()
+    .max(50, "Bentuk sediaan maksimal 50 karakter")
+    .optional(),
   description: z.string().optional(),
   price: z.coerce
     .number({ invalid_type_error: "Harga harus berupa angka" })
@@ -67,6 +71,7 @@ export function MedicineForm({
     resolver: zodResolver(medicineFormSchema),
     defaultValues: {
       name: initialData?.name || "",
+      dosageForm: initialData?.dosageForm || "",
       description: initialData?.description || "",
       price: initialData?.price || 0,
       minimumStock: initialData?.minimumStock ?? 5, // Default here
@@ -78,6 +83,7 @@ export function MedicineForm({
     if (isEdit && initialData) {
       form.reset({
         name: initialData.name || "",
+        dosageForm: initialData.dosageForm || "",
         description: initialData.description || "",
         price: initialData.price || 0,
         minimumStock: initialData.minimumStock ?? 5,
@@ -88,6 +94,7 @@ export function MedicineForm({
       // For new form, ensure it resets to initial default values if needed
       form.reset({
         name: "",
+        dosageForm: "",
         description: "",
         price: 0,
         minimumStock: 5,
@@ -107,6 +114,7 @@ export function MedicineForm({
       // Ensure potentially undefined optional fields have defaults before sending
       const payload = {
         ...values,
+        dosageForm: values.dosageForm?.trim() || undefined,
         minimumStock: values.minimumStock ?? 5, // Ensure it's a number
         reorderThresholdPercentage: values.reorderThresholdPercentage ?? 20, // Ensure it's a number
       };
@@ -132,6 +140,7 @@ export function MedicineForm({
         // Reset to clean slate for new form after successful submission
         form.reset({
           name: "",
+          dosageForm: "",
           description: "",
           price: 0,
           minimumStock: 5,
@@ -158,6 +167,26 @@ export function MedicineForm({
               <FormControl>
                 <Input placeholder="Masukkan nama obat" {...field} />
               </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="dosageForm"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Bentuk Sediaan (Opsional)</FormLabel>
+              <FormControl>
+                <Input
+                  placeholder="Contoh: Tablet, kapsul, sirup, salep"
+                  {...field}
+                  value={field.value || ""}
+                />
+              </FormControl>
+              <FormDescription>
+                Membantu membedakan bentuk obat dari satuan stok.
+              </FormDescription>
               <FormMessage />
             </FormItem>
           )}
