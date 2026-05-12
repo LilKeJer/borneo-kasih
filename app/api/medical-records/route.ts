@@ -331,7 +331,6 @@ export async function POST(req: NextRequest) {
             encryptedDuration: item.duration,
             encryptionIv: item.encryptionIv ?? null,
             quantityUsed: item.quantity,
-            notes: item.notes || null,
             createdAt: new Date(),
             updatedAt: new Date(),
           })
