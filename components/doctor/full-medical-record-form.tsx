@@ -59,6 +59,9 @@ export function FullMedicalRecordForm({
   const [serviceSearchTerms, setServiceSearchTerms] = useState<
     Record<string, string>
   >({});
+  const [medicineSearchTerms, setMedicineSearchTerms] = useState<
+    Record<string, string>
+  >({});
   const { encrypt, initialize } = useEncryption();
 
   const form = useForm<FullMedicalRecordFormValues>({
@@ -194,6 +197,48 @@ export function FullMedicalRecordForm({
       !filtered.some((service) => service.id === selectedService.id)
     ) {
       return [selectedService, ...filtered];
+    }
+
+    return filtered;
+  };
+
+  const getFilteredMedicines = (
+    searchTerm: string,
+    selectedMedicineId?: string
+  ) => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    if (!normalizedSearch) {
+      return availableMedicines;
+    }
+
+    const filtered = availableMedicines.filter((medicine) => {
+      const name = medicine.name.toLowerCase();
+      const category = medicine.category?.toLowerCase() || "";
+      const description = medicine.description?.toLowerCase() || "";
+      const dosageForm = medicine.dosageForm?.toLowerCase() || "";
+
+      return (
+        name.includes(normalizedSearch) ||
+        category.includes(normalizedSearch) ||
+        description.includes(normalizedSearch) ||
+        dosageForm.includes(normalizedSearch)
+      );
+    });
+
+    if (!selectedMedicineId) {
+      return filtered;
+    }
+
+    const selectedMedicine = availableMedicines.find(
+      (medicine) => medicine.id.toString() === selectedMedicineId
+    );
+
+    if (
+      selectedMedicine &&
+      !filtered.some((medicine) => medicine.id === selectedMedicine.id)
+    ) {
+      return [selectedMedicine, ...filtered];
     }
 
     return filtered;
@@ -595,7 +640,14 @@ export function FullMedicalRecordForm({
                     variant="ghost"
                     size="icon"
                     className="absolute top-1 right-1 h-6 w-6"
-                    onClick={() => removePrescription(index)}
+                    onClick={() => {
+                      removePrescription(index);
+                      setMedicineSearchTerms((current) => {
+                        const next = { ...current };
+                        delete next[field.id];
+                        return next;
+                      });
+                    }}
                   >
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
@@ -606,8 +658,29 @@ export function FullMedicalRecordForm({
                       render={({ field: medField }) => (
                         <FormItem>
                           <FormLabel>Obat</FormLabel>
+                          <Input
+                            placeholder="Cari obat..."
+                            value={medicineSearchTerms[field.id] || ""}
+                            onChange={(event) =>
+                              setMedicineSearchTerms((current) => ({
+                                ...current,
+                                [field.id]: event.target.value,
+                              }))
+                            }
+                            className="mb-2"
+                          />
                           <Select
-                            onValueChange={medField.onChange}
+                            onValueChange={(value) => {
+                              medField.onChange(value);
+                              const selectedMedicine = availableMedicines.find(
+                                (medicine) => medicine.id.toString() === value
+                              );
+
+                              setMedicineSearchTerms((current) => ({
+                                ...current,
+                                [field.id]: selectedMedicine?.name || "",
+                              }));
+                            }}
                             defaultValue={medField.value}
                           >
                             <FormControl>
@@ -616,22 +689,34 @@ export function FullMedicalRecordForm({
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {availableMedicines.map((med) => (
-                                <SelectItem
-                                  key={med.id}
-                                  value={med.id.toString()}
-                                >
-                                  {med.name}
-                                  {typeof med.totalStock === "number"
-                                    ? ` - ${med.totalStock} ${med.unit || "unit"}`
-                                    : ""}
-                                  {med.status === "Low Stock"
-                                    ? " - stok rendah"
-                                    : med.status === "Out of Stock"
-                                      ? " - stok habis"
+                              {getFilteredMedicines(
+                                medicineSearchTerms[field.id] || "",
+                                medField.value
+                              ).length === 0 ? (
+                                <div className="px-2 py-3 text-sm text-muted-foreground">
+                                  Tidak ada obat yang cocok.
+                                </div>
+                              ) : (
+                                getFilteredMedicines(
+                                  medicineSearchTerms[field.id] || "",
+                                  medField.value
+                                ).map((med) => (
+                                  <SelectItem
+                                    key={med.id}
+                                    value={med.id.toString()}
+                                  >
+                                    {med.name}
+                                    {typeof med.totalStock === "number"
+                                      ? ` - ${med.totalStock} ${med.unit || "unit"}`
                                       : ""}
-                                </SelectItem>
-                              ))}
+                                    {med.status === "Low Stock"
+                                      ? " - stok rendah"
+                                      : med.status === "Out of Stock"
+                                        ? " - stok habis"
+                                        : ""}
+                                  </SelectItem>
+                                ))
+                              )}
                             </SelectContent>
                           </Select>
                           <FormMessage />
