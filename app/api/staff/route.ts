@@ -10,8 +10,9 @@ import {
   receptionistDetails,
   pharmacistDetails,
 } from "@/db/schema";
-import { eq, and, isNull, or } from "drizzle-orm";
+import { eq, and, isNull, or, count } from "drizzle-orm";
 import bcrypt from "bcrypt";
+import { isValidEmail, normalizeEmail } from "@/lib/utils/email";
 
 // GET - List all staff with filters
 export async function GET(req: NextRequest) {
@@ -52,7 +53,15 @@ export async function GET(req: NextRequest) {
 
     // Get staff members based on role
     const baseQuery = db
-      .select()
+      .select({
+        id: users.id,
+        email: users.email,
+        role: users.role,
+        status: users.status,
+        createdAt: users.createdAt,
+        updatedAt: users.updatedAt,
+        deletedAt: users.deletedAt,
+      })
       .from(users)
       .where(and(...conditions));
 
@@ -61,7 +70,7 @@ export async function GET(req: NextRequest) {
 
     // Get total count for pagination
     const totalCount = await db
-      .select({ count: users.id })
+      .select({ count: count() })
       .from(users)
       .where(and(...conditions));
 
@@ -114,7 +123,7 @@ export async function GET(req: NextRequest) {
       filteredStaff = staffWithDetails.filter((staff) => {
         const searchLower = search.toLowerCase();
         return (
-          staff.username.toLowerCase().includes(searchLower) ||
+          staff.email.toLowerCase().includes(searchLower) ||
           staff.details?.name?.toLowerCase().includes(searchLower) ||
           staff.details?.email?.toLowerCase().includes(searchLower)
         );
@@ -149,13 +158,20 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { username, password, role, name, email, phone, specialization } =
-      body;
+    const { password, role, name, phone, specialization } = body;
+    const email =
+      typeof body.email === "string" ? normalizeEmail(body.email) : "";
 
-    // Validate required fields
-    if (!username || !password || !role || !name) {
+    if (!email || !password || !role || !name) {
       return NextResponse.json(
-        { message: "Username, password, role, dan name harus diisi" },
+        { message: "Email, password, role, dan nama harus diisi" },
+        { status: 400 }
+      );
+    }
+
+    if (!isValidEmail(email)) {
+      return NextResponse.json(
+        { message: "Format email tidak valid" },
         { status: 400 }
       );
     }
@@ -169,70 +185,70 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if username already exists
     const existingUser = await db.query.users.findFirst({
-      where: eq(users.username, username),
+      where: eq(users.email, email),
     });
 
     if (existingUser) {
       return NextResponse.json(
-        { message: "Username sudah digunakan" },
+        { message: "Email sudah digunakan" },
         { status: 400 }
       );
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user
-    const [newUser] = await db
-      .insert(users)
-      .values({
-        username,
-        password: hashedPassword,
-        role,
-      })
-      .returning({ id: users.id });
+    const newUserId = await db.transaction(async (tx) => {
+      const [newUser] = await tx
+        .insert(users)
+        .values({
+          email,
+          password: hashedPassword,
+          role,
+        })
+        .returning({ id: users.id });
 
-    // Create role-specific details
-    switch (role) {
-      case "Doctor":
-        await db.insert(doctorDetails).values({
-          userId: newUser.id,
-          name,
-          email,
-          phone,
-          specialization,
-        });
-        break;
-      case "Nurse":
-        await db.insert(nurseDetails).values({
-          userId: newUser.id,
-          name,
-          email,
-          phone,
-        });
-        break;
-      case "Receptionist":
-        await db.insert(receptionistDetails).values({
-          userId: newUser.id,
-          name,
-          email,
-          phone,
-        });
-        break;
-      case "Pharmacist":
-        await db.insert(pharmacistDetails).values({
-          userId: newUser.id,
-          name,
-          email,
-          phone,
-        });
-        break;
-    }
+      switch (role) {
+        case "Doctor":
+          await tx.insert(doctorDetails).values({
+            userId: newUser.id,
+            name,
+            email,
+            phone,
+            specialization,
+          });
+          break;
+        case "Nurse":
+          await tx.insert(nurseDetails).values({
+            userId: newUser.id,
+            name,
+            email,
+            phone,
+          });
+          break;
+        case "Receptionist":
+          await tx.insert(receptionistDetails).values({
+            userId: newUser.id,
+            name,
+            email,
+            phone,
+          });
+          break;
+        case "Pharmacist":
+          await tx.insert(pharmacistDetails).values({
+            userId: newUser.id,
+            name,
+            email,
+            phone,
+          });
+          break;
+      }
+
+      return newUser.id;
+    });
 
     return NextResponse.json(
-      { message: "Staff berhasil ditambahkan", id: newUser.id },
+      { message: "Staff berhasil ditambahkan", id: newUserId },
       { status: 201 }
     );
   } catch (error) {

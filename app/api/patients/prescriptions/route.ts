@@ -4,11 +4,11 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/db";
 import {
+  doctorDetails,
   prescriptions,
   prescriptionMedicines,
   medicines,
   medicalHistories,
-  users,
 } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 
@@ -46,7 +46,7 @@ export async function GET() {
         visitDate: medicalHistories.createdAt,
         diagnosis: medicalHistories.encryptedCondition,
         encryptionIvDoctor: medicalHistories.encryptionIvDoctor,
-        doctorName: users.username,
+        doctorName: doctorDetails.name,
 
         // Prescription data
         prescriptionId: prescriptions.id,
@@ -69,7 +69,7 @@ export async function GET() {
         eq(prescriptions.id, prescriptionMedicines.prescriptionId)
       )
       .leftJoin(medicines, eq(prescriptionMedicines.medicineId, medicines.id))
-      .leftJoin(users, eq(medicalHistories.doctorId, users.id))
+      .leftJoin(doctorDetails, eq(medicalHistories.doctorId, doctorDetails.userId))
       .where(eq(medicalHistories.patientId, patientId))
       .orderBy(desc(medicalHistories.createdAt))
       .limit(20);
@@ -83,7 +83,7 @@ export async function GET() {
       if (!acc[key]) {
         acc[key] = {
           date: row.visitDate?.toISOString().split("T")[0] || "No date",
-          doctorName: `Dr. ${row.doctorName}` || "Unknown Doctor",
+          doctorName: row.doctorName ? `Dr. ${row.doctorName}` : "Dokter",
           diagnosis: row.diagnosis || "General Checkup",
           encryptionIvDoctor: row.encryptionIvDoctor || null,
           medicines: [],

@@ -26,7 +26,6 @@ import { formatDate } from "@/lib/utils/date";
 
 interface PendingPatient {
   id: string;
-  username: string;
   name: string;
   nik: string;
   email: string | null;
@@ -207,7 +206,7 @@ export function PendingPatientList({ onUpdate }: PendingPatientListProps) {
               <div>
                 <CardTitle className="text-lg">{patient.name}</CardTitle>
                 <CardDescription>
-                  Username: {patient.username} | NIK: {patient.nik}
+                  NIK: {patient.nik}
                 </CardDescription>
                 <p className="mt-2 text-sm text-muted-foreground">
                   Periksa kesesuaian identitas pasien dengan arsip klinik sebelum

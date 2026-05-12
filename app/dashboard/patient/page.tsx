@@ -4,8 +4,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import Link from "next/link";
 import { Clock } from "lucide-react";
 import { AppointmentStatusCard } from "@/components/patient/appointment-status-card";
 
@@ -62,16 +60,9 @@ export default function PatientDashboardPage() {
         </CardHeader>
         <CardContent>
           <p className="text-gray-600">
-            Halo {user?.name || user?.username}, selamat datang di sistem rekam
+            Halo {user?.name || user?.email}, selamat datang di sistem rekam
             medis Klinik Borneo Kasih.
           </p>
-          <div className="mt-4 flex gap-4">
-            <Button asChild variant="outline">
-              <Link href="/dashboard/patient/medical-records">
-                Lihat Riwayat
-              </Link>
-            </Button>
-          </div>
         </CardContent>
       </Card>
 

@@ -22,10 +22,9 @@ export function useAuth() {
     if (status === "authenticated" && session?.user) {
       setUser({
         id: session.user.id,
-        username: session.user.username,
+        email: session.user.email,
         role: session.user.role,
         name: session.user.name,
-        email: session.user.email,
       });
       setAuthenticated(true);
     } else if (status === "unauthenticated") {

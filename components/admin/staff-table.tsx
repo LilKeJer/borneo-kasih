@@ -45,7 +45,7 @@ interface StaffTableProps {
 interface ApiStaffResponse {
   data: Array<{
     id: string;
-    username: string;
+    email: string;
     role: "Doctor" | "Nurse" | "Receptionist" | "Pharmacist";
     createdAt: string;
     details: {
@@ -86,7 +86,7 @@ export function StaffTable({ onEdit }: StaffTableProps) {
       // Transformasi data API ke tipe StaffMember
       const transformedData: StaffMember[] = data.data.map((member) => ({
         id: member.id,
-        username: member.username,
+        email: member.email,
         role: member.role,
         createdAt: member.createdAt,
         details: {
@@ -167,8 +167,7 @@ export function StaffTable({ onEdit }: StaffTableProps) {
         <TableCell className="font-medium">
           {member.details?.name || "-"}
         </TableCell>
-        <TableCell>{member.username}</TableCell>
-        <TableCell>{member.details?.email || "-"}</TableCell>
+        <TableCell>{member.email}</TableCell>
         <TableCell>{member.details?.phone || "-"}</TableCell>
         <TableCell>
           <Badge variant={getRoleBadgeVariant(member.role)}>
@@ -266,7 +265,6 @@ export function StaffTable({ onEdit }: StaffTableProps) {
           <TableHeader>
             <TableRow>
               <TableHead>Nama</TableHead>
-              <TableHead>Username</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Telepon</TableHead>
               <TableHead>Role</TableHead>
@@ -277,13 +275,13 @@ export function StaffTable({ onEdit }: StaffTableProps) {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center">
+                <TableCell colSpan={6} className="text-center">
                   Memuat data...
                 </TableCell>
               </TableRow>
             ) : staff.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center">
+                <TableCell colSpan={6} className="text-center">
                   Tidak ada data staff
                 </TableCell>
               </TableRow>

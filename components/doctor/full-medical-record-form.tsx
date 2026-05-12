@@ -56,6 +56,9 @@ export function FullMedicalRecordForm({
   onCancel,
 }: FullMedicalRecordFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [serviceSearchTerms, setServiceSearchTerms] = useState<
+    Record<string, string>
+  >({});
   const { encrypt, initialize } = useEncryption();
 
   const form = useForm<FullMedicalRecordFormValues>({
@@ -91,6 +94,43 @@ export function FullMedicalRecordForm({
   });
   const prescriptionValues = form.watch("prescriptions");
 
+  const getSelectedMedicineById = (medicineId?: string) => {
+    if (!medicineId) return undefined;
+
+    return availableMedicines.find(
+      (medicine) => medicine.id.toString() === medicineId
+    );
+  };
+
+  const getRequestedQuantityForMedicine = (
+    medicineId?: string,
+    excludeIndex?: number
+  ) => {
+    if (!medicineId) return 0;
+
+    return (prescriptionValues ?? []).reduce((total, item, index) => {
+      if (!item || item.medicineId !== medicineId || index === excludeIndex) {
+        return total;
+      }
+
+      return total + Number(item.quantity || 0);
+    }, 0);
+  };
+
+  const getRemainingStockForMedicine = (
+    medicineId?: string,
+    excludeIndex?: number
+  ) => {
+    const medicine = getSelectedMedicineById(medicineId);
+    const totalStock = medicine?.totalStock ?? 0;
+    const usedByOtherRows = getRequestedQuantityForMedicine(
+      medicineId,
+      excludeIndex
+    );
+
+    return Math.max(totalStock - usedByOtherRows, 0);
+  };
+
   const getMedicineStockLabel = (medicine?: ApiMedicineType) => {
     if (!medicine) return "Belum ada data stok";
 
@@ -119,6 +159,46 @@ export function FullMedicalRecordForm({
     return "bg-emerald-100 text-emerald-700";
   };
 
+  const getFilteredServices = (
+    searchTerm: string,
+    selectedServiceId?: string
+  ) => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    if (!normalizedSearch) {
+      return availableServices;
+    }
+
+    const filtered = availableServices.filter((service) => {
+      const name = service.name.toLowerCase();
+      const category = service.category.toLowerCase();
+      const description = service.description?.toLowerCase() || "";
+
+      return (
+        name.includes(normalizedSearch) ||
+        category.includes(normalizedSearch) ||
+        description.includes(normalizedSearch)
+      );
+    });
+
+    if (!selectedServiceId) {
+      return filtered;
+    }
+
+    const selectedService = availableServices.find(
+      (service) => service.id.toString() === selectedServiceId
+    );
+
+    if (
+      selectedService &&
+      !filtered.some((service) => service.id === selectedService.id)
+    ) {
+      return [selectedService, ...filtered];
+    }
+
+    return filtered;
+  };
+
   useEffect(() => {
     initialize();
   }, [initialize]);
@@ -126,6 +206,48 @@ export function FullMedicalRecordForm({
   async function onSubmit(data: FullMedicalRecordFormValues) {
     setIsSubmitting(true);
     try {
+      data.prescriptions?.forEach((_, index) => {
+        form.clearErrors(`prescriptions.${index}.quantity`);
+      });
+
+      const requestedByMedicine = new Map<
+        string,
+        { totalQuantity: number; indexes: number[] }
+      >();
+
+      data.prescriptions?.forEach((item, index) => {
+        if (!item.medicineId) {
+          return;
+        }
+
+        const existing = requestedByMedicine.get(item.medicineId) ?? {
+          totalQuantity: 0,
+          indexes: [],
+        };
+
+        existing.totalQuantity += Number(item.quantity || 0);
+        existing.indexes.push(index);
+        requestedByMedicine.set(item.medicineId, existing);
+      });
+
+      for (const [medicineId, summary] of requestedByMedicine) {
+        const selectedMedicine = getSelectedMedicineById(medicineId);
+        const totalStock = selectedMedicine?.totalStock ?? 0;
+
+        if (summary.totalQuantity > totalStock) {
+          summary.indexes.forEach((index) => {
+            form.setError(`prescriptions.${index}.quantity`, {
+              type: "manual",
+              message: `Total resep ${summary.totalQuantity} melebihi stok tersedia ${totalStock}`,
+            });
+          });
+
+          throw new Error(
+            `Jumlah resep untuk ${selectedMedicine?.name || "obat terpilih"} melebihi stok tersedia (${totalStock}).`
+          );
+        }
+      }
+
       const doctorIvMap: Record<string, string> = {};
       const encryptDoctorField = async (value: string, key: string) => {
         const { ciphertext, iv } = await encrypt(value);
@@ -317,7 +439,14 @@ export function FullMedicalRecordForm({
                   variant="ghost"
                   size="icon"
                   className="absolute top-1 right-1 h-6 w-6"
-                  onClick={() => removeService(index)}
+                  onClick={() => {
+                    removeService(index);
+                    setServiceSearchTerms((current) => {
+                      const next = { ...current };
+                      delete next[field.id];
+                      return next;
+                    });
+                  }}
                 >
                   <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
@@ -327,8 +456,29 @@ export function FullMedicalRecordForm({
                   render={({ field: serviceField }) => (
                     <FormItem className="flex-1">
                       <FormLabel>Layanan</FormLabel>
+                      <Input
+                        placeholder="Cari layanan..."
+                        value={serviceSearchTerms[field.id] || ""}
+                        onChange={(event) =>
+                          setServiceSearchTerms((current) => ({
+                            ...current,
+                            [field.id]: event.target.value,
+                          }))
+                        }
+                        className="mb-2"
+                      />
                       <Select
-                        onValueChange={serviceField.onChange}
+                        onValueChange={(value) => {
+                          serviceField.onChange(value);
+                          const selectedService = availableServices.find(
+                            (service) => service.id.toString() === value
+                          );
+
+                          setServiceSearchTerms((current) => ({
+                            ...current,
+                            [field.id]: selectedService?.name || "",
+                          }));
+                        }}
                         defaultValue={serviceField.value}
                       >
                         <FormControl>
@@ -337,15 +487,27 @@ export function FullMedicalRecordForm({
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {availableServices.map((service) => (
-                            <SelectItem
-                              key={service.id}
-                              value={service.id.toString()}
-                            >
-                              {service.name} (
-                              {formatRupiah(parseFloat(service.basePrice))})
-                            </SelectItem>
-                          ))}
+                          {getFilteredServices(
+                            serviceSearchTerms[field.id] || "",
+                            serviceField.value
+                          ).length === 0 ? (
+                            <div className="px-2 py-3 text-sm text-muted-foreground">
+                              Tidak ada layanan yang cocok.
+                            </div>
+                          ) : (
+                            getFilteredServices(
+                              serviceSearchTerms[field.id] || "",
+                              serviceField.value
+                            ).map((service) => (
+                              <SelectItem
+                                key={service.id}
+                                value={service.id.toString()}
+                              >
+                                {service.name} (
+                                {formatRupiah(parseFloat(service.basePrice))})
+                              </SelectItem>
+                            ))
+                          )}
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -407,12 +569,21 @@ export function FullMedicalRecordForm({
           </CardHeader>
           <CardContent className="space-y-4">
             {prescriptionFields.map((field, index) => {
-              const selectedMedicine = availableMedicines.find(
-                (medicine) =>
-                  medicine.id.toString() ===
-                  prescriptionValues?.[index]?.medicineId
+              const selectedMedicine = getSelectedMedicineById(
+                prescriptionValues?.[index]?.medicineId
               );
               const unitLabel = selectedMedicine?.unit?.trim() || "unit";
+              const currentMedicineId = prescriptionValues?.[index]?.medicineId;
+              const totalRequestedForMedicine = getRequestedQuantityForMedicine(
+                currentMedicineId
+              );
+              const remainingStockForRow = getRemainingStockForMedicine(
+                currentMedicineId,
+                index
+              );
+              const isStockExceeded =
+                Boolean(currentMedicineId) &&
+                totalRequestedForMedicine > (selectedMedicine?.totalStock ?? 0);
 
               return (
                 <div
@@ -477,6 +648,7 @@ export function FullMedicalRecordForm({
                             <Input
                               type="number"
                               min="1"
+                              max={selectedMedicine?.totalStock ?? undefined}
                               {...qtyField}
                               className="w-full"
                             />
@@ -519,6 +691,25 @@ export function FullMedicalRecordForm({
                           </span>
                         </p>
                       </div>
+                      <div className="mt-2 grid grid-cols-1 gap-1 text-muted-foreground md:grid-cols-2">
+                        <p>
+                          Total diresepkan di form ini:{" "}
+                          <span className="font-medium text-foreground">
+                            {totalRequestedForMedicine} {unitLabel}
+                          </span>
+                        </p>
+                        <p>
+                          Sisa stok untuk baris ini:{" "}
+                          <span className="font-medium text-foreground">
+                            {remainingStockForRow} {unitLabel}
+                          </span>
+                        </p>
+                      </div>
+                      {isStockExceeded && (
+                        <p className="mt-2 text-sm font-medium text-red-600">
+                          Total resep untuk obat ini melebihi stok yang tersedia.
+                        </p>
+                      )}
                     </div>
                   )}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

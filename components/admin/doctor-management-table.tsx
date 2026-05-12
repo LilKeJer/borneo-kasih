@@ -17,7 +17,7 @@ import { toast } from "sonner";
 
 interface ApiDoctor {
   id: number;
-  username: string;
+  email: string;
   status?: string | null;
   details?: {
     name?: string | null;
@@ -100,9 +100,9 @@ export function DoctorManagementTable() {
 
         const rows: DoctorRow[] = doctorData.map((doctor) => ({
           id: Number(doctor.id),
-          name: doctor.details?.name || doctor.username,
+          name: doctor.details?.name || doctor.email,
           specialization: doctor.details?.specialization || "-",
-          email: doctor.details?.email || "-",
+          email: doctor.email || doctor.details?.email || "-",
           phone: doctor.details?.phone || "-",
           status: doctor.status || "Active",
           schedules: scheduleMap.get(Number(doctor.id)) ?? [],

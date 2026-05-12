@@ -6,11 +6,22 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PatientTable } from "@/components/admin/patient-table";
 import { PendingPatientList } from "@/components/admin/pending-patient-list";
+import { PatientForm } from "@/components/admin/patient-form";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Plus } from "lucide-react";
 
 export default function PatientManagementPage() {
   const [pendingCount, setPendingCount] = useState(0);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     fetchPendingCount();
@@ -29,6 +40,13 @@ export default function PatientManagementPage() {
 
   const handlePendingUpdate = () => {
     fetchPendingCount();
+    setRefreshKey((current) => current + 1);
+  };
+
+  const handleCreateSuccess = () => {
+    setIsCreateOpen(false);
+    fetchPendingCount();
+    setRefreshKey((current) => current + 1);
   };
 
   return (
@@ -36,7 +54,12 @@ export default function PatientManagementPage() {
       <PageHeader
         title="Manajemen Pasien"
         description="Kelola data pasien dan verifikasi pendaftar baru"
-      />
+      >
+        <Button onClick={() => setIsCreateOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Tambah Pasien
+        </Button>
+      </PageHeader>
 
       <Card className="border-amber-200 bg-amber-50/80">
         <CardContent className="py-5 text-sm text-amber-900">
@@ -62,7 +85,10 @@ export default function PatientManagementPage() {
         </TabsList>
 
         <TabsContent value="all">
-          <PatientTable onUpdate={handlePendingUpdate} />
+          <PatientTable
+            onUpdate={handlePendingUpdate}
+            refreshKey={refreshKey}
+          />
         </TabsContent>
 
         <TabsContent value="pending">
@@ -79,6 +105,18 @@ export default function PatientManagementPage() {
           )}
         </TabsContent>
       </Tabs>
+
+      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Tambah Pasien Baru</DialogTitle>
+          </DialogHeader>
+          <PatientForm
+            onSuccess={handleCreateSuccess}
+            onCancel={() => setIsCreateOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

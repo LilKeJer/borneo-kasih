@@ -3,8 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/db";
-import { reservations, payments } from "@/db/schema";
-import { eq, and, isNull } from "drizzle-orm";
+import { medicalHistories, payments, reservations } from "@/db/schema";
+import { eq, and, isNotNull, isNull } from "drizzle-orm";
 
 export async function PUT(
   req: NextRequest,
@@ -69,6 +69,26 @@ export async function PUT(
       let cancellationReason: string | null = null;
 
       if (examinationStatus === "Completed") {
+        const [existingMedicalRecord] = await tx
+          .select({ id: medicalHistories.id })
+          .from(medicalHistories)
+          .where(
+            and(
+              eq(medicalHistories.reservationId, reservationId),
+              isNull(medicalHistories.deletedAt),
+              isNotNull(medicalHistories.encryptedCondition),
+              isNotNull(medicalHistories.encryptedDescription),
+              isNotNull(medicalHistories.encryptedTreatment)
+            )
+          )
+          .limit(1);
+
+        if (!existingMedicalRecord) {
+          throw new Error(
+            "Isi rekam medis dokter terlebih dahulu sebelum menyelesaikan pemeriksaan"
+          );
+        }
+
         // Jika examination completed, check apakah sudah ada payment
         const existingPayment = await tx
           .select({ id: payments.id })

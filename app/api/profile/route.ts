@@ -12,7 +12,8 @@ import {
   pharmacistDetails,
   patientDetails,
 } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull, ne } from "drizzle-orm";
+import { isValidEmail, normalizeEmail } from "@/lib/utils/email";
 
 // GET - Get current user profile
 export async function GET() {
@@ -75,7 +76,7 @@ export async function GET() {
     // Return profile data
     return NextResponse.json({
       id: user.id,
-      username: user.username,
+      email: user.email,
       role: user.role,
       createdAt: user.createdAt,
       ...details,
@@ -100,7 +101,9 @@ export async function PUT(req: NextRequest) {
 
     const userId = parseInt(session.user.id);
     const body = await req.json();
-    const { name, email, phone, address, specialization } = body;
+    const { name, phone, address, specialization } = body;
+    const email =
+      typeof body.email === "string" ? normalizeEmail(body.email) : undefined;
 
     // Get user for role checking
     const user = await db.query.users.findFirst({
@@ -114,51 +117,81 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    // Update role-specific details
-    switch (user.role) {
-      case "Admin":
-        await db
-          .update(adminDetails)
-          .set({ name, email, phone })
-          .where(eq(adminDetails.userId, userId));
-        break;
-      case "Doctor":
-        await db
-          .update(doctorDetails)
-          .set({ name, email, phone, specialization })
-          .where(eq(doctorDetails.userId, userId));
-        break;
-      case "Nurse":
-        await db
-          .update(nurseDetails)
-          .set({ name, email, phone })
-          .where(eq(nurseDetails.userId, userId));
-        break;
-      case "Receptionist":
-        await db
-          .update(receptionistDetails)
-          .set({ name, email, phone })
-          .where(eq(receptionistDetails.userId, userId));
-        break;
-      case "Pharmacist":
-        await db
-          .update(pharmacistDetails)
-          .set({ name, email, phone })
-          .where(eq(pharmacistDetails.userId, userId));
-        break;
-      case "Patient":
-        await db
-          .update(patientDetails)
-          .set({ phone, address })
-          .where(eq(patientDetails.userId, userId));
-        break;
+    if (user.role !== "Patient") {
+      if (!email) {
+        return NextResponse.json(
+          { message: "Email wajib diisi" },
+          { status: 400 }
+        );
+      }
+
+      if (!isValidEmail(email)) {
+        return NextResponse.json(
+          { message: "Format email tidak valid" },
+          { status: 400 }
+        );
+      }
+
+      const duplicateUser = await db.query.users.findFirst({
+        where: and(eq(users.email, email), ne(users.id, userId), isNull(users.deletedAt)),
+      });
+
+      if (duplicateUser) {
+        return NextResponse.json(
+          { message: "Email sudah digunakan" },
+          { status: 409 }
+        );
+      }
     }
 
-    // Update user timestamp
-    await db
-      .update(users)
-      .set({ updatedAt: new Date() })
-      .where(eq(users.id, userId));
+    await db.transaction(async (tx) => {
+      switch (user.role) {
+        case "Admin":
+          await tx
+            .update(adminDetails)
+            .set({ name, email, phone })
+            .where(eq(adminDetails.userId, userId));
+          break;
+        case "Doctor":
+          await tx
+            .update(doctorDetails)
+            .set({ name, email, phone, specialization })
+            .where(eq(doctorDetails.userId, userId));
+          break;
+        case "Nurse":
+          await tx
+            .update(nurseDetails)
+            .set({ name, email, phone })
+            .where(eq(nurseDetails.userId, userId));
+          break;
+        case "Receptionist":
+          await tx
+            .update(receptionistDetails)
+            .set({ name, email, phone })
+            .where(eq(receptionistDetails.userId, userId));
+          break;
+        case "Pharmacist":
+          await tx
+            .update(pharmacistDetails)
+            .set({ name, email, phone })
+            .where(eq(pharmacistDetails.userId, userId));
+          break;
+        case "Patient":
+          await tx
+            .update(patientDetails)
+            .set({ phone, address })
+            .where(eq(patientDetails.userId, userId));
+          break;
+      }
+
+      await tx
+        .update(users)
+        .set({
+          email: email ?? user.email,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, userId));
+    });
 
     return NextResponse.json({ message: "Profile berhasil diperbarui" });
   } catch (error) {

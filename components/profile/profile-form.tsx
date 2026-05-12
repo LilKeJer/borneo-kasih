@@ -190,7 +190,7 @@ export function ProfileForm() {
             <p className="text-sm text-muted-foreground">
               {getRoleLabel(user?.role || "")}
             </p>
-            <p className="text-xs text-muted-foreground">@{user?.username}</p>
+            <p className="text-xs text-muted-foreground">{user?.email}</p>
           </div>
         </div>
 

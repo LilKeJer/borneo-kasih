@@ -4,53 +4,23 @@ import bcrypt from "bcrypt";
 import { db } from "@/db";
 import { users, patientDetails } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { isValidEmail, normalizeEmail } from "@/lib/utils/email";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    const {
-      username,
-      password,
-      name,
-      nik,
-      email,
-      phone,
-      dateOfBirth,
-      address,
-      gender,
-    } = body;
+    const { password, name, nik, phone, dateOfBirth, address, gender } = body;
+    const email =
+      typeof body.email === "string" ? normalizeEmail(body.email) : "";
 
-    // Validasi input
-    if (
-      !username ||
-      !password ||
-      !name ||
-      !nik ||
-      !email ||
-      !phone ||
-      !dateOfBirth ||
-      !address ||
-      !gender
-    ) {
+    if (!password || !name || !nik || !email || !phone || !dateOfBirth || !address || !gender) {
       return NextResponse.json(
         { message: "Semua field wajib diisi" },
         { status: 400 }
       );
     }
 
-    // Validasi format username
-    if (!/^[a-zA-Z0-9_]{3,50}$/.test(username)) {
-      return NextResponse.json(
-        {
-          message:
-            "Username hanya boleh huruf, angka, dan underscore (3-50 karakter)",
-        },
-        { status: 400 }
-      );
-    }
-
-    // Validasi password
     if (password.length < 6) {
       return NextResponse.json(
         { message: "Password minimal 6 karakter" },
@@ -66,9 +36,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validasi email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (!isValidEmail(email)) {
       return NextResponse.json(
         { message: "Format email tidak valid" },
         { status: 400 }
@@ -91,14 +59,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Cek jika username sudah ada
     const existingUser = await db.query.users.findFirst({
-      where: eq(users.username, username),
+      where: eq(users.email, email),
     });
 
     if (existingUser) {
       return NextResponse.json(
-        { message: "Username sudah digunakan" },
+        { message: "Email sudah terdaftar" },
         { status: 400 }
       );
     }
@@ -115,42 +82,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Cek jika email sudah terdaftar
-    const existingEmail = await db.query.patientDetails.findFirst({
-      where: eq(patientDetails.email, email),
-    });
-
-    if (existingEmail) {
-      return NextResponse.json(
-        { message: "Email sudah terdaftar" },
-        { status: 400 }
-      );
-    }
-
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Buat user baru dengan status Pending untuk verifikasi
-    const [newUser] = await db
-      .insert(users)
-      .values({
-        username,
-        password: hashedPassword,
-        role: "Patient",
-        status: "Pending", // Set status to Pending for new patients
-      })
-      .returning({ id: users.id });
+    await db.transaction(async (tx) => {
+      const [newUser] = await tx
+        .insert(users)
+        .values({
+          email,
+          password: hashedPassword,
+          role: "Patient",
+          status: "Pending",
+        })
+        .returning({ id: users.id });
 
-    // Buat detail pasien dengan semua field yang required
-    await db.insert(patientDetails).values({
-      userId: newUser.id,
-      name,
-      nik,
-      email,
-      phone,
-      dateOfBirth: new Date(dateOfBirth),
-      address,
-      gender,
+      await tx.insert(patientDetails).values({
+        userId: newUser.id,
+        name,
+        nik,
+        email,
+        phone,
+        dateOfBirth: new Date(dateOfBirth),
+        address,
+        gender,
+      });
     });
 
     return NextResponse.json(

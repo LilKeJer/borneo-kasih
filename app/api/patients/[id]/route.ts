@@ -4,6 +4,7 @@ import { and, eq, isNull, ne } from "drizzle-orm";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/db";
 import { patientDetails, users } from "@/db/schema";
+import { isValidEmail, normalizeEmail } from "@/lib/utils/email";
 
 const editableStatuses = ["Pending", "Verified", "Inactive", "Suspended"];
 
@@ -34,13 +35,12 @@ export async function GET(
     const patient = await db
       .select({
         id: users.id,
-        username: users.username,
         status: users.status,
         createdAt: users.createdAt,
         verifiedAt: users.verifiedAt,
         name: patientDetails.name,
         nik: patientDetails.nik,
-        email: patientDetails.email,
+        email: users.email,
         phone: patientDetails.phone,
         dateOfBirth: patientDetails.dateOfBirth,
         address: patientDetails.address,
@@ -91,9 +91,12 @@ export async function PUT(
     const body = await req.json();
 
     const name = normalizeOptionalString(body.name);
-    const email = normalizeOptionalString(body.email);
     const phone = normalizeOptionalString(body.phone);
     const address = normalizeOptionalString(body.address);
+    const hasEmailField = Object.prototype.hasOwnProperty.call(body, "email");
+    const rawEmail =
+      typeof body.email === "string" ? body.email.trim() : undefined;
+    const email = rawEmail ? normalizeEmail(rawEmail) : undefined;
     const gender =
       body.gender === "L" || body.gender === "P" ? body.gender : undefined;
     const dateOfBirth =
@@ -120,6 +123,20 @@ export async function PUT(
       );
     }
 
+    if (hasEmailField && !rawEmail) {
+      return NextResponse.json(
+        { message: "Email pasien wajib diisi" },
+        { status: 400 }
+      );
+    }
+
+    if (email && !isValidEmail(email)) {
+      return NextResponse.json(
+        { message: "Format email pasien tidak valid" },
+        { status: 400 }
+      );
+    }
+
     const existingPatient = await db.query.users.findFirst({
       where: and(
         eq(users.id, patientId),
@@ -139,38 +156,39 @@ export async function PUT(
     }
 
     if (email) {
-      const duplicateEmail = await db.query.patientDetails.findFirst({
-        where: and(eq(patientDetails.email, email), ne(patientDetails.userId, patientId)),
+      const duplicateEmail = await db.query.users.findFirst({
+        where: and(eq(users.email, email), ne(users.id, patientId), isNull(users.deletedAt)),
       });
 
       if (duplicateEmail) {
         return NextResponse.json(
-          { message: "Email sudah digunakan oleh pasien lain" },
+          { message: "Email sudah digunakan oleh akun lain" },
           { status: 409 }
         );
       }
     }
 
-    await db
-      .update(patientDetails)
-      .set({
-        name: name ?? undefined,
-        email,
-        phone,
-        address,
-        dateOfBirth:
-          dateOfBirth && !Number.isNaN(dateOfBirth.getTime())
-            ? dateOfBirth
-            : undefined,
-        gender,
-      })
-      .where(eq(patientDetails.userId, patientId));
+    await db.transaction(async (tx) => {
+      await tx
+        .update(patientDetails)
+        .set({
+          name: name ?? undefined,
+          email,
+          phone,
+          address,
+          dateOfBirth:
+            dateOfBirth && !Number.isNaN(dateOfBirth.getTime())
+              ? dateOfBirth
+              : undefined,
+          gender,
+        })
+        .where(eq(patientDetails.userId, patientId));
 
-    if (requestedStatus) {
-      await db
+      await tx
         .update(users)
         .set({
-          status: requestedStatus,
+          email: email ?? existingPatient.email,
+          status: requestedStatus ?? existingPatient.status,
           verifiedAt:
             requestedStatus === "Verified"
               ? existingPatient.verifiedAt ?? new Date()
@@ -182,12 +200,7 @@ export async function PUT(
           updatedAt: new Date(),
         })
         .where(eq(users.id, patientId));
-    } else {
-      await db
-        .update(users)
-        .set({ updatedAt: new Date() })
-        .where(eq(users.id, patientId));
-    }
+    });
 
     return NextResponse.json({
       message: requestedStatus

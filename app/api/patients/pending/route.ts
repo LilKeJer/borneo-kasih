@@ -19,12 +19,11 @@ export async function GET() {
     const patients = await db
       .select({
         id: users.id,
-        username: users.username,
         status: users.status,
         createdAt: users.createdAt,
         name: patientDetails.name,
         nik: patientDetails.nik,
-        email: patientDetails.email,
+        email: users.email,
         phone: patientDetails.phone,
         dateOfBirth: patientDetails.dateOfBirth,
         address: patientDetails.address,

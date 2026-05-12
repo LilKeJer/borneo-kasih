@@ -33,7 +33,7 @@ export interface StaffDetails {
 
 export interface StaffFormInitialData {
   id: string;
-  username: string;
+  email: string;
   role: "Doctor" | "Nurse" | "Receptionist" | "Pharmacist";
   details?: StaffDetails;
 }
@@ -61,7 +61,6 @@ export function StaffForm(props: StaffFormProps) {
   const form = useForm<StaffFormValues>({
     resolver: zodResolver(staffSchema),
     defaultValues: {
-      username: "",
       password: "",
       confirmPassword: "",
       name: "",
@@ -75,9 +74,8 @@ export function StaffForm(props: StaffFormProps) {
   useEffect(() => {
     if (initialData) {
       form.reset({
-        username: initialData.username,
+        email: initialData.email,
         name: initialData.details?.name || "",
-        email: initialData.details?.email || "",
         phone: initialData.details?.phone || "",
         role: initialData.role,
         specialization: initialData.details?.specialization || "",
@@ -136,20 +134,6 @@ export function StaffForm(props: StaffFormProps) {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <FormField
             control={form.control}
-            name="username"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Username</FormLabel>
-                <FormControl>
-                  <Input placeholder="username" {...field} disabled={isEdit} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
             name="role"
             render={({ field }) => (
               <FormItem>
@@ -195,7 +179,7 @@ export function StaffForm(props: StaffFormProps) {
             name="email"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Email</FormLabel>
+                <FormLabel>Email Login</FormLabel>
                 <FormControl>
                   <Input
                     type="email"

@@ -49,7 +49,6 @@ import { formatDate } from "@/lib/utils/date";
 
 interface Patient {
   id: string;
-  username: string;
   name: string;
   nik: string;
   email: string;
@@ -63,6 +62,7 @@ interface Patient {
 
 interface PatientTableProps {
   onUpdate?: () => void;
+  refreshKey?: number;
 }
 
 interface PatientFormValues {
@@ -85,7 +85,7 @@ const statusLabels: Record<string, string> = {
 
 const editableStatuses = ["Verified", "Suspended", "Inactive"];
 
-export function PatientTable({ onUpdate }: PatientTableProps) {
+export function PatientTable({ onUpdate, refreshKey = 0 }: PatientTableProps) {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -132,7 +132,7 @@ export function PatientTable({ onUpdate }: PatientTableProps) {
 
   useEffect(() => {
     fetchPatients();
-  }, [fetchPatients]);
+  }, [fetchPatients, refreshKey]);
 
   const notifyUpdated = useCallback(() => {
     fetchPatients();
@@ -237,6 +237,11 @@ export function PatientTable({ onUpdate }: PatientTableProps) {
       return;
     }
 
+    if (!editForm.email.trim()) {
+      toast.error("Email pasien wajib diisi");
+      return;
+    }
+
     setSavingEdit(true);
     try {
       const response = await fetch(`/api/patients/${selectedPatient.id}`, {
@@ -316,7 +321,7 @@ export function PatientTable({ onUpdate }: PatientTableProps) {
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="Cari nama, NIK, email, atau username pasien"
+            placeholder="Cari nama, NIK, atau email pasien"
             className="pl-8"
             value={searchTerm}
             onChange={(e) => {
@@ -488,12 +493,6 @@ export function PatientTable({ onUpdate }: PatientTableProps) {
                     Nama
                   </p>
                   <p className="font-medium">{selectedPatient.name || "-"}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Username
-                  </p>
-                  <p className="font-medium">{selectedPatient.username}</p>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">

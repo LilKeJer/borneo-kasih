@@ -112,6 +112,11 @@ export function getDashboardNavByRole(role: DashboardRole): DashboardNavItem[] {
           icon: <Clock className="h-4 w-4" />,
         },
         {
+          title: "Rekam Medis",
+          href: "/dashboard/doctor/medical-records",
+          icon: <FileText className="h-4 w-4" />,
+        },
+        {
           title: "Profil",
           href: "/dashboard/doctor/profile",
           icon: <User className="h-4 w-4" />,
@@ -212,11 +217,6 @@ export function getDashboardNavByRole(role: DashboardRole): DashboardNavItem[] {
           title: "Antrian",
           href: "/queue-display",
           icon: <Clock className="h-4 w-4" />,
-        },
-        {
-          title: "Medical Records",
-          href: "/dashboard/patient/medical-records",
-          icon: <FileText className="h-4 w-4" />,
         },
         {
           title: "Prescriptions",

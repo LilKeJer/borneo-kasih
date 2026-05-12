@@ -10,8 +10,9 @@ import {
   receptionistDetails,
   pharmacistDetails,
 } from "@/db/schema";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, ne } from "drizzle-orm";
 import bcrypt from "bcrypt";
+import { isValidEmail, normalizeEmail } from "@/lib/utils/email";
 
 // GET - Get single staff member by ID
 export async function GET(
@@ -28,10 +29,19 @@ export async function GET(
     const resolvedParams = await params; // 2. Await promise
     const staffId = parseInt(resolvedParams.id); // 3. Akses ID dari resolved params
 
-    // Get user
-    const staff = await db.query.users.findFirst({
-      where: and(eq(users.id, staffId), isNull(users.deletedAt)),
-    });
+    const [staff] = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        role: users.role,
+        status: users.status,
+        createdAt: users.createdAt,
+        updatedAt: users.updatedAt,
+        deletedAt: users.deletedAt,
+      })
+      .from(users)
+      .where(and(eq(users.id, staffId), isNull(users.deletedAt)))
+      .limit(1);
 
     if (!staff) {
       return NextResponse.json(
@@ -93,7 +103,9 @@ export async function PUT(
     const staffId = parseInt(resolvedParams.id); // 3. Akses ID dari resolved params
 
     const body = await req.json();
-    const { name, email, phone, specialization, password } = body;
+    const { name, phone, specialization, password } = body;
+    const email =
+      typeof body.email === "string" ? normalizeEmail(body.email) : "";
 
     // Get existing user
     const existingUser = await db.query.users.findFirst({
@@ -107,48 +119,74 @@ export async function PUT(
       );
     }
 
-    // Update password if provided
+    if (!email) {
+      return NextResponse.json(
+        { message: "Email wajib diisi" },
+        { status: 400 }
+      );
+    }
+
+    if (!isValidEmail(email)) {
+      return NextResponse.json(
+        { message: "Format email tidak valid" },
+        { status: 400 }
+      );
+    }
+
+    const duplicateUser = await db.query.users.findFirst({
+      where: and(eq(users.email, email), ne(users.id, staffId), isNull(users.deletedAt)),
+    });
+
+    if (duplicateUser) {
+      return NextResponse.json(
+        { message: "Email sudah digunakan" },
+        { status: 409 }
+      );
+    }
+
+    const userUpdateData: {
+      email: string;
+      updatedAt: Date;
+      password?: string;
+    } = {
+      email,
+      updatedAt: new Date(),
+    };
+
     if (password) {
-      const hashedPassword = await bcrypt.hash(password, 10);
-      await db
-        .update(users)
-        .set({ password: hashedPassword, updatedAt: new Date() })
-        .where(eq(users.id, staffId));
+      userUpdateData.password = await bcrypt.hash(password, 10);
     }
 
-    // Update role-specific details
-    switch (existingUser.role) {
-      case "Doctor":
-        await db
-          .update(doctorDetails)
-          .set({ name, email, phone, specialization })
-          .where(eq(doctorDetails.userId, staffId));
-        break;
-      case "Nurse":
-        await db
-          .update(nurseDetails)
-          .set({ name, email, phone })
-          .where(eq(nurseDetails.userId, staffId));
-        break;
-      case "Receptionist":
-        await db
-          .update(receptionistDetails)
-          .set({ name, email, phone })
-          .where(eq(receptionistDetails.userId, staffId));
-        break;
-      case "Pharmacist":
-        await db
-          .update(pharmacistDetails)
-          .set({ name, email, phone })
-          .where(eq(pharmacistDetails.userId, staffId));
-        break;
-    }
+    await db.transaction(async (tx) => {
+      await tx.update(users).set(userUpdateData).where(eq(users.id, staffId));
 
-    // Update user timestamp
-    await db
-      .update(users)
-      .set({ updatedAt: new Date() })
-      .where(eq(users.id, staffId));
+      switch (existingUser.role) {
+        case "Doctor":
+          await tx
+            .update(doctorDetails)
+            .set({ name, email, phone, specialization })
+            .where(eq(doctorDetails.userId, staffId));
+          break;
+        case "Nurse":
+          await tx
+            .update(nurseDetails)
+            .set({ name, email, phone })
+            .where(eq(nurseDetails.userId, staffId));
+          break;
+        case "Receptionist":
+          await tx
+            .update(receptionistDetails)
+            .set({ name, email, phone })
+            .where(eq(receptionistDetails.userId, staffId));
+          break;
+        case "Pharmacist":
+          await tx
+            .update(pharmacistDetails)
+            .set({ name, email, phone })
+            .where(eq(pharmacistDetails.userId, staffId));
+          break;
+      }
+    });
 
     return NextResponse.json({ message: "Staff berhasil diperbarui" });
   } catch (error) {

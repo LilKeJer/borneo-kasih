@@ -16,7 +16,7 @@ export const users = pgTable(
   "Users",
   {
     id: serial("id").primaryKey(),
-    username: varchar("username", { length: 50 }).notNull().unique(),
+    email: varchar("email", { length: 100 }).notNull().unique(),
     password: varchar("password", { length: 255 }).notNull(),
     role: varchar("role", { length: 20 }).notNull(),
     status: varchar("status", { length: 20 }).default("Active"),
@@ -28,7 +28,7 @@ export const users = pgTable(
   },
   (table) => {
     return {
-      usernameIdx: index("idx_username").on(table.username),
+      emailIdx: index("idx_user_email").on(table.email),
       roleIdx: index("idx_role").on(table.role),
       statusIdx: index("idx_user_status").on(table.status),
       roleCheck: check(

@@ -44,7 +44,6 @@ export function RegisterForm({
   const form = useForm<FormData>({
     resolver: zodResolver(registerPatientSchema),
     defaultValues: {
-      username: "",
       password: "",
       confirmPassword: "",
       name: "",
@@ -69,7 +68,6 @@ export function RegisterForm({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          username: values.username,
           password: values.password,
           name: values.name,
           nik: values.nik,
@@ -125,24 +123,6 @@ export function RegisterForm({
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <FormField
-            control={form.control}
-            name="username"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Username</FormLabel>
-                <FormControl>
-                  <Input placeholder="Buat username" {...field} />
-                </FormControl>
-                <FormDescription>
-                  Gunakan huruf, angka, atau underscore dengan minimal 3
-                  karakter.
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
           <div className="grid grid-cols-2 gap-4">
             <FormField
               control={form.control}
@@ -228,6 +208,7 @@ export function RegisterForm({
                       {...field}
                     />
                   </FormControl>
+                  <FormDescription>Email ini dipakai untuk login akun</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

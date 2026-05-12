@@ -4,7 +4,16 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/db";
 import { reservations, patientDetails, medicalHistories } from "@/db/schema";
-import { eq, and, isNull, gte, lte, sql, desc } from "drizzle-orm";
+import {
+  eq,
+  and,
+  isNull,
+  gte,
+  lt,
+  sql,
+  desc,
+  isNotNull,
+} from "drizzle-orm";
 
 export async function GET() {
   try {
@@ -48,7 +57,7 @@ export async function GET() {
         and(
           eq(reservations.doctorId, doctorId),
           gte(reservations.reservationDate, today),
-          lte(reservations.reservationDate, nextDay),
+          lt(reservations.reservationDate, nextDay),
           eq(reservations.examinationStatus, "In Progress"),
           isNull(reservations.deletedAt)
         )
@@ -79,7 +88,7 @@ export async function GET() {
         and(
           eq(reservations.doctorId, doctorId),
           gte(reservations.reservationDate, today),
-          lte(reservations.reservationDate, nextDay),
+          lt(reservations.reservationDate, nextDay),
           eq(reservations.examinationStatus, "Waiting"),
           isNull(reservations.deletedAt)
         )
@@ -95,6 +104,8 @@ export async function GET() {
         // Cari kunjungan terakhir pasien ini
         const lastVisit = await db
           .select({
+            id: medicalHistories.id,
+            reservationId: medicalHistories.reservationId,
             dateOfDiagnosis: medicalHistories.dateOfDiagnosis,
             createdAt: medicalHistories.createdAt,
           })
@@ -102,10 +113,26 @@ export async function GET() {
           .where(
             and(
               eq(medicalHistories.patientId, patient.patientId),
+              isNotNull(medicalHistories.encryptedCondition),
               isNull(medicalHistories.deletedAt)
             )
           )
           .orderBy(desc(medicalHistories.createdAt))
+          .limit(1);
+
+        const currentReservationRecord = await db
+          .select({
+            id: medicalHistories.id,
+          })
+          .from(medicalHistories)
+          .where(
+            and(
+              eq(medicalHistories.reservationId, patient.id),
+              isNotNull(medicalHistories.encryptedCondition),
+              isNull(medicalHistories.deletedAt)
+            )
+          )
+          .orderBy(desc(medicalHistories.updatedAt))
           .limit(1);
 
         return {
@@ -114,6 +141,8 @@ export async function GET() {
             lastVisit.length > 0
               ? lastVisit[0].dateOfDiagnosis || lastVisit[0].createdAt
               : null,
+          hasMedicalRecord: currentReservationRecord.length > 0,
+          medicalRecordId: currentReservationRecord[0]?.id ?? null,
         };
       })
     );

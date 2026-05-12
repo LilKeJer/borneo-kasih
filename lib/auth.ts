@@ -3,8 +3,9 @@ import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcrypt";
 import { db } from "@/db";
-import { users } from "@/db/schema/auth"; // Make sure the path is correct
+import { users } from "@/db/schema/auth";
 import { and, eq, isNull } from "drizzle-orm";
+import { normalizeEmail } from "@/lib/utils/email";
 
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
@@ -18,20 +19,18 @@ export const authOptions: NextAuthOptions = {
     CredentialsProvider({
       name: "Credentials",
       credentials: {
-        username: { label: "Username", type: "text" },
+        email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.username || !credentials?.password) {
+        if (!credentials?.email || !credentials?.password) {
           return null;
         }
 
-        // Cari user berdasarkan username
+        const email = normalizeEmail(credentials.email);
+
         const foundUser = await db.query.users.findFirst({
-          where: and(
-            eq(users.username, credentials.username),
-            isNull(users.deletedAt)
-          ),
+          where: and(eq(users.email, email), isNull(users.deletedAt)),
           with: {
             adminDetails: true,
             doctorDetails: true,
@@ -97,11 +96,10 @@ export const authOptions: NextAuthOptions = {
         // Return user untuk dimasukkan ke JWT token
         return {
           id: foundUser.id.toString(),
-          username: foundUser.username,
+          email: foundUser.email,
           role: foundUser.role,
           status: normalizedStatus,
           name: details?.name || undefined,
-          email: details?.email || undefined,
         };
       },
     }),
@@ -111,7 +109,7 @@ export const authOptions: NextAuthOptions = {
       if (authUser) {
         token.id = authUser.id;
         token.role = authUser.role;
-        token.username = authUser.username;
+        token.email = authUser.email;
         token.status = authUser.status ?? "Active";
         token.name = authUser.name;
       }
@@ -121,8 +119,9 @@ export const authOptions: NextAuthOptions = {
       if (token) {
         session.user.id = token.id;
         session.user.role = token.role;
-        session.user.username = token.username;
+        session.user.email = token.email;
         session.user.status = token.status;
+        session.user.name = token.name;
       }
       return session;
     },

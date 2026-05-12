@@ -29,7 +29,7 @@ interface LoginFormProps {
 const mapAuthError = (errorMessage: string) => {
   switch (errorMessage) {
     case "CredentialsSignin":
-      return "Username atau kata sandi tidak sesuai";
+      return "Email atau kata sandi tidak sesuai";
     default:
       return decodeURIComponent(errorMessage);
   }
@@ -60,7 +60,7 @@ export function LoginForm({
   const form = useForm<FormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      username: "",
+      email: "",
       password: "",
     },
   });
@@ -71,7 +71,7 @@ export function LoginForm({
 
     try {
       const result = await signIn("credentials", {
-        username: values.username,
+        email: values.email,
         password: values.password,
         redirect: false,
       });
@@ -150,12 +150,16 @@ export function LoginForm({
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <FormField
             control={form.control}
-            name="username"
+            name="email"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Username</FormLabel>
+                <FormLabel>Email</FormLabel>
                 <FormControl>
-                  <Input placeholder="Masukkan username" {...field} />
+                  <Input
+                    type="email"
+                    placeholder="Masukkan email"
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>

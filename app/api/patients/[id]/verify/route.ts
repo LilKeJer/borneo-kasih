@@ -4,7 +4,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/db";
 import { users, patientDetails } from "@/db/schema";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, ne } from "drizzle-orm";
+import { isValidEmail, normalizeEmail } from "@/lib/utils/email";
 
 // PUT - Approve/Reject patient
 export async function PUT(
@@ -39,28 +40,59 @@ export async function PUT(
     }
 
     if (action === "approve") {
-      // If completeData is provided, update patient details
-      if (completeData) {
-        await db
-          .update(patientDetails)
-          .set({
-            email: completeData.email,
-            phone: completeData.phone,
-            address: completeData.address,
-          })
-          .where(eq(patientDetails.userId, patientId));
+      const nextEmail =
+        typeof completeData?.email === "string" && completeData.email.trim()
+          ? normalizeEmail(completeData.email)
+          : existingPatient.email;
+
+      if (!nextEmail) {
+        return NextResponse.json(
+          { message: "Email pasien wajib tersedia sebelum verifikasi" },
+          { status: 400 }
+        );
       }
 
-      // Update user status to Verified
-      await db
-        .update(users)
-        .set({
-          status: "Verified", // <-- Update status menjadi Verified
-          verifiedAt: new Date(),
-          verifiedBy: parseInt(session.user.id),
-          updatedAt: new Date(),
-        })
-        .where(eq(users.id, patientId));
+      if (!isValidEmail(nextEmail)) {
+        return NextResponse.json(
+          { message: "Format email pasien tidak valid" },
+          { status: 400 }
+        );
+      }
+
+      const duplicateUser = await db.query.users.findFirst({
+        where: and(eq(users.email, nextEmail), ne(users.id, patientId), isNull(users.deletedAt)),
+      });
+
+      if (duplicateUser) {
+        return NextResponse.json(
+          { message: "Email sudah digunakan oleh akun lain" },
+          { status: 409 }
+        );
+      }
+
+      await db.transaction(async (tx) => {
+        if (completeData) {
+          await tx
+            .update(patientDetails)
+            .set({
+              email: nextEmail,
+              phone: completeData.phone,
+              address: completeData.address,
+            })
+            .where(eq(patientDetails.userId, patientId));
+        }
+
+        await tx
+          .update(users)
+          .set({
+            email: nextEmail,
+            status: "Verified",
+            verifiedAt: new Date(),
+            verifiedBy: parseInt(session.user.id),
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, patientId));
+      });
 
       return NextResponse.json({
         message: "Pasien berhasil disetujui",
@@ -71,7 +103,7 @@ export async function PUT(
       await db
         .update(users)
         .set({
-          status: "Rejected", // <-- Update status menjadi Rejected
+          status: "Rejected",
           deletedAt: new Date(),
         })
         .where(eq(users.id, patientId));
