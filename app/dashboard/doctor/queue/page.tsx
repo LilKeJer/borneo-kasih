@@ -220,6 +220,9 @@ export default function DoctorQueuePage() {
     });
   };
 
+  const nextEligiblePatientId =
+    currentPatient === null ? queuePatients[0]?.id ?? null : null;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -286,6 +289,12 @@ export default function DoctorQueuePage() {
             Auto refresh dimatikan agar tidak mengganggu pemeriksaan.
           </p>
         )}
+      </div>
+
+      <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+        Pasien hanya dapat mulai diperiksa sesuai giliran aktif. Jika ada kasus
+        darurat, pasien tersebut harus dijadikan prioritas dan ditempatkan di
+        nomor antrian paling depan terlebih dahulu.
       </div>
 
       {/* Current Patient Card */}
@@ -460,7 +469,11 @@ export default function DoctorQueuePage() {
                           <Button
                             variant="default"
                             size="sm"
-                            disabled={updatingReservationId === patient.id}
+                            disabled={
+                              updatingReservationId === patient.id ||
+                              currentPatient !== null ||
+                              nextEligiblePatientId !== patient.id
+                            }
                             onClick={() =>
                               void handleUpdateStatus(patient.id, "In Progress")
                             }
@@ -520,13 +533,27 @@ export default function DoctorQueuePage() {
                   </p>
                 </div>
               )}
+
+              {selectedPatient.examinationStatus === "Waiting" &&
+                (currentPatient !== null ||
+                  nextEligiblePatientId !== selectedPatient.id) && (
+                  <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                    {currentPatient !== null
+                      ? "Masih ada pasien lain yang sedang diperiksa. Selesaikan pemeriksaan aktif terlebih dahulu."
+                      : "Pasien ini belum menjadi giliran berikutnya untuk diperiksa."}
+                  </div>
+                )}
             </div>
           )}
           <DialogFooter>
             {selectedPatient &&
               selectedPatient.examinationStatus === "Waiting" && (
                 <Button
-                  disabled={updatingReservationId === selectedPatient.id}
+                  disabled={
+                    updatingReservationId === selectedPatient.id ||
+                    currentPatient !== null ||
+                    nextEligiblePatientId !== selectedPatient.id
+                  }
                   onClick={() => {
                     void handleUpdateStatus(
                       selectedPatient.id,

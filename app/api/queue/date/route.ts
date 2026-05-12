@@ -101,7 +101,12 @@ export async function GET(req: NextRequest) {
           isNull(reservations.deletedAt)
         )
       )
-      .orderBy(doctorDetails.name, reservations.queueNumber);
+      .orderBy(
+        doctorDetails.name,
+        desc(reservations.isPriority),
+        reservations.queueNumber,
+        reservations.reservationDate
+      );
 
     const reservationIds = queues.map((queue) => queue.id);
     const nurseCheckupMap = new Map<number, boolean>();

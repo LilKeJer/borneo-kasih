@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/db";
 import { medicalHistories, payments, reservations } from "@/db/schema";
-import { eq, and, isNotNull, isNull } from "drizzle-orm";
+import { eq, and, isNotNull, isNull, ne, gte, lt, desc } from "drizzle-orm";
 
 export async function PUT(
   req: NextRequest,
@@ -49,6 +49,10 @@ export async function PUT(
           id: reservations.id,
           status: reservations.status,
           examinationStatus: reservations.examinationStatus,
+          doctorId: reservations.doctorId,
+          reservationDate: reservations.reservationDate,
+          queueNumber: reservations.queueNumber,
+          isPriority: reservations.isPriority,
         })
         .from(reservations)
         .where(
@@ -67,6 +71,90 @@ export async function PUT(
       let reservationStatus = currentReservation.status;
       let finalExaminationStatus = examinationStatus;
       let cancellationReason: string | null = null;
+
+      if (examinationStatus === "In Progress") {
+        if (currentReservation.examinationStatus !== "Waiting") {
+          throw new Error(
+            "Hanya pasien dengan status menunggu yang dapat mulai diperiksa"
+          );
+        }
+
+        const startOfDay = new Date(currentReservation.reservationDate);
+        startOfDay.setHours(0, 0, 0, 0);
+
+        const nextDay = new Date(startOfDay);
+        nextDay.setDate(nextDay.getDate() + 1);
+
+        const [activeExamination] = await tx
+          .select({
+            id: reservations.id,
+            queueNumber: reservations.queueNumber,
+          })
+          .from(reservations)
+          .where(
+            and(
+              eq(reservations.doctorId, currentReservation.doctorId),
+              gte(reservations.reservationDate, startOfDay),
+              lt(reservations.reservationDate, nextDay),
+              eq(reservations.examinationStatus, "In Progress"),
+              ne(reservations.id, reservationId),
+              isNull(reservations.deletedAt)
+            )
+          )
+          .orderBy(desc(reservations.updatedAt))
+          .limit(1);
+
+        if (activeExamination) {
+          throw new Error(
+            `Masih ada pasien yang sedang diperiksa. Selesaikan antrian nomor ${
+              activeExamination.queueNumber ?? "-"
+            } terlebih dahulu`
+          );
+        }
+
+        const [nextEligibleReservation] = await tx
+          .select({
+            id: reservations.id,
+            queueNumber: reservations.queueNumber,
+            isPriority: reservations.isPriority,
+          })
+          .from(reservations)
+          .where(
+            and(
+              eq(reservations.doctorId, currentReservation.doctorId),
+              eq(reservations.status, "Confirmed"),
+              eq(reservations.examinationStatus, "Waiting"),
+              gte(reservations.reservationDate, startOfDay),
+              lt(reservations.reservationDate, nextDay),
+              isNull(reservations.deletedAt)
+            )
+          )
+          .orderBy(
+            desc(reservations.isPriority),
+            reservations.queueNumber,
+            reservations.reservationDate
+          )
+          .limit(1);
+
+        if (
+          nextEligibleReservation &&
+          nextEligibleReservation.id !== reservationId
+        ) {
+          if (nextEligibleReservation.isPriority) {
+            throw new Error(
+              `Mulai pasien prioritas pada nomor antrian ${
+                nextEligibleReservation.queueNumber ?? "-"
+              } terlebih dahulu`
+            );
+          }
+
+          throw new Error(
+            `Mulai nomor antrian ${
+              nextEligibleReservation.queueNumber ?? "-"
+            } terlebih dahulu`
+          );
+        }
+      }
 
       if (examinationStatus === "Completed") {
         const [existingMedicalRecord] = await tx

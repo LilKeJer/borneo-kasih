@@ -1235,16 +1235,16 @@ async function seed() {
     const [reservationWaiting] = await tx
       .insert(reservations)
       .values({
-        patientId: patientOneUser.id,
+        patientId: patientTwoUser.id,
         doctorId: doctorUser.id,
         scheduleId: todayScheduleId,
         reservationDate: waitingAt,
-        queueNumber: 1,
+        queueNumber: 2,
         status: "Confirmed",
         examinationStatus: "Waiting",
-        complaint: "Demam sejak semalam",
-        isPriority: true,
-        priorityReason: "Sesak napas ringan",
+        complaint: "Batuk berdahak",
+        isPriority: false,
+        priorityReason: null,
         createdAt: now,
         updatedAt: now,
       })
@@ -1253,14 +1253,16 @@ async function seed() {
     const [reservationInProgress] = await tx
       .insert(reservations)
       .values({
-        patientId: patientTwoUser.id,
+        patientId: patientOneUser.id,
         doctorId: doctorUser.id,
         scheduleId: todayScheduleId,
         reservationDate: inProgressAt,
-        queueNumber: 2,
+        queueNumber: 1,
         status: "Confirmed",
         examinationStatus: "In Progress",
-        complaint: "Batuk berdahak",
+        complaint: "Demam sejak semalam disertai sesak napas ringan",
+        isPriority: true,
+        priorityReason: "Sesak napas ringan",
         createdAt: now,
         updatedAt: now,
       })

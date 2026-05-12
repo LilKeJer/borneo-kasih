@@ -93,7 +93,11 @@ export async function GET() {
           isNull(reservations.deletedAt)
         )
       )
-      .orderBy(reservations.queueNumber);
+      .orderBy(
+        desc(reservations.isPriority),
+        reservations.queueNumber,
+        reservations.reservationDate
+      );
 
     // Untuk setiap pasien, tambahkan tanggal kunjungan terakhir
     const patientsWithLastVisit = await Promise.all(

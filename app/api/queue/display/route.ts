@@ -9,7 +9,7 @@ import {
   medicalHistories,
   prescriptions,
 } from "@/db/schema";
-import { eq, and, isNull, gte, lte, sql } from "drizzle-orm";
+import { eq, and, isNull, gte, lte, sql, desc } from "drizzle-orm";
 
 // Definisi tipe untuk item antrian
 interface QueueItem {
@@ -92,7 +92,9 @@ export async function GET() {
       .orderBy(
         doctorDetails.name,
         practiceSessions.name,
-        reservations.queueNumber
+        desc(reservations.isPriority),
+        reservations.queueNumber,
+        reservations.reservationDate
       );
 
     // Mengelompokkan antrian berdasarkan dokter dan sesi
