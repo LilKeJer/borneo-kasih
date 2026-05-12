@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { MedicalRecordDetailDialog } from "@/components/doctor/medical-record-detail-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,25 +18,38 @@ import { Badge } from "@/components/ui/badge";
 import { useEncryption } from "@/hooks/use-encryption";
 import { formatDate } from "@/lib/utils/date";
 import {
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   FileText,
   Loader2,
   Search,
 } from "lucide-react";
 
-interface MedicalRecordSummary {
+interface MedicalRecordItem {
   id: number;
-  patientId: number;
-  patientName: string;
   doctorName: string;
   diagnosis: string;
   encryptionIvDoctor?: string | null;
   date: string;
+  reservationId?: number | null;
+}
+
+interface MedicalRecordGroup {
+  patientId: number;
+  patientName: string;
+  latestRecordId: number;
+  latestDoctorName: string;
+  latestDiagnosis: string;
+  latestEncryptionIvDoctor?: string | null;
+  latestDate: string;
+  totalRecords: number;
+  records: MedicalRecordItem[];
 }
 
 export default function DoctorMedicalRecordsPage() {
-  const [records, setRecords] = useState<MedicalRecordSummary[]>([]);
+  const [recordGroups, setRecordGroups] = useState<MedicalRecordGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -45,6 +58,7 @@ export default function DoctorMedicalRecordsPage() {
   const [dateTo, setDateTo] = useState("");
   const [selectedRecordId, setSelectedRecordId] = useState<number | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [expandedPatients, setExpandedPatients] = useState<number[]>([]);
   const { decrypt, initialize } = useEncryption();
 
   useEffect(() => {
@@ -83,6 +97,7 @@ export default function DoctorMedicalRecordsPage() {
       const params = new URLSearchParams({
         page: page.toString(),
         limit: "10",
+        groupBy: "patient",
       });
 
       if (searchTerm.trim()) {
@@ -109,23 +124,39 @@ export default function DoctorMedicalRecordsPage() {
       }
 
       const result = await response.json();
-      const rawRecords = Array.isArray(result.data) ? result.data : [];
-      const decryptedRecords = await Promise.all(
-        rawRecords.map(async (record: MedicalRecordSummary) => ({
-          ...record,
-          diagnosis: await decryptField(
-            record.diagnosis,
-            record.encryptionIvDoctor || null,
+      const rawGroups = Array.isArray(result.data) ? result.data : [];
+      const decryptedGroups = await Promise.all(
+        rawGroups.map(async (group: MedicalRecordGroup) => ({
+          ...group,
+          latestDiagnosis: await decryptField(
+            group.latestDiagnosis,
+            group.latestEncryptionIvDoctor || null,
             "condition"
+          ),
+          records: await Promise.all(
+            group.records.map(async (record) => ({
+              ...record,
+              diagnosis: await decryptField(
+                record.diagnosis,
+                record.encryptionIvDoctor || null,
+                "condition"
+              ),
+            }))
           ),
         }))
       );
 
-      setRecords(decryptedRecords);
+      setRecordGroups(decryptedGroups);
       setTotalPages(result.pagination?.totalPages || 1);
+      setExpandedPatients((current) =>
+        current.filter((patientId) =>
+          decryptedGroups.some((group) => group.patientId === patientId)
+        )
+      );
     } catch (error) {
       console.error("Error fetching doctor medical records:", error);
-      setRecords([]);
+      setRecordGroups([]);
+      setExpandedPatients([]);
       setTotalPages(1);
     } finally {
       setLoading(false);
@@ -136,18 +167,26 @@ export default function DoctorMedicalRecordsPage() {
     void fetchRecords();
   }, [fetchRecords]);
 
+  const togglePatientGroup = useCallback((patientId: number) => {
+    setExpandedPatients((current) =>
+      current.includes(patientId)
+        ? current.filter((id) => id !== patientId)
+        : [...current, patientId]
+    );
+  }, []);
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Rekam Medis"
-        description="Cari dan tinjau riwayat rekam medis pasien."
+        description="Cari dan tinjau riwayat rekam medis yang dikelompokkan per pasien."
       />
 
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            Daftar Rekam Medis Pasien
+            Daftar Rekam Medis Per Pasien
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -197,10 +236,10 @@ export default function DoctorMedicalRecordsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Tanggal</TableHead>
                   <TableHead>Pasien</TableHead>
-                  <TableHead>Dokter</TableHead>
-                  <TableHead>Diagnosis</TableHead>
+                  <TableHead>Kunjungan Terakhir</TableHead>
+                  <TableHead>Dokter Terakhir</TableHead>
+                  <TableHead>Ringkasan</TableHead>
                   <TableHead className="text-right">Aksi</TableHead>
                 </TableRow>
               </TableHeader>
@@ -214,51 +253,107 @@ export default function DoctorMedicalRecordsPage() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ) : records.length === 0 ? (
+                ) : recordGroups.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="h-24 text-center">
                       Tidak ada rekam medis yang cocok dengan filter.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  records.map((record) => (
-                    <TableRow
-                      key={record.id}
-                      className="cursor-pointer"
-                      onClick={() => {
-                        setSelectedRecordId(record.id);
-                        setIsDetailOpen(true);
-                      }}
-                    >
-                      <TableCell>{formatDate(record.date)}</TableCell>
-                      <TableCell className="font-medium">
-                        {record.patientName}
-                      </TableCell>
-                      <TableCell>{record.doctorName}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{record.diagnosis}</Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setSelectedRecordId(record.id);
-                            setIsDetailOpen(true);
-                          }}
-                        >
-                          Lihat Detail
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  recordGroups.map((group) => {
+                    const isExpanded = expandedPatients.includes(group.patientId);
+
+                    return (
+                      <Fragment key={group.patientId}>
+                        <TableRow>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-3">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => togglePatientGroup(group.patientId)}
+                              >
+                                {isExpanded ? (
+                                  <ChevronUp className="h-4 w-4" />
+                                ) : (
+                                  <ChevronDown className="h-4 w-4" />
+                                )}
+                              </Button>
+                              <div>
+                                <p>{group.patientName}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {group.totalRecords} rekam medis
+                                </p>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>{formatDate(group.latestDate)}</TableCell>
+                          <TableCell>{group.latestDoctorName}</TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">
+                              {group.latestDiagnosis}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => togglePatientGroup(group.patientId)}
+                            >
+                              {isExpanded ? "Sembunyikan" : "Lihat Riwayat"}
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                        {isExpanded && (
+                          <TableRow>
+                            <TableCell colSpan={5} className="bg-muted/20 p-0">
+                              <div className="space-y-3 p-4">
+                                {group.records.map((record) => (
+                                  <div
+                                    key={record.id}
+                                    className="flex flex-col gap-3 rounded-md border bg-background p-4 md:flex-row md:items-start md:justify-between"
+                                  >
+                                    <div className="space-y-1">
+                                      <p className="text-sm font-medium">
+                                        {formatDate(record.date)}
+                                      </p>
+                                      <p className="text-sm text-muted-foreground">
+                                        Dokter: {record.doctorName}
+                                      </p>
+                                      <div>
+                                        <Badge variant="secondary">
+                                          {record.diagnosis}
+                                        </Badge>
+                                      </div>
+                                    </div>
+                                    <div className="flex justify-end">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                          setSelectedRecordId(record.id);
+                                          setIsDetailOpen(true);
+                                        }}
+                                      >
+                                        Lihat Detail
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </Fragment>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
           </div>
 
-          {!loading && records.length > 0 && (
+          {!loading && recordGroups.length > 0 && (
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
                 Halaman {page} dari {totalPages}

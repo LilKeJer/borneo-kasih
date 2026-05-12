@@ -40,6 +40,7 @@ export async function GET(req: NextRequest) {
     const excludeReservationIdParam = searchParams.get("excludeReservationId");
     const dateFromParam = searchParams.get("dateFrom");
     const dateToParam = searchParams.get("dateTo");
+    const groupByPatient = searchParams.get("groupBy") === "patient";
 
     const conditions = [
       isNull(medicalHistories.deletedAt),
@@ -116,7 +117,7 @@ export async function GET(req: NextRequest) {
 
     const whereClause = and(...conditions);
 
-    const recordsQuery = db
+    const baseRecordsQuery = db
       .select({
         id: medicalHistories.id,
         patientId: medicalHistories.patientId,
@@ -138,9 +139,80 @@ export async function GET(req: NextRequest) {
         eq(medicalHistories.doctorId, doctorDetails.userId)
       )
       .where(whereClause)
-      .orderBy(desc(medicalHistories.createdAt))
-      .limit(limit)
-      .offset(offset);
+      .orderBy(desc(medicalHistories.createdAt));
+
+    if (groupByPatient && !patientIdParam) {
+      const records = await baseRecordsQuery;
+      const groupedMap = new Map<
+        number,
+        {
+          patientId: number;
+          patientName: string;
+          latestRecordId: number;
+          latestDoctorName: string;
+          latestDiagnosis: string;
+          latestEncryptionIvDoctor: string | null;
+          latestDate: Date | string;
+          totalRecords: number;
+          records: Array<{
+            id: number;
+            doctorName: string;
+            diagnosis: string;
+            encryptionIvDoctor: string | null;
+            date: Date | string;
+            createdAt: Date | null;
+            reservationId: number | null;
+          }>;
+        }
+      >();
+
+      for (const record of records) {
+        const recordDate = record.dateOfDiagnosis || record.createdAt || new Date(0);
+        const normalizedRecord = {
+          id: record.id,
+          doctorName: record.doctorName || "Dokter",
+          diagnosis: record.diagnosis || "Pemeriksaan Umum",
+          encryptionIvDoctor: record.encryptionIvDoctor || null,
+          date: recordDate,
+          createdAt: record.createdAt,
+          reservationId: record.reservationId,
+        };
+
+        const existingGroup = groupedMap.get(record.patientId);
+
+        if (!existingGroup) {
+          groupedMap.set(record.patientId, {
+            patientId: record.patientId,
+            patientName: record.patientName || "Pasien",
+            latestRecordId: record.id,
+            latestDoctorName: record.doctorName || "Dokter",
+            latestDiagnosis: record.diagnosis || "Pemeriksaan Umum",
+            latestEncryptionIvDoctor: record.encryptionIvDoctor || null,
+            latestDate: recordDate,
+            totalRecords: 1,
+            records: [normalizedRecord],
+          });
+          continue;
+        }
+
+        existingGroup.totalRecords += 1;
+        existingGroup.records.push(normalizedRecord);
+      }
+
+      const groupedRecords = Array.from(groupedMap.values());
+      const total = groupedRecords.length;
+      const paginatedGroups = groupedRecords.slice(offset, offset + limit);
+
+      return NextResponse.json({
+        data: paginatedGroups,
+        pagination: {
+          page: currentPage,
+          limit,
+          total,
+          totalPages: Math.max(1, Math.ceil(total / limit)),
+        },
+      });
+    }
 
     const totalQuery = db
       .select({ count: count() })
@@ -154,6 +226,8 @@ export async function GET(req: NextRequest) {
         eq(medicalHistories.doctorId, doctorDetails.userId)
       )
       .where(whereClause);
+
+    const recordsQuery = baseRecordsQuery.limit(limit).offset(offset);
 
     const [records, totalResult] = await Promise.all([recordsQuery, totalQuery]);
     const total = totalResult[0]?.count ?? 0;
