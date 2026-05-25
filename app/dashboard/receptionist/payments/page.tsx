@@ -86,7 +86,9 @@ export default function PaymentsPage() {
   const [loadingDetails, setLoadingDetails] = useState(false);
 
   // Filter states
-  const [statusFilter, setStatusFilter] = useState<PaymentStatus | "">("");
+  const [statusFilter, setStatusFilter] = useState<PaymentStatus | "all">(
+    "all"
+  );
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
@@ -109,7 +111,7 @@ export default function PaymentsPage() {
         page: pagination.page.toString(),
         limit: pagination.limit.toString(),
         ...(searchTerm && { search: searchTerm }),
-        ...(statusFilter && { status: statusFilter }),
+        ...(statusFilter !== "all" && { status: statusFilter }),
         ...(startDate && { startDate }),
         ...(endDate && { endDate }),
       });
@@ -325,14 +327,14 @@ export default function PaymentsPage() {
             <Select
               value={statusFilter}
               onValueChange={(value) =>
-                setStatusFilter(value as PaymentStatus | "")
+                setStatusFilter(value as PaymentStatus | "all")
               }
             >
               <SelectTrigger>
                 <SelectValue placeholder="Semua Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Semua Status</SelectItem>
+                <SelectItem value="all">Semua Status</SelectItem>
                 <SelectItem value="Paid">Lunas</SelectItem>
                 <SelectItem value="Pending">Menunggu</SelectItem>
                 <SelectItem value="Cancelled">Dibatalkan</SelectItem>

@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/db";
 import { users, patientDetails } from "@/db/schema";
-import { eq, and, isNull, like, or, count } from "drizzle-orm";
+import { eq, and, isNull, like, or, count, inArray } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import { isValidEmail, normalizeEmail } from "@/lib/utils/email";
 
@@ -13,7 +13,12 @@ export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || !["Admin", "Doctor", "Nurse"].includes(session.user.role)) {
+    if (
+      !session ||
+      !["Admin", "Doctor", "Nurse", "Receptionist"].includes(
+        session.user.role
+      )
+    ) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
@@ -24,7 +29,13 @@ export async function GET(req: NextRequest) {
     const offset = (page - 1) * limit;
 
     // Build base conditions
-    const baseConditions = [eq(users.role, "Patient"), isNull(users.deletedAt)];
+    const baseConditions = [
+      eq(users.role, "Patient"),
+      isNull(users.deletedAt),
+      ...(session.user.role === "Receptionist"
+        ? [inArray(users.status, ["Active", "Verified"])]
+        : []),
+    ];
 
     // Add search condition if exists
     const searchConditions = [];
