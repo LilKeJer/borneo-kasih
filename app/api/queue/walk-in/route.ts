@@ -9,6 +9,7 @@ import {
   doctorSchedules,
 } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
+import { getClinicDateString } from "@/lib/clinic-time";
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,8 +21,18 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const { patientId, doctorId, scheduleId } = body;
+    const patientIdNumber = Number(patientId);
+    const doctorIdNumber = Number(doctorId);
+    const scheduleIdNumber = Number(scheduleId);
 
-    if (!patientId || !doctorId || !scheduleId) {
+    if (
+      !Number.isInteger(patientIdNumber) ||
+      !Number.isInteger(doctorIdNumber) ||
+      !Number.isInteger(scheduleIdNumber) ||
+      patientIdNumber <= 0 ||
+      doctorIdNumber <= 0 ||
+      scheduleIdNumber <= 0
+    ) {
       return NextResponse.json(
         { message: "Data pasien, dokter, dan jadwal wajib diisi" },
         { status: 400 }
@@ -30,7 +41,28 @@ export async function POST(req: NextRequest) {
 
     // Format tanggal hari ini
     const today = new Date();
-    const formattedDate = today.toISOString().split("T")[0];
+    const formattedDate = getClinicDateString(today);
+
+    // Cek jadwal dokter untuk memastikan jadwal valid dan aktif
+    const doctorSchedule = await db
+      .select({
+        maxPatients: doctorSchedules.maxPatients,
+      })
+      .from(doctorSchedules)
+      .where(
+        and(
+          eq(doctorSchedules.id, scheduleIdNumber),
+          eq(doctorSchedules.doctorId, doctorIdNumber),
+          eq(doctorSchedules.isActive, true)
+        )
+      );
+
+    if (doctorSchedule.length === 0) {
+      return NextResponse.json(
+        { message: "Jadwal dokter tidak valid atau sedang tidak aktif" },
+        { status: 400 }
+      );
+    }
 
     // Cek status jadwal harian
     const dailyStatus = await db
@@ -41,18 +73,10 @@ export async function POST(req: NextRequest) {
       .from(dailyScheduleStatuses)
       .where(
         and(
-          eq(dailyScheduleStatuses.scheduleId, scheduleId),
+          eq(dailyScheduleStatuses.scheduleId, scheduleIdNumber),
           eq(dailyScheduleStatuses.date, formattedDate)
         )
       );
-
-    // Cek jadwal dokter untuk mendapatkan maxPatients
-    const doctorSchedule = await db
-      .select({
-        maxPatients: doctorSchedules.maxPatients,
-      })
-      .from(doctorSchedules)
-      .where(eq(doctorSchedules.id, scheduleId));
 
     const maxPatients = doctorSchedule[0]?.maxPatients || 30;
 
@@ -76,7 +100,7 @@ export async function POST(req: NextRequest) {
       const [newStatus] = await db
         .insert(dailyScheduleStatuses)
         .values({
-          scheduleId: scheduleId,
+          scheduleId: scheduleIdNumber,
           date: formattedDate,
           isActive: true,
           currentReservations: 0,
@@ -93,9 +117,9 @@ export async function POST(req: NextRequest) {
     const [newReservation] = await db
       .insert(reservations)
       .values({
-        patientId: parseInt(patientId),
-        doctorId: parseInt(doctorId),
-        scheduleId: scheduleId,
+        patientId: patientIdNumber,
+        doctorId: doctorIdNumber,
+        scheduleId: scheduleIdNumber,
         reservationDate: today,
         queueNumber,
         status: "Confirmed", // Walk-in langsung confirmed

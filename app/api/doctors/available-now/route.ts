@@ -9,8 +9,13 @@ import {
   doctorSchedules,
   practiceSessions,
 } from "@/db/schema";
-import { eq, and, isNull, lte, gte } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { sql } from "drizzle-orm"; // Tambahkan import sql
+import {
+  getClinicDateString,
+  getClinicNowParts,
+  isSessionActiveAt,
+} from "@/lib/clinic-time";
 
 export async function GET() {
   try {
@@ -24,7 +29,9 @@ export async function GET() {
     }
 
     const now = new Date();
-    const currentDay = now.getDay();
+    const { dayOfWeek: currentDay, minutesSinceMidnight } =
+      getClinicNowParts(now);
+    const today = getClinicDateString(now);
 
     const availableDoctors = await db
       .select({
@@ -48,8 +55,6 @@ export async function GET() {
         and(
           eq(doctorSchedules.dayOfWeek, currentDay),
           eq(doctorSchedules.isActive, true),
-          lte(practiceSessions.startTime, now),
-          gte(practiceSessions.endTime, now),
           eq(users.status, "Active"),
           isNull(users.deletedAt)
         )
@@ -57,8 +62,6 @@ export async function GET() {
 
     const doctorsWithCapacity = await Promise.all(
       availableDoctors.map(async (doctor) => {
-        const today = new Date().toISOString().split("T")[0];
-
         // Perbaiki query dengan sql template
         const dailyStatus = await db.execute(
           sql`SELECT id, current_reservations 
@@ -73,6 +76,11 @@ export async function GET() {
           Number(dailyStatus.rows[0]?.current_reservations) || 0;
         const maxPatients = doctor.maxPatients || 30;
         const remainingCapacity = maxPatients - currentReservations;
+        const isCurrentSession = isSessionActiveAt({
+          startTime: doctor.startTime,
+          endTime: doctor.endTime,
+          minutesSinceMidnight,
+        });
 
         return {
           id: doctor.id,
@@ -82,7 +90,7 @@ export async function GET() {
           currentPatients: currentReservations,
           maxPatients: maxPatients,
           remainingCapacity: remainingCapacity,
-          available: remainingCapacity > 0,
+          available: isCurrentSession && remainingCapacity > 0,
         };
       })
     );

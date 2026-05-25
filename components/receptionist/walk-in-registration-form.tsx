@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -135,7 +135,19 @@ export function WalkInRegistrationForm({
       }
 
       const data = await response.json();
-      setAvailableDoctors(data);
+      const apiDoctors = data as Array<
+        Omit<Doctor, "id" | "scheduleId"> & {
+          id: number | string;
+          scheduleId: number | string;
+        }
+      >;
+      const convertedDoctors: Doctor[] = apiDoctors.map((doctor) => ({
+        ...doctor,
+        id: String(doctor.id),
+        scheduleId: Number(doctor.scheduleId),
+      }));
+
+      setAvailableDoctors(convertedDoctors);
     } catch (error) {
       console.error("Error fetching available doctors:", error);
       toast.error("Gagal memuat daftar dokter yang tersedia");
@@ -145,16 +157,25 @@ export function WalkInRegistrationForm({
   };
 
   const handleDoctorChange = (doctorId: string) => {
-    form.setValue("doctorId", doctorId);
+    form.setValue("doctorId", doctorId, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
 
     // Cari dokter yang dipilih
     const selectedDoctor = availableDoctors.find((d) => d.id === doctorId);
 
     // Set scheduleId dari dokter yang dipilih
     if (selectedDoctor) {
-      form.setValue("scheduleId", selectedDoctor.scheduleId.toString());
+      form.setValue("scheduleId", selectedDoctor.scheduleId.toString(), {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
     } else {
-      form.setValue("scheduleId", "");
+      form.setValue("scheduleId", "", {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
     }
   };
 
@@ -195,9 +216,22 @@ export function WalkInRegistrationForm({
     }
   }
 
+  function onInvalidSubmit(errors: FieldErrors<FormValues>) {
+    const message =
+      errors.patientId?.message ||
+      errors.doctorId?.message ||
+      errors.scheduleId?.message ||
+      "Lengkapi data pendaftaran walk-in";
+
+    toast.error(String(message));
+  }
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <form
+        onSubmit={form.handleSubmit(onSubmit, onInvalidSubmit)}
+        className="space-y-6"
+      >
         <div className="space-y-4">
           <div>
             <div className="flex items-center justify-between">
@@ -228,7 +262,7 @@ export function WalkInRegistrationForm({
                 <FormLabel>Pilih Pasien</FormLabel>
                 <Select
                   onValueChange={field.onChange}
-                  defaultValue={field.value}
+                  value={field.value}
                   disabled={loadingPatients}
                 >
                   <FormControl>
@@ -268,7 +302,7 @@ export function WalkInRegistrationForm({
                 <FormLabel>Pilih Dokter</FormLabel>
                 <Select
                   onValueChange={handleDoctorChange}
-                  defaultValue={field.value}
+                  value={field.value}
                   disabled={loadingDoctors}
                 >
                   <FormControl>
@@ -320,6 +354,12 @@ export function WalkInRegistrationForm({
           />
         </div>
 
+        {!loadingDoctors && availableDoctors.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            Tidak ada dokter yang sedang tersedia untuk pendaftaran walk-in.
+          </p>
+        )}
+
         <div className="flex justify-end gap-2">
           <Button
             type="button"
@@ -331,13 +371,17 @@ export function WalkInRegistrationForm({
           </Button>
           <Button
             type="submit"
-            disabled={submitting || !availableDoctors.length}
+            disabled={submitting || loadingDoctors || !availableDoctors.length}
           >
             {submitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Menyimpan...
               </>
+            ) : loadingDoctors ? (
+              "Memuat dokter..."
+            ) : availableDoctors.length === 0 ? (
+              "Tidak ada dokter tersedia"
             ) : (
               "Daftarkan Pasien"
             )}
