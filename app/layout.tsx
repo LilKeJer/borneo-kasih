@@ -9,8 +9,8 @@ import { ThemeProvider } from "@/components/theme/theme-provider";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Sistem Rekam Medis - Klinik Borneo Kasih",
-  description: "Sistem informasi rekam medis untuk Klinik Borneo Kasih",
+  title: "Sistem Rekam Medis Klinik",
+  description: "Sistem informasi rekam medis klinik",
 };
 
 export default function RootLayout({

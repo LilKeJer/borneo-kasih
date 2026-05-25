@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Clock } from "lucide-react";
 import { AppointmentStatusCard } from "@/components/patient/appointment-status-card";
+import { useClinicSettings } from "@/hooks/use-clinic-settings";
 
 interface DashboardData {
   nextAppointment: {
@@ -20,6 +21,7 @@ interface DashboardData {
 
 export default function PatientDashboardPage() {
   const { user } = useAuth();
+  const { clinicName } = useClinicSettings();
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(
     null
   );
@@ -61,7 +63,7 @@ export default function PatientDashboardPage() {
         <CardContent>
           <p className="text-gray-600">
             Halo {user?.name || user?.email}, selamat datang di sistem rekam
-            medis Klinik Borneo Kasih.
+            medis {clinicName}.
           </p>
         </CardContent>
       </Card>

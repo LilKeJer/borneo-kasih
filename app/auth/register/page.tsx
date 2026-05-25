@@ -6,10 +6,16 @@ import {
   getOrCreateClinicSettings,
 } from "@/lib/clinic-settings";
 
-export const metadata: Metadata = {
-  title: "Registrasi - Klinik Borneo Kasih",
-  description: "Buat akun pasien baru",
-};
+export const dynamic = "force-dynamic";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getOrCreateClinicSettings();
+
+  return {
+    title: `Registrasi - ${settings.clinicName}`,
+    description: `Buat akun pasien baru untuk ${settings.clinicName}`,
+  };
+}
 
 export default async function RegisterPage() {
   const settings = await getOrCreateClinicSettings();

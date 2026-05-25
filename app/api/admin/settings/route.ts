@@ -1,6 +1,7 @@
 // app/api/admin/settings/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import { revalidatePath } from "next/cache";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/db";
 import { clinicSettings } from "@/db/schema";
@@ -118,6 +119,10 @@ export async function PUT(req: NextRequest) {
       })
       .where(eq(clinicSettings.id, settings.id))
       .returning();
+
+    revalidatePath("/");
+    revalidatePath("/auth/login");
+    revalidatePath("/auth/register");
 
     return NextResponse.json({
       message: "Pengaturan berhasil diperbarui",

@@ -4,6 +4,8 @@ import {
   getOrCreateClinicSettings,
 } from "@/lib/clinic-settings";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     const settings = await getOrCreateClinicSettings();

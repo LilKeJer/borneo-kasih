@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import { CLINIC_SETTINGS_UPDATED_EVENT } from "@/hooks/use-clinic-settings";
 
 export default function AdminSettingsPage() {
   const [settings, setSettings] = useState({
@@ -88,6 +89,12 @@ export default function AdminSettingsPage() {
       });
 
       if (!response.ok) throw new Error("Gagal menyimpan pengaturan");
+      const result = await response.json();
+      window.dispatchEvent(
+        new CustomEvent(CLINIC_SETTINGS_UPDATED_EVENT, {
+          detail: result.data,
+        })
+      );
 
       toast.success("Pengaturan berhasil disimpan");
     } catch (error) {
@@ -115,6 +122,12 @@ export default function AdminSettingsPage() {
       });
 
       if (!response.ok) throw new Error("Gagal menyimpan jadwal");
+      const result = await response.json();
+      window.dispatchEvent(
+        new CustomEvent(CLINIC_SETTINGS_UPDATED_EVENT, {
+          detail: result.data,
+        })
+      );
 
       toast.success("Jadwal berhasil disimpan");
     } catch (error) {
@@ -143,6 +156,12 @@ export default function AdminSettingsPage() {
       });
 
       if (!response.ok) throw new Error("Gagal menyimpan aturan check-in");
+      const result = await response.json();
+      window.dispatchEvent(
+        new CustomEvent(CLINIC_SETTINGS_UPDATED_EVENT, {
+          detail: result.data,
+        })
+      );
 
       toast.success("Aturan check-in dan batal otomatis berhasil disimpan");
     } catch (error) {

@@ -1,9 +1,21 @@
 import Link from "next/link";
+import { Metadata } from "next";
 import { Button } from "@/components/ui/button";
 import {
   formatClinicOperatingHours,
   getOrCreateClinicSettings,
 } from "@/lib/clinic-settings";
+
+export const dynamic = "force-dynamic";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getOrCreateClinicSettings();
+
+  return {
+    title: `Sistem Rekam Medis - ${settings.clinicName}`,
+    description: `Sistem informasi rekam medis untuk ${settings.clinicName}`,
+  };
+}
 
 export default async function Home() {
   const settings = await getOrCreateClinicSettings();
@@ -51,11 +63,7 @@ export default async function Home() {
         </section>
 
         <aside className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-          <h2 className="text-lg font-semibold">Informasi Kontak</h2>
-          <p className="mt-2 text-sm text-slate-600">
-            Data berikut diambil langsung dari pengaturan klinik dan tampil
-            konsisten untuk pasien maupun admin.
-          </p>
+          <h2 className="text-lg font-semibold">Kontak Klinik</h2>
 
           <dl className="mt-6 space-y-5 text-sm">
             <div>

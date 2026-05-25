@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { useClinicSettings } from "@/hooks/use-clinic-settings";
 
 interface DoctorQueueItem {
   id: number;
@@ -34,6 +35,7 @@ interface QueueDisplayData {
 }
 
 export default function QueueDisplayPage() {
+  const { clinicName } = useClinicSettings();
   const [queueData, setQueueData] = useState<QueueDisplayData>({
     doctorQueues: [],
     paymentQueues: [],
@@ -169,7 +171,7 @@ export default function QueueDisplayPage() {
             ANTRIAN PASIEN
           </h1>
           <h2 className="text-xl md:text-2xl font-semibold mb-1">
-            KLINIK BORNEO KASIH
+            {clinicName.toUpperCase()}
           </h2>
           <p className="text-gray-600 mb-2">
             {new Date().toLocaleDateString("id-ID", {
