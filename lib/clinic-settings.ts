@@ -184,7 +184,11 @@ export async function getDoctorOperatingHours(): Promise<DoctorOperatingHours[]>
   return Array.from(doctors.entries()).map(([doctorId, doctor]) => {
     const sessions = Array.from(doctor.sessions.values())
       .sort((a, b) => a.sortTime.getTime() - b.sortTime.getTime())
-      .map(({ sortTime, ...session }) => session);
+      .map((session) => ({
+        sessionName: session.sessionName,
+        startTime: session.startTime,
+        endTime: session.endTime,
+      }));
     const displayText = sessions
       .map((session) => `${session.startTime} - ${session.endTime}`)
       .join(" dan ");
