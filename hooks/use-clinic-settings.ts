@@ -1,5 +1,6 @@
 "use client";
 
+import type { DoctorOperatingHours } from "@/lib/clinic-settings";
 import { useEffect, useState } from "react";
 
 export const CLINIC_SETTINGS_UPDATED_EVENT = "clinic-settings-updated";
@@ -14,18 +15,21 @@ export interface ClinicSettingsInfo {
   eveningStart: string;
   eveningEnd: string;
   operatingHours: string;
+  doctorOperatingHours: DoctorOperatingHours[];
 }
 
 const fallbackClinicSettings: ClinicSettingsInfo = {
   clinicName: "Klinik Borneo Kasih",
-  address: "Jl. Klinik No. 123, Banjarmasin",
+  address:
+    "Jl. RTA Milono No.KM. 1,5, Langkai, Kec. Pahandut, Kota Palangka Raya, Kalimantan Tengah 73111",
   phone: "0541-123456",
   email: "info@borneokasih.com",
-  morningStart: "08:00",
+  morningStart: "07:30",
   morningEnd: "12:00",
   eveningStart: "17:00",
   eveningEnd: "21:00",
-  operatingHours: "08:00 - 12:00 dan 17:00 - 21:00",
+  operatingHours: "07:30 WIB - 12:00 WIB dan 17:00 WIB - 21:00 WIB",
+  doctorOperatingHours: [],
 };
 
 let cachedClinicSettings: ClinicSettingsInfo | null = null;
@@ -37,7 +41,7 @@ function formatOperatingHours(settings: Partial<ClinicSettingsInfo>) {
   const eveningStart = settings.eveningStart || fallbackClinicSettings.eveningStart;
   const eveningEnd = settings.eveningEnd || fallbackClinicSettings.eveningEnd;
 
-  return `${morningStart} - ${morningEnd} dan ${eveningStart} - ${eveningEnd}`;
+  return `${morningStart} WIB - ${morningEnd} WIB dan ${eveningStart} WIB - ${eveningEnd} WIB`;
 }
 
 function normalizeClinicSettings(data: Partial<ClinicSettingsInfo>) {

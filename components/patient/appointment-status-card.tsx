@@ -13,6 +13,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  formatDate,
+  formatDateTime,
+  formatTime,
+} from "@/lib/utils/date";
 
 interface Appointment {
   id: string;
@@ -161,37 +166,6 @@ export function AppointmentStatusCard() {
     }
   };
 
-  const formatTime = (dateString: string) => {
-    if (!dateString) return "-";
-
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleTimeString("id-ID", {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch (e) {
-      console.error("Error formatting date:", e);
-      return "-";
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    if (!dateString) return "-";
-
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString("id-ID", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      });
-    } catch (e) {
-      console.error("Error formatting date:", e);
-      return "-";
-    }
-  };
-
   const showCheckInButton = Boolean(
     appointment &&
       (typeof appointment.canCheckInNow === "boolean"
@@ -202,11 +176,6 @@ export function AppointmentStatusCard() {
             appointment.examinationStatus || "Not Started"
           ))
   );
-
-  const formatDateTime = (dateString?: string) => {
-    if (!dateString) return "-";
-    return `${formatDate(dateString)} ${formatTime(dateString)}`;
-  };
 
   const getDisplayStatusBadge = (current: Appointment) => {
     const isCheckInEligible =

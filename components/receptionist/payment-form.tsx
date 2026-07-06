@@ -112,6 +112,9 @@ export function PaymentForm({
   const [pendingPaymentData, setPendingPaymentData] =
     useState<PaymentFormValues | null>(null);
   const { decrypt, initialize } = useEncryption();
+  const manuallySelectableServices = availableServices.filter(
+    (service) => !service.isDoctorDefault
+  );
 
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentSchema),
@@ -166,7 +169,7 @@ export function PaymentForm({
       return;
     }
 
-    const service = availableServices.find(
+    const service = manuallySelectableServices.find(
       (s) => s.id.toString() === selectedServiceId
     );
     if (!service) {
@@ -440,7 +443,7 @@ export function PaymentForm({
                   <SelectValue placeholder="Pilih layanan..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableServices.map((service) => (
+                  {manuallySelectableServices.map((service) => (
                     <SelectItem key={service.id} value={service.id.toString()}>
                       {service.name} -{" "}
                       {formatRupiah(parseFloat(service.basePrice))}

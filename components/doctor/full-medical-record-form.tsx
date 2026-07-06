@@ -63,6 +63,9 @@ export function FullMedicalRecordForm({
     Record<string, string>
   >({});
   const { encrypt, initialize } = useEncryption();
+  const manuallySelectableServices = availableServices.filter(
+    (service) => !service.isDoctorDefault
+  );
 
   const form = useForm<FullMedicalRecordFormValues>({
     resolver: zodResolver(fullMedicalRecordSchema),
@@ -169,10 +172,10 @@ export function FullMedicalRecordForm({
     const normalizedSearch = searchTerm.trim().toLowerCase();
 
     if (!normalizedSearch) {
-      return availableServices;
+      return manuallySelectableServices;
     }
 
-    const filtered = availableServices.filter((service) => {
+    const filtered = manuallySelectableServices.filter((service) => {
       const name = service.name.toLowerCase();
       const category = service.category.toLowerCase();
       const description = service.description?.toLowerCase() || "";
@@ -188,7 +191,7 @@ export function FullMedicalRecordForm({
       return filtered;
     }
 
-    const selectedService = availableServices.find(
+    const selectedService = manuallySelectableServices.find(
       (service) => service.id.toString() === selectedServiceId
     );
 

@@ -38,6 +38,10 @@ interface Service {
   description: string | null;
   basePrice: string;
   category: ServiceCategory;
+  doctorId: number | null;
+  doctorName: string | null;
+  doctorSpecialization: string | null;
+  isDoctorDefault: boolean | null;
   isActive: boolean;
 }
 
@@ -156,6 +160,7 @@ export function ServiceCatalogTable({
             <TableRow>
               <TableHead>Nama Layanan</TableHead>
               <TableHead>Kategori</TableHead>
+              <TableHead>Dokter</TableHead>
               <TableHead>Harga Dasar</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Aksi</TableHead>
@@ -164,7 +169,7 @@ export function ServiceCatalogTable({
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8">
+                <TableCell colSpan={6} className="text-center py-8">
                   <div className="flex justify-center items-center">
                     <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
                     <span>Memuat data...</span>
@@ -174,7 +179,7 @@ export function ServiceCatalogTable({
             ) : services.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={6}
                   className="text-center py-8 text-muted-foreground"
                 >
                   Tidak ada layanan yang ditemukan
@@ -192,6 +197,27 @@ export function ServiceCatalogTable({
                     )}
                   </TableCell>
                   <TableCell>{getCategoryBadge(service.category)}</TableCell>
+                  <TableCell>
+                    {service.doctorName ? (
+                      <div className="space-y-1">
+                        <div className="text-sm font-medium">
+                          {service.doctorName}
+                        </div>
+                        {service.doctorSpecialization && (
+                          <div className="text-xs text-muted-foreground">
+                            {service.doctorSpecialization}
+                          </div>
+                        )}
+                        {service.isDoctorDefault && (
+                          <Badge variant="secondary">Otomatis</Badge>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">
+                        Umum
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     {formatRupiah(parseFloat(service.basePrice))}
                   </TableCell>

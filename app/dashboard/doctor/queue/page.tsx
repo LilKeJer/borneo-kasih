@@ -3,6 +3,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { formatDate, formatTime } from "@/lib/utils/date";
 import { useEmergencyPolling } from "@/hooks/use-emergency-polling";
 import { EmergencyNotification } from "@/components/receptionist/emergency-notification";
 
@@ -201,23 +202,10 @@ export default function DoctorQueuePage() {
     }
   };
 
-  const formatTime = (dateString: string) => {
-    if (!dateString) return "-";
-    const date = new Date(dateString);
-    return date.toLocaleTimeString("id-ID", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
   const formatLastUpdated = (date: Date | null) => {
     if (!date) return "Belum pernah diperbarui";
 
-    return date.toLocaleTimeString("id-ID", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
+    return formatTime(date);
   };
 
   const nextEligiblePatientId =
@@ -439,9 +427,7 @@ export default function DoctorQueuePage() {
                       {patient.lastVisitDate && (
                         <div className="text-xs text-muted-foreground">
                           Kunjungan terakhir:{" "}
-                          {new Date(patient.lastVisitDate).toLocaleDateString(
-                            "id-ID"
-                          )}
+                          {formatDate(patient.lastVisitDate)}
                         </div>
                       )}
                     </TableCell>
@@ -527,9 +513,7 @@ export default function DoctorQueuePage() {
                 <div className="border rounded-md p-3">
                   <div className="text-sm font-medium">Kunjungan Terakhir:</div>
                   <p className="text-sm mt-1">
-                    {new Date(selectedPatient.lastVisitDate).toLocaleDateString(
-                      "id-ID"
-                    )}
+                    {formatDate(selectedPatient.lastVisitDate)}
                   </p>
                 </div>
               )}

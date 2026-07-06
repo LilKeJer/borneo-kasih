@@ -17,6 +17,8 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import { formatTime, formatTimeInputPreview } from "@/lib/utils/date";
+import { createClinicDateTimeFromTimeInput } from "@/lib/clinic-time";
 import {
   Dialog,
   DialogContent,
@@ -142,6 +144,21 @@ export default function DoctorSchedulesPage() {
     endTime: "",
     description: "",
   });
+
+  const updateSessionTime = (
+    field: "startTime" | "endTime",
+    timeString: string
+  ) => {
+    const dateObj = createClinicDateTimeFromTimeInput(
+      "2000-01-01",
+      timeString
+    );
+
+    setSessionForm((current) => ({
+      ...current,
+      [field]: dateObj ? dateObj.toISOString() : "",
+    }));
+  };
 
   // Tab state untuk navigasi antara jadwal dan sesi
   const [activeTab, setActiveTab] = useState("schedules");
@@ -526,14 +543,6 @@ export default function DoctorSchedulesPage() {
     return days[dayOfWeek];
   };
 
-  const formatTime = (timeString: string) => {
-    const date = new Date(timeString);
-    return date.toLocaleTimeString("id-ID", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
   // Grouping schedules by doctor
   const filterAndGroupSchedules = () => {
     const filteredSchedules = schedules.filter(
@@ -769,13 +778,10 @@ export default function DoctorSchedulesPage() {
                                   setSelectedSession(session);
 
                                   // Persiapkan form dengan data yang benar
-                                  const startDate = new Date(session.startTime);
-                                  const endDate = new Date(session.endTime);
-
                                   setSessionForm({
                                     name: session.name,
-                                    startTime: startDate.toISOString(),
-                                    endTime: endDate.toISOString(),
+                                    startTime: session.startTime,
+                                    endTime: session.endTime,
                                     description: session.description || "",
                                   });
 
@@ -1120,26 +1126,11 @@ export default function DoctorSchedulesPage() {
                 type="time"
                 value={
                   sessionForm.startTime
-                    ? new Date(sessionForm.startTime).toLocaleTimeString(
-                        "en-GB",
-                        { hour: "2-digit", minute: "2-digit" }
-                      )
+                    ? formatTimeInputPreview(sessionForm.startTime)
                     : ""
                 }
                 onChange={(e) => {
-                  const timeString = e.target.value;
-                  // Buat tanggal baru dengan waktu yang diinput
-                  const dateObj = new Date();
-                  const [hours, minutes] = timeString.split(":");
-                  dateObj.setHours(parseInt(hours || "0", 10));
-                  dateObj.setMinutes(parseInt(minutes || "0", 10));
-                  dateObj.setSeconds(0);
-                  dateObj.setMilliseconds(0);
-
-                  setSessionForm({
-                    ...sessionForm,
-                    startTime: dateObj.toISOString(),
-                  });
+                  updateSessionTime("startTime", e.target.value);
                 }}
               />
             </div>
@@ -1151,26 +1142,11 @@ export default function DoctorSchedulesPage() {
                 type="time"
                 value={
                   sessionForm.endTime
-                    ? new Date(sessionForm.endTime).toLocaleTimeString(
-                        "en-GB",
-                        { hour: "2-digit", minute: "2-digit" }
-                      )
+                    ? formatTimeInputPreview(sessionForm.endTime)
                     : ""
                 }
                 onChange={(e) => {
-                  const timeString = e.target.value;
-                  // Buat tanggal baru dengan waktu yang diinput
-                  const dateObj = new Date();
-                  const [hours, minutes] = timeString.split(":");
-                  dateObj.setHours(parseInt(hours || "0", 10));
-                  dateObj.setMinutes(parseInt(minutes || "0", 10));
-                  dateObj.setSeconds(0);
-                  dateObj.setMilliseconds(0);
-
-                  setSessionForm({
-                    ...sessionForm,
-                    endTime: dateObj.toISOString(),
-                  });
+                  updateSessionTime("endTime", e.target.value);
                 }}
               />
             </div>
@@ -1239,26 +1215,11 @@ export default function DoctorSchedulesPage() {
                 type="time"
                 value={
                   sessionForm.startTime
-                    ? new Date(sessionForm.startTime).toLocaleTimeString(
-                        "en-GB",
-                        { hour: "2-digit", minute: "2-digit" }
-                      )
+                    ? formatTimeInputPreview(sessionForm.startTime)
                     : ""
                 }
                 onChange={(e) => {
-                  const timeString = e.target.value;
-                  // Buat tanggal baru dengan waktu yang diinput
-                  const dateObj = new Date();
-                  const [hours, minutes] = timeString.split(":");
-                  dateObj.setHours(parseInt(hours || "0", 10));
-                  dateObj.setMinutes(parseInt(minutes || "0", 10));
-                  dateObj.setSeconds(0);
-                  dateObj.setMilliseconds(0);
-
-                  setSessionForm({
-                    ...sessionForm,
-                    startTime: dateObj.toISOString(),
-                  });
+                  updateSessionTime("startTime", e.target.value);
                 }}
               />
             </div>
@@ -1270,26 +1231,11 @@ export default function DoctorSchedulesPage() {
                 type="time"
                 value={
                   sessionForm.endTime
-                    ? new Date(sessionForm.endTime).toLocaleTimeString(
-                        "en-GB",
-                        { hour: "2-digit", minute: "2-digit" }
-                      )
+                    ? formatTimeInputPreview(sessionForm.endTime)
                     : ""
                 }
                 onChange={(e) => {
-                  const timeString = e.target.value;
-                  // Buat tanggal baru dengan waktu yang diinput
-                  const dateObj = new Date();
-                  const [hours, minutes] = timeString.split(":");
-                  dateObj.setHours(parseInt(hours || "0", 10));
-                  dateObj.setMinutes(parseInt(minutes || "0", 10));
-                  dateObj.setSeconds(0);
-                  dateObj.setMilliseconds(0);
-
-                  setSessionForm({
-                    ...sessionForm,
-                    endTime: dateObj.toISOString(),
-                  });
+                  updateSessionTime("endTime", e.target.value);
                 }}
               />
             </div>

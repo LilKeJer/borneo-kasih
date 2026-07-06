@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Clock } from "lucide-react";
 import { AppointmentStatusCard } from "@/components/patient/appointment-status-card";
 import { useClinicSettings } from "@/hooks/use-clinic-settings";
+import { formatDate } from "@/lib/utils/date";
 
 interface DashboardData {
   nextAppointment: {
@@ -42,15 +43,6 @@ export default function PatientDashboardPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("id-ID", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
   };
 
   return (

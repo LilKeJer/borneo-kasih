@@ -1,4 +1,5 @@
 export const CLINIC_TIME_ZONE = "Asia/Jakarta";
+export const CLINIC_UTC_OFFSET = "+07:00";
 
 const WEEKDAY_INDEX: Record<string, number> = {
   Sun: 0,
@@ -21,6 +22,14 @@ function getDateTimeParts(date: Date, options: Intl.DateTimeFormatOptions) {
   );
 }
 
+function pad2(value: number): string {
+  return String(value).padStart(2, "0");
+}
+
+function pad3(value: number): string {
+  return String(value).padStart(3, "0");
+}
+
 export function getClinicDateString(date = new Date()): string {
   const parts = getDateTimeParts(date, {
     year: "numeric",
@@ -31,6 +40,74 @@ export function getClinicDateString(date = new Date()): string {
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
+export function addDaysToClinicDateString(
+  dateString: string,
+  days: number
+): string {
+  const [year, month, day] = dateString.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + days));
+
+  return [
+    date.getUTCFullYear(),
+    pad2(date.getUTCMonth() + 1),
+    pad2(date.getUTCDate()),
+  ].join("-");
+}
+
+export function getClinicClockParts(date: Date): {
+  hour: number;
+  minute: number;
+  second: number;
+} {
+  const parts = getDateTimeParts(date, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  });
+  const hour = Number(parts.hour);
+
+  return {
+    hour: hour === 24 ? 0 : hour,
+    minute: Number(parts.minute),
+    second: Number(parts.second),
+  };
+}
+
+export function createClinicDateTime(
+  dateString: string,
+  hour: number,
+  minute: number,
+  second = 0,
+  millisecond = 0
+): Date {
+  const fraction = millisecond ? `.${pad3(millisecond)}` : "";
+  return new Date(
+    `${dateString}T${pad2(hour)}:${pad2(minute)}:${pad2(second)}${fraction}${CLINIC_UTC_OFFSET}`
+  );
+}
+
+export function createClinicDateTimeFromTimeInput(
+  dateString: string,
+  timeString: string
+): Date | null {
+  const [hourValue, minuteValue] = timeString.split(":").map(Number);
+
+  if (
+    !Number.isInteger(hourValue) ||
+    !Number.isInteger(minuteValue) ||
+    hourValue < 0 ||
+    hourValue > 23 ||
+    minuteValue < 0 ||
+    minuteValue > 59
+  ) {
+    return null;
+  }
+
+  const date = createClinicDateTime(dateString, hourValue, minuteValue);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 export function getClinicNowParts(date = new Date()): {
   dayOfWeek: number;
   minutesSinceMidnight: number;
@@ -39,7 +116,7 @@ export function getClinicNowParts(date = new Date()): {
     weekday: "short",
     hour: "2-digit",
     minute: "2-digit",
-    hour12: false,
+    hourCycle: "h23",
   });
 
   const rawHour = Number(parts.hour);
@@ -53,7 +130,8 @@ export function getClinicNowParts(date = new Date()): {
 }
 
 export function getClockMinutes(date: Date): number {
-  return date.getHours() * 60 + date.getMinutes();
+  const { hour, minute } = getClinicClockParts(date);
+  return hour * 60 + minute;
 }
 
 export function isClockMinuteInRange(

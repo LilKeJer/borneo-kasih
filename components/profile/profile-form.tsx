@@ -20,6 +20,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getInitials } from "@/lib/utils";
+import { formatDate } from "@/lib/utils/date";
 
 type Profile = {
   name: string;
@@ -293,9 +294,7 @@ export function ProfileForm() {
               <FormLabel>Tanggal Lahir</FormLabel>
               <FormControl>
                 <Input
-                  value={new Date(profile.dateOfBirth).toLocaleDateString(
-                    "id-ID"
-                  )}
+                  value={formatDate(profile.dateOfBirth)}
                   disabled
                 />
               </FormControl>

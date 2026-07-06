@@ -2,6 +2,8 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import type { DoctorOperatingHours } from "@/lib/clinic-settings";
+import { DoctorOperatingHoursList } from "@/components/clinic/doctor-operating-hours-list";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,6 +18,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { formatTime, formatTimeInputPreview } from "@/lib/utils/date";
+import {
+  addDaysToClinicDateString,
+  createClinicDateTimeFromTimeInput,
+  getClinicDateString,
+} from "@/lib/clinic-time";
 
 interface Doctor {
   id: string;
@@ -37,6 +45,7 @@ interface ClinicSettingsInfo {
   phone: string;
   email: string;
   operatingHours: string;
+  doctorOperatingHours?: DoctorOperatingHours[];
 }
 
 export default function NewAppointmentPage() {
@@ -162,19 +171,13 @@ export default function NewAppointmentPage() {
     try {
       setIsSubmitting(true);
 
-      const [year, month, day] = selectedDate
-        .split("-")
-        .map((value) => Number(value));
-      const appointmentDate = new Date(year, month - 1, day);
-      const timeComponents = new Date(selectedSlot.time);
-
-      // Mengambil jam dan menit dari time slot
-      appointmentDate.setHours(
-        timeComponents.getHours(),
-        timeComponents.getMinutes(),
-        0,
-        0
+      const appointmentDate = createClinicDateTimeFromTimeInput(
+        selectedDate,
+        formatTimeInputPreview(selectedSlot.time)
       );
+      if (!appointmentDate) {
+        throw new Error("Waktu janji temu tidak valid");
+      }
 
       const response = await fetch("/api/appointments/book", {
         method: "POST",
@@ -212,29 +215,13 @@ export default function NewAppointmentPage() {
     }
   };
 
-  // Format tanggal untuk input date (YYYY-MM-DD)
-  const formatDateForInput = (date: Date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
-
   // Mendapatkan tanggal hari ini dan tanggal maksimal (30 hari ke depan)
-  const today = new Date();
-  const minDate = formatDateForInput(today);
-
-  const maxDate = new Date();
-  maxDate.setDate(today.getDate() + 30);
-  const maxDateStr = formatDateForInput(maxDate);
+  const minDate = getClinicDateString();
+  const maxDateStr = addDaysToClinicDateString(minDate, 30);
 
   // Format waktu untuk ditampilkan (HH:MM)
   const formatTimeDisplay = (dateTimeStr: string) => {
-    const date = new Date(dateTimeStr);
-    return date.toLocaleTimeString("id-ID", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return formatTime(dateTimeStr);
   };
 
   return (
@@ -272,10 +259,16 @@ export default function NewAppointmentPage() {
                 <span className="font-medium text-slate-900">Email:</span>{" "}
                 {clinicInfo.email}
               </p>
-              <p>
-                <span className="font-medium text-slate-900">Jam layanan:</span>{" "}
-                {clinicInfo.operatingHours}
-              </p>
+              <div>
+                <span className="font-medium text-slate-900">
+                  Jam layanan:
+                </span>
+                <DoctorOperatingHoursList
+                  doctorOperatingHours={clinicInfo.doctorOperatingHours}
+                  fallback={clinicInfo.operatingHours}
+                  tone="blue"
+                />
+              </div>
             </div>
           </CardContent>
         </Card>

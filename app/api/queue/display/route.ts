@@ -123,13 +123,14 @@ export async function GET() {
         status: queue.examinationStatus as "Waiting" | "In Progress",
         reservationStatus: queue.status, // Simpan status reservasi
         reservationDate: queue.reservationDate,
-        isPriority: queue.isPriority ?? false,
+        isPriority:
+          queue.examinationStatus === "Waiting" && (queue.isPriority ?? false),
       });
 
       return result;
     }, {} as Record<string, DoctorSessionGroup>);
 
-    const paymentQueues: PaymentQueueItem[] = await db
+    const paymentQueueRows = await db
       .select({
         reservationId: reservations.id,
         queueNumber: reservations.queueNumber,
@@ -149,7 +150,12 @@ export async function GET() {
       )
       .orderBy(doctorDetails.name, reservations.queueNumber);
 
-    const pharmacyQueues: PharmacyQueueItem[] = await db
+    const paymentQueues: PaymentQueueItem[] = paymentQueueRows.map((queue) => ({
+      ...queue,
+      isPriority: false,
+    }));
+
+    const pharmacyQueueRows = await db
       .select({
         reservationId: reservations.id,
         queueNumber: reservations.queueNumber,
@@ -176,6 +182,13 @@ export async function GET() {
         )
       )
       .orderBy(doctorDetails.name, reservations.queueNumber);
+
+    const pharmacyQueues: PharmacyQueueItem[] = pharmacyQueueRows.map(
+      (queue) => ({
+        ...queue,
+        isPriority: false,
+      })
+    );
 
     return NextResponse.json({
       data: {

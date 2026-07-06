@@ -21,7 +21,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { type Service as ApiServiceType } from "@/types/payment";
 import { type Medicine as ApiMedicineType } from "@/types/pharmacy";
 import { useEncryption } from "@/hooks/use-encryption";
-import { formatDate } from "@/lib/utils/date";
+import { formatDate, formatDateTime } from "@/lib/utils/date";
 
 interface PatientData {
   id: string;
@@ -125,7 +125,7 @@ function CreateMedicalRecordContent() {
 
         // Fetch Available Services
         setLoadingServices(true);
-        const servicesRes = await fetch("/api/services?limit=1000"); // Ambil semua layanan
+        const servicesRes = await fetch("/api/services?limit=1000&active=true");
         if (!servicesRes.ok) throw new Error("Gagal memuat daftar layanan.");
         const servicesData = await servicesRes.json();
         setAvailableServices(servicesData.data || []);
@@ -341,13 +341,7 @@ function CreateMedicalRecordContent() {
                 {nurseCheckupTimestamp && (
                   <CardDescription>
                     Diperbarui{" "}
-                    {new Date(nurseCheckupTimestamp).toLocaleString("id-ID", {
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {formatDateTime(nurseCheckupTimestamp)}
                   </CardDescription>
                 )}
               </CardHeader>

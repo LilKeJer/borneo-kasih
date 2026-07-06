@@ -49,6 +49,22 @@ function addDays(value: Date, days: number): Date {
   return result;
 }
 
+function addClinicDays(value: Date, days: number): Date {
+  const step = days >= 0 ? 1 : -1;
+  const result = new Date(value);
+  let remaining = Math.abs(days);
+
+  while (remaining > 0) {
+    result.setDate(result.getDate() + step);
+
+    if (result.getDay() !== 0) {
+      remaining -= 1;
+    }
+  }
+
+  return result;
+}
+
 function addMinutes(value: Date, minutes: number): Date {
   const result = new Date(value);
   result.setMinutes(result.getMinutes() + minutes);
@@ -59,11 +75,6 @@ function setTime(value: Date, hours: number, minutes: number): Date {
   const result = new Date(value);
   result.setHours(hours, minutes, 0, 0);
   return result;
-}
-
-function toSessionClockTime(value: Date): Date {
-  const base = new Date("2000-01-01T00:00:00");
-  return setTime(base, value.getHours(), value.getMinutes());
 }
 
 function isSameDay(a: Date, b: Date): boolean {
@@ -181,14 +192,16 @@ async function seed() {
 
   try {
     const now = new Date();
-    const today = startOfDay(now);
-    const sevenDaysAgo = addDays(today, -7);
-    const sixDaysAgo = addDays(today, -6);
-    const yesterday = addDays(today, -1);
-    const tomorrow = addDays(today, 1);
-    const fiveDaysAgo = addDays(today, -5);
-    const fourDaysAgo = addDays(today, -4);
-    const threeDaysAgo = addDays(today, -3);
+    const calendarToday = startOfDay(now);
+    const today =
+      calendarToday.getDay() === 0 ? addClinicDays(calendarToday, 1) : calendarToday;
+    const sevenDaysAgo = addClinicDays(today, -7);
+    const sixDaysAgo = addClinicDays(today, -6);
+    const yesterday = addClinicDays(today, -1);
+    const tomorrow = addClinicDays(today, 1);
+    const fiveDaysAgo = addClinicDays(today, -5);
+    const fourDaysAgo = addClinicDays(today, -4);
+    const threeDaysAgo = addClinicDays(today, -3);
 
     const expiryIn30Days = addDays(today, 30);
     const expiryIn90Days = addDays(today, 90);
@@ -253,8 +266,6 @@ async function seed() {
       fallbackHour: 20,
       fallbackMinute: 15,
     });
-    const autoCancelSessionStartClock = toSessionClockTime(autoCancelSessionStartAt);
-    const autoCancelSessionEndClock = toSessionClockTime(autoCancelSessionEndAt);
     const autoCancelExpectedAt = addMinutes(autoCancelSessionEndAt, 1);
 
     const tomorrowPendingAt = setTime(tomorrow, now.getHours(), now.getMinutes());
@@ -329,7 +340,7 @@ async function seed() {
     const [doctorUser] = await tx
       .insert(users)
       .values({
-        email: "doctor@klinik.local",
+        email: "silverius@klinik.local",
         password: passwordHash,
         role: "Doctor",
         status: "Active",
@@ -340,10 +351,50 @@ async function seed() {
 
     await tx.insert(doctorDetails).values({
       userId: doctorUser.id,
-      name: "Dr. Borneo",
+      name: "dr. Silverius Seantoni Sabella",
       specialization: "Dokter Umum",
-      email: "doctor@klinik.local",
-      phone: "081222222222",
+      email: "silverius@klinik.local",
+      phone: null,
+    });
+
+    const [obgynDoctorUser] = await tx
+      .insert(users)
+      .values({
+        email: "ida.bagus@klinik.local",
+        password: passwordHash,
+        role: "Doctor",
+        status: "Active",
+        createdAt: fiveDaysAgo,
+        updatedAt: now,
+      })
+      .returning({ id: users.id });
+
+    await tx.insert(doctorDetails).values({
+      userId: obgynDoctorUser.id,
+      name: "dr. Ida Bagus Wicaksana, Sp.OG",
+      specialization: "Spesialis Kebidanan dan Penyakit Kandungan",
+      email: "ida.bagus@klinik.local",
+      phone: null,
+    });
+
+    const [dentistDoctorUser] = await tx
+      .insert(users)
+      .values({
+        email: "ida.ayu@klinik.local",
+        password: passwordHash,
+        role: "Doctor",
+        status: "Active",
+        createdAt: fiveDaysAgo,
+        updatedAt: now,
+      })
+      .returning({ id: users.id });
+
+    await tx.insert(doctorDetails).values({
+      userId: dentistDoctorUser.id,
+      name: "drg. Ida Ayu Purniadnyani Pemaron",
+      specialization: "Dokter Gigi",
+      email: "ida.ayu@klinik.local",
+      phone: null,
     });
 
     const [nurseUser] = await tx
@@ -624,52 +675,68 @@ async function seed() {
       gender: "L",
     });
 
-    const [morningSession, afternoonSession, standbySession, autoCancelTestSession] = await tx
+    const [
+      obgynMorningSession,
+      obgynEveningSession,
+      dentistMorningSession,
+      dentistEveningSession,
+      generalEveningSession,
+    ] = await tx
       .insert(practiceSessions)
       .values([
         {
-          name: "Pagi",
-          startTime: new Date("2000-01-01T08:00:00"),
+          name: "Kandungan Pagi",
+          startTime: new Date("2000-01-01T07:30:00"),
+          endTime: new Date("2000-01-01T09:00:00"),
+          description: "dr. Ida Bagus Wicaksana, Sp.OG - Senin-Sabtu",
+          createdAt: now,
+          updatedAt: now,
+        },
+        {
+          name: "Kandungan Malam",
+          startTime: new Date("2000-01-01T18:30:00"),
+          endTime: new Date("2000-01-01T21:00:00"),
+          description: "dr. Ida Bagus Wicaksana, Sp.OG - Senin-Sabtu",
+          createdAt: now,
+          updatedAt: now,
+        },
+        {
+          name: "Gigi Pagi",
+          startTime: new Date("2000-01-01T09:00:00"),
           endTime: new Date("2000-01-01T12:00:00"),
-          description: "Sesi praktik pagi",
+          description: "drg. Ida Ayu Purniadnyani Pemaron - Senin-Sabtu",
           createdAt: now,
           updatedAt: now,
         },
         {
-          name: "Sore",
-          startTime: new Date("2000-01-01T13:00:00"),
-          endTime: new Date("2000-01-01T17:00:00"),
-          description: "Sesi praktik sore",
+          name: "Gigi Sore",
+          startTime: new Date("2000-01-01T17:00:00"),
+          endTime: new Date("2000-01-01T20:30:00"),
+          description: "drg. Ida Ayu Purniadnyani Pemaron - Senin-Sabtu",
           createdAt: now,
           updatedAt: now,
         },
         {
-          name: "Jaga",
-          startTime: new Date("2000-01-01T00:00:00"),
-          endTime: new Date("2099-12-31T23:59:00"),
-          description: "Sesi jaga untuk testing",
-          createdAt: now,
-          updatedAt: now,
-        },
-        {
-          name: "AutoCancel Test",
-          startTime: autoCancelSessionStartClock,
-          endTime: autoCancelSessionEndClock,
-          description: "Sesi dinamis untuk uji auto-cancel cepat (2 jam)",
+          name: "Umum Sore",
+          startTime: new Date("2000-01-01T18:00:00"),
+          endTime: new Date("2000-01-01T21:00:00"),
+          description: "dr. Silverius Seantoni Sabella - Senin-Sabtu",
           createdAt: now,
           updatedAt: now,
         },
       ])
       .returning({ id: practiceSessions.id, name: practiceSessions.name });
 
-    const allDaySchedules = await tx
+    const practiceDays = [1, 2, 3, 4, 5, 6];
+
+    const generalDoctorSchedules = await tx
       .insert(doctorSchedules)
       .values(
-        Array.from({ length: 7 }, (_, dayOfWeek) => ({
+        practiceDays.map((dayOfWeek) => ({
           doctorId: doctorUser.id,
-          sessionId: standbySession.id,
+          sessionId: generalEveningSession.id,
           dayOfWeek,
-          maxPatients: 50,
+          maxPatients: 30,
           isActive: true,
           createdAt: now,
           updatedAt: now,
@@ -680,49 +747,91 @@ async function seed() {
         dayOfWeek: doctorSchedules.dayOfWeek,
       });
 
-    const currentDay = today.getDay();
-
-    await tx.insert(doctorSchedules).values({
-      doctorId: doctorUser.id,
-      sessionId: morningSession.id,
-      dayOfWeek: currentDay,
-      maxPatients: 30,
-      isActive: true,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    await tx.insert(doctorSchedules).values({
-      doctorId: doctorUser.id,
-      sessionId: afternoonSession.id,
-      dayOfWeek: currentDay,
-      maxPatients: 30,
-      isActive: true,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    const [autoCancelTestSchedule] = await tx
-      .insert(doctorSchedules)
-      .values({
-        doctorId: doctorUser.id,
-        sessionId: autoCancelTestSession.id,
-        dayOfWeek: currentDay,
-        maxPatients: 5,
-        isActive: true,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .returning({ id: doctorSchedules.id });
+    const specialtyDoctorSchedules = await tx.insert(doctorSchedules).values([
+      ...practiceDays.flatMap((dayOfWeek) => [
+        {
+          doctorId: obgynDoctorUser.id,
+          sessionId: obgynMorningSession.id,
+          dayOfWeek,
+          maxPatients: 30,
+          isActive: true,
+          createdAt: now,
+          updatedAt: now,
+        },
+        {
+          doctorId: obgynDoctorUser.id,
+          sessionId: obgynEveningSession.id,
+          dayOfWeek,
+          maxPatients: 30,
+          isActive: true,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ]),
+      ...practiceDays.flatMap((dayOfWeek) => [
+        {
+          doctorId: dentistDoctorUser.id,
+          sessionId: dentistMorningSession.id,
+          dayOfWeek,
+          maxPatients: 30,
+          isActive: true,
+          createdAt: now,
+          updatedAt: now,
+        },
+        {
+          doctorId: dentistDoctorUser.id,
+          sessionId: dentistEveningSession.id,
+          dayOfWeek,
+          maxPatients: 30,
+          isActive: true,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ]),
+    ])
+      .returning({
+        id: doctorSchedules.id,
+        doctorId: doctorSchedules.doctorId,
+        sessionId: doctorSchedules.sessionId,
+        dayOfWeek: doctorSchedules.dayOfWeek,
+      });
 
     const getRecurringScheduleId = (date: Date) => {
       const scheduleId =
-        allDaySchedules.find((schedule) => schedule.dayOfWeek === date.getDay())
+        generalDoctorSchedules.find(
+          (schedule) => schedule.dayOfWeek === date.getDay()
+        )
           ?.id ?? null;
 
       if (!scheduleId) {
         throw new Error(
-          `Gagal menentukan schedule harian untuk seed tanggal ${toDateOnly(date)}`
+          `Gagal menentukan jadwal dokter umum untuk seed tanggal ${toDateOnly(
+            date
+          )}`
+        );
+      }
+
+      return scheduleId;
+    };
+
+    const getSpecialtyScheduleId = (
+      date: Date,
+      doctorId: number,
+      sessionId: number
+    ) => {
+      const scheduleId =
+        specialtyDoctorSchedules.find(
+          (schedule) =>
+            schedule.doctorId === doctorId &&
+            schedule.sessionId === sessionId &&
+            schedule.dayOfWeek === date.getDay()
+        )?.id ?? null;
+
+      if (!scheduleId) {
+        throw new Error(
+          `Gagal menentukan jadwal dokter spesialis untuk seed tanggal ${toDateOnly(
+            date
+          )}`
         );
       }
 
@@ -732,18 +841,34 @@ async function seed() {
     const todayScheduleId = getRecurringScheduleId(today);
     const tomorrowScheduleId = getRecurringScheduleId(tomorrow);
     const yesterdayScheduleId = getRecurringScheduleId(yesterday);
-    const threeDaysAgoScheduleId = getRecurringScheduleId(threeDaysAgo);
-    const fourDaysAgoScheduleId = getRecurringScheduleId(fourDaysAgo);
-    const fiveDaysAgoScheduleId = getRecurringScheduleId(fiveDaysAgo);
     const sixDaysAgoScheduleId = getRecurringScheduleId(sixDaysAgo);
-    const sevenDaysAgoScheduleId = getRecurringScheduleId(sevenDaysAgo);
+    const obgynFourDaysAgoScheduleId = getSpecialtyScheduleId(
+      fourDaysAgo,
+      obgynDoctorUser.id,
+      obgynMorningSession.id
+    );
+    const obgynFiveDaysAgoScheduleId = getSpecialtyScheduleId(
+      fiveDaysAgo,
+      obgynDoctorUser.id,
+      obgynEveningSession.id
+    );
+    const dentistThreeDaysAgoScheduleId = getSpecialtyScheduleId(
+      threeDaysAgo,
+      dentistDoctorUser.id,
+      dentistMorningSession.id
+    );
+    const dentistSevenDaysAgoScheduleId = getSpecialtyScheduleId(
+      sevenDaysAgo,
+      dentistDoctorUser.id,
+      dentistEveningSession.id
+    );
 
     await tx.insert(dailyScheduleStatuses).values([
       {
         scheduleId: todayScheduleId,
         date: toDateOnly(today),
         isActive: true,
-        currentReservations: 6,
+        currentReservations: 7,
         notes: "Seed hari ini (dinamis)",
         createdAt: now,
         updatedAt: now,
@@ -758,15 +883,6 @@ async function seed() {
         updatedAt: now,
       },
       {
-        scheduleId: autoCancelTestSchedule.id,
-        date: toDateOnly(today),
-        isActive: true,
-        currentReservations: 1,
-        notes: "Seed auto-cancel test (dinamis)",
-        createdAt: now,
-        updatedAt: now,
-      },
-      {
         scheduleId: yesterdayScheduleId,
         date: toDateOnly(yesterday),
         isActive: true,
@@ -776,29 +892,29 @@ async function seed() {
         updatedAt: now,
       },
       {
-        scheduleId: threeDaysAgoScheduleId,
-        date: toDateOnly(threeDaysAgo),
-        isActive: true,
-        currentReservations: 1,
-        notes: "Seed tiga hari lalu",
-        createdAt: now,
-        updatedAt: now,
-      },
-      {
-        scheduleId: fourDaysAgoScheduleId,
+        scheduleId: obgynFourDaysAgoScheduleId,
         date: toDateOnly(fourDaysAgo),
         isActive: true,
         currentReservations: 1,
-        notes: "Seed empat hari lalu",
+        notes: "Seed kandungan - USG 2D",
         createdAt: now,
         updatedAt: now,
       },
       {
-        scheduleId: fiveDaysAgoScheduleId,
+        scheduleId: obgynFiveDaysAgoScheduleId,
         date: toDateOnly(fiveDaysAgo),
         isActive: true,
         currentReservations: 1,
-        notes: "Seed lima hari lalu",
+        notes: "Seed kandungan - ginekologi",
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        scheduleId: dentistThreeDaysAgoScheduleId,
+        date: toDateOnly(threeDaysAgo),
+        isActive: true,
+        currentReservations: 1,
+        notes: "Seed dokter gigi - periksa gigi",
         createdAt: now,
         updatedAt: now,
       },
@@ -812,425 +928,682 @@ async function seed() {
         updatedAt: now,
       },
       {
-        scheduleId: sevenDaysAgoScheduleId,
+        scheduleId: dentistSevenDaysAgoScheduleId,
         date: toDateOnly(sevenDaysAgo),
         isActive: true,
         currentReservations: 1,
-        notes: "Seed tujuh hari lalu",
+        notes: "Seed dokter gigi - scalling",
         createdAt: now,
         updatedAt: now,
       },
     ]);
 
-    const [
-      consultationService,
-      followUpConsultationService,
-      labService,
-      bloodSugarService,
-      urineTestService,
-      procedureService,
-      woundCareService,
-      vitaminInjectionService,
-      adminFeeService,
-      healthCertificateService,
-    ] = await tx
+    const serviceSeedRows = [
+      {
+        key: "obgynUsg2dConsultation",
+        name: "USG 2D + Konsultasi",
+        description: "Paket USG 2D termasuk konsultasi dokter kandungan",
+        basePrice: "150000.00",
+        category: "Pemeriksaan",
+        doctorId: obgynDoctorUser.id,
+        isDoctorDefault: false,
+      },
+      {
+        key: "obgynUsg4dConsultation",
+        name: "USG 4D + Konsultasi",
+        description: "Paket USG 4D termasuk konsultasi dokter kandungan",
+        basePrice: "250000.00",
+        category: "Pemeriksaan",
+        doctorId: obgynDoctorUser.id,
+        isDoctorDefault: false,
+      },
+      {
+        key: "obgynGynecologyConsultation",
+        name: "Pemeriksaan Ginekologi + Konsultasi",
+        description: "Pemeriksaan ginekologi termasuk konsultasi dokter kandungan",
+        basePrice: "200000.00",
+        category: "Pemeriksaan",
+        doctorId: obgynDoctorUser.id,
+        isDoctorDefault: false,
+      },
+      {
+        key: "dentistChildExtractionMin",
+        name: "Cabut Gigi Anak + Konsultasi (Tarif Minimum)",
+        description: "Batas bawah tarif cabut gigi anak termasuk konsultasi",
+        basePrice: "100000.00",
+        category: "Tindakan",
+        doctorId: dentistDoctorUser.id,
+        isDoctorDefault: false,
+      },
+      {
+        key: "dentistChildExtractionMax",
+        name: "Cabut Gigi Anak + Konsultasi (Tarif Maksimum)",
+        description: "Batas atas tarif cabut gigi anak termasuk konsultasi",
+        basePrice: "150000.00",
+        category: "Tindakan",
+        doctorId: dentistDoctorUser.id,
+        isDoctorDefault: false,
+      },
+      {
+        key: "dentistAdultExtractionMin",
+        name: "Cabut Gigi Dewasa + Konsultasi (Tarif Minimum)",
+        description: "Batas bawah tarif cabut gigi dewasa termasuk konsultasi",
+        basePrice: "300000.00",
+        category: "Tindakan",
+        doctorId: dentistDoctorUser.id,
+        isDoctorDefault: false,
+      },
+      {
+        key: "dentistAdultExtractionMax",
+        name: "Cabut Gigi Dewasa + Konsultasi (Tarif Maksimum)",
+        description: "Batas atas tarif cabut gigi dewasa termasuk konsultasi",
+        basePrice: "400000.00",
+        category: "Tindakan",
+        doctorId: dentistDoctorUser.id,
+        isDoctorDefault: false,
+      },
+      {
+        key: "dentistScalingMin",
+        name: "Scalling + Konsultasi (Tarif Minimum)",
+        description: "Batas bawah tarif scalling termasuk konsultasi dokter gigi",
+        basePrice: "300000.00",
+        category: "Tindakan",
+        doctorId: dentistDoctorUser.id,
+        isDoctorDefault: false,
+      },
+      {
+        key: "dentistScalingMax",
+        name: "Scalling + Konsultasi (Tarif Maksimum)",
+        description: "Batas atas tarif scalling termasuk konsultasi dokter gigi",
+        basePrice: "400000.00",
+        category: "Tindakan",
+        doctorId: dentistDoctorUser.id,
+        isDoctorDefault: false,
+      },
+      {
+        key: "dentistDentalCheckupConsultation",
+        name: "Periksa Gigi + Konsultasi",
+        description: "Pemeriksaan gigi termasuk konsultasi dokter gigi",
+        basePrice: "150000.00",
+        category: "Pemeriksaan",
+        doctorId: dentistDoctorUser.id,
+        isDoctorDefault: false,
+      },
+      {
+        key: "generalConsultation",
+        name: "Konsultasi",
+        description: "Konsultasi dokter umum",
+        basePrice: "60000.00",
+        category: "Konsultasi",
+        doctorId: doctorUser.id,
+        isDoctorDefault: true,
+      },
+      {
+        key: "generalVitaminInjectionConsultation",
+        name: "Konsultasi + Injeksi Vitamin",
+        description: "Konsultasi dokter umum dengan tindakan injeksi vitamin",
+        basePrice: "120000.00",
+        category: "Tindakan",
+        doctorId: doctorUser.id,
+        isDoctorDefault: false,
+      },
+    ] as const;
+
+    const insertedServiceRows = await tx
       .insert(serviceCatalog)
-      .values([
-        {
-          name: "Konsultasi Umum",
-          description: "Pemeriksaan awal dokter umum",
-          basePrice: "150000.00",
-          category: "Konsultasi",
+      .values(
+        serviceSeedRows.map(({ key, ...service }) => ({
+          ...service,
           isActive: true,
           createdAt: now,
           updatedAt: now,
-        },
-        {
-          name: "Konsultasi Kontrol",
-          description: "Kunjungan kontrol pasca terapi atau evaluasi lanjutan",
-          basePrice: "100000.00",
-          category: "Konsultasi",
-          isActive: true,
-          createdAt: now,
-          updatedAt: now,
-        },
-        {
-          name: "Tes Darah Lengkap",
-          description: "Pemeriksaan laboratorium dasar",
-          basePrice: "200000.00",
-          category: "Pemeriksaan",
-          isActive: true,
-          createdAt: now,
-          updatedAt: now,
-        },
-        {
-          name: "Cek Gula Darah Sewaktu",
-          description: "Skrining kadar gula darah cepat",
-          basePrice: "85000.00",
-          category: "Pemeriksaan",
-          isActive: true,
-          createdAt: now,
-          updatedAt: now,
-        },
-        {
-          name: "Urinalisis Sederhana",
-          description: "Pemeriksaan urine dasar untuk infeksi atau dehidrasi",
-          basePrice: "90000.00",
-          category: "Pemeriksaan",
-          isActive: true,
-          createdAt: now,
-          updatedAt: now,
-        },
-        {
-          name: "Nebulizer",
-          description: "Tindakan terapi pernapasan",
-          basePrice: "120000.00",
-          category: "Tindakan",
-          isActive: true,
-          createdAt: now,
-          updatedAt: now,
-        },
-        {
-          name: "Perawatan Luka Ringan",
-          description: "Pembersihan luka, dressing, dan observasi infeksi ringan",
-          basePrice: "135000.00",
-          category: "Tindakan",
-          isActive: true,
-          createdAt: now,
-          updatedAt: now,
-        },
-        {
-          name: "Injeksi Vitamin B Kompleks",
-          description: "Tindakan injeksi vitamin untuk pemulihan umum",
-          basePrice: "110000.00",
-          category: "Tindakan",
-          isActive: true,
-          createdAt: now,
-          updatedAt: now,
-        },
-        {
-          name: "Biaya Administrasi",
-          description: "Biaya layanan tambahan",
-          basePrice: "25000.00",
-          category: "Lainnya",
-          isActive: true,
-          createdAt: now,
-          updatedAt: now,
-        },
-        {
-          name: "Surat Keterangan Sehat",
-          description: "Penerbitan surat sehat setelah pemeriksaan dokter",
-          basePrice: "50000.00",
-          category: "Lainnya",
-          isActive: true,
-          createdAt: now,
-          updatedAt: now,
-        },
-      ])
+        }))
+      )
       .returning({ id: serviceCatalog.id, name: serviceCatalog.name });
 
-    const [
-      paracetamol,
-      amoxicillin,
-      vitaminC,
-      ibuprofen,
-      cetirizine,
-      omeprazole,
-      salbutamol,
-      oralit,
-      zinc,
-    ] = await tx
-      .insert(medicines)
-      .values([
-        {
-          name: "Paracetamol 500mg",
-          description: "Obat penurun demam dan nyeri",
-          category: "Analgesik",
-          dosageForm: "Tablet",
-          unit: "tablet",
-          pharmacistId: pharmacistUser.id,
-          price: "5000.00",
-          minimumStock: 50,
-          reorderThresholdPercentage: 20,
-          isActive: true,
-          createdAt: now,
-          updatedAt: now,
-        },
-        {
-          name: "Amoxicillin 500mg",
-          description: "Antibiotik oral",
-          category: "Antibiotik",
-          dosageForm: "Kapsul",
-          unit: "kapsul",
-          pharmacistId: pharmacistUser.id,
-          price: "7000.00",
-          minimumStock: 30,
-          reorderThresholdPercentage: 20,
-          isActive: true,
-          createdAt: now,
-          updatedAt: now,
-        },
-        {
-          name: "Vitamin C 500mg",
-          description: "Suplemen vitamin C",
-          category: "Suplemen",
-          dosageForm: "Tablet",
-          unit: "tablet",
-          pharmacistId: pharmacistUser.id,
-          price: "3000.00",
-          minimumStock: 100,
-          reorderThresholdPercentage: 20,
-          isActive: true,
-          createdAt: now,
-          updatedAt: now,
-        },
-        {
-          name: "Ibuprofen 400mg",
-          description: "Obat antiinflamasi untuk nyeri dan peradangan ringan",
-          category: "Analgesik",
-          dosageForm: "Tablet",
-          unit: "tablet",
-          pharmacistId: pharmacistUser.id,
-          price: "4500.00",
-          minimumStock: 40,
-          reorderThresholdPercentage: 25,
-          isActive: true,
-          createdAt: now,
-          updatedAt: now,
-        },
-        {
-          name: "Cetirizine 10mg",
-          description: "Antihistamin untuk alergi",
-          category: "Antihistamin",
-          dosageForm: "Tablet",
-          unit: "tablet",
-          pharmacistId: pharmacistUser.id,
-          price: "4000.00",
-          minimumStock: 20,
-          reorderThresholdPercentage: 25,
-          isActive: true,
-          createdAt: now,
-          updatedAt: now,
-        },
-        {
-          name: "Omeprazole 20mg",
-          description: "Obat penurun asam lambung",
-          category: "Gastrointestinal",
-          dosageForm: "Kapsul",
-          unit: "kapsul",
-          pharmacistId: pharmacistUser.id,
-          price: "6500.00",
-          minimumStock: 25,
-          reorderThresholdPercentage: 20,
-          isActive: true,
-          createdAt: now,
-          updatedAt: now,
-        },
-        {
-          name: "Salbutamol Sirup 60ml",
-          description: "Sirup bronkodilator untuk keluhan mengi ringan",
-          category: "Respirasi",
-          dosageForm: "Sirup",
-          unit: "botol",
-          pharmacistId: pharmacistUser.id,
-          price: "45000.00",
-          minimumStock: 10,
-          reorderThresholdPercentage: 20,
-          isActive: true,
-          createdAt: now,
-          updatedAt: now,
-        },
-        {
-          name: "Oralit Sachet",
-          description: "Larutan elektrolit oral untuk rehidrasi",
-          category: "Rehidrasi",
-          dosageForm: "Serbuk",
-          unit: "sachet",
-          pharmacistId: pharmacistUser.id,
-          price: "3500.00",
-          minimumStock: 30,
-          reorderThresholdPercentage: 20,
-          isActive: true,
-          createdAt: now,
-          updatedAt: now,
-        },
-        {
-          name: "Zinc 20mg",
-          description: "Suplemen zinc untuk diare dan pemulihan",
-          category: "Suplemen",
-          dosageForm: "Tablet",
-          unit: "tablet",
-          pharmacistId: pharmacistUser.id,
-          price: "2500.00",
-          minimumStock: 25,
-          reorderThresholdPercentage: 20,
-          isActive: true,
-          createdAt: now,
-          updatedAt: now,
-        },
+    const serviceByKey = Object.fromEntries(
+      insertedServiceRows.map((service, index) => [
+        serviceSeedRows[index].key,
+        service,
       ])
+    ) as Record<
+      (typeof serviceSeedRows)[number]["key"],
+      { id: number; name: string }
+    >;
+
+    const medicineSeedRows = [
+      {
+        key: "biocalKandungan",
+        name: "Biocal",
+        category: "Poli Kandungan",
+        dosageForm: "Tablet",
+        unit: "tablet",
+        price: "9000.00",
+        batchPrefix: "KAND-BIOCAL",
+        quantity: 120,
+        remainingQuantity: 96,
+        expiryDate: toDateOnly(expiryIn180Days),
+        minimumStock: 20,
+      },
+      {
+        key: "cal95Kandungan",
+        name: "Cal-95",
+        category: "Poli Kandungan",
+        dosageForm: "Tablet",
+        unit: "tablet",
+        price: "10000.00",
+        batchPrefix: "KAND-CAL95",
+        quantity: 100,
+        remainingQuantity: 74,
+        expiryDate: toDateOnly(expiryIn180Days),
+        minimumStock: 20,
+      },
+      {
+        key: "folaplusKandungan",
+        name: "Folaplus",
+        category: "Poli Kandungan",
+        dosageForm: "Tablet",
+        unit: "tablet",
+        price: "2000.00",
+        batchPrefix: "KAND-FOLAPLUS",
+        quantity: 180,
+        remainingQuantity: 132,
+        expiryDate: toDateOnly(expiryIn180Days),
+        minimumStock: 30,
+      },
+      {
+        key: "amvarKandungan",
+        name: "Amvar",
+        category: "Poli Kandungan",
+        dosageForm: "Tablet",
+        unit: "tablet",
+        price: "15000.00",
+        batchPrefix: "KAND-AMVAR",
+        quantity: 90,
+        remainingQuantity: 62,
+        expiryDate: toDateOnly(expiryIn180Days),
+        minimumStock: 15,
+      },
+      {
+        key: "hbVitKandungan",
+        name: "Hb Vit",
+        category: "Poli Kandungan",
+        dosageForm: "Tablet",
+        unit: "tablet",
+        price: "6000.00",
+        batchPrefix: "KAND-HBVIT",
+        quantity: 120,
+        remainingQuantity: 84,
+        expiryDate: toDateOnly(expiryIn90Days),
+        minimumStock: 20,
+      },
+      {
+        key: "hyFolicKandungan",
+        name: "Hy Folic",
+        category: "Poli Kandungan",
+        dosageForm: "Tablet",
+        unit: "tablet",
+        price: "7000.00",
+        batchPrefix: "KAND-HYFOLIC",
+        quantity: 40,
+        remainingQuantity: 8,
+        expiryDate: toDateOnly(expiryIn30Days),
+        minimumStock: 15,
+      },
+      {
+        key: "dopametKandungan",
+        name: "Dopamet",
+        category: "Poli Kandungan",
+        dosageForm: "Tablet",
+        unit: "tablet",
+        price: "5000.00",
+        batchPrefix: "KAND-DOPAMET",
+        quantity: 100,
+        remainingQuantity: 72,
+        expiryDate: toDateOnly(expiryIn180Days),
+        minimumStock: 15,
+      },
+      {
+        key: "busminKandungan",
+        name: "Busmin",
+        category: "Poli Kandungan",
+        dosageForm: "Tablet",
+        unit: "tablet",
+        price: "10000.00",
+        batchPrefix: "KAND-BUSMIN",
+        quantity: 80,
+        remainingQuantity: 64,
+        expiryDate: toDateOnly(expiryIn180Days),
+        minimumStock: 15,
+      },
+      {
+        key: "maxcefKandungan",
+        name: "Maxcef",
+        category: "Poli Kandungan",
+        dosageForm: "Tablet",
+        unit: "tablet",
+        price: "16000.00",
+        batchPrefix: "KAND-MAXCEF",
+        quantity: 80,
+        remainingQuantity: 58,
+        expiryDate: toDateOnly(expiryIn90Days),
+        minimumStock: 15,
+      },
+      {
+        key: "meprolutKandungan",
+        name: "Meprolut",
+        category: "Poli Kandungan",
+        dosageForm: "Tablet",
+        unit: "tablet",
+        price: "6000.00",
+        batchPrefix: "KAND-MEPROLUT",
+        quantity: 100,
+        remainingQuantity: 70,
+        expiryDate: toDateOnly(expiryIn180Days),
+        minimumStock: 15,
+      },
+      {
+        key: "maxcef500Kandungan",
+        name: "Maxcef 500 mg",
+        category: "Poli Kandungan",
+        dosageForm: "Tablet",
+        unit: "tablet",
+        price: "16000.00",
+        batchPrefix: "KAND-MAXCEF500",
+        quantity: 80,
+        remainingQuantity: 52,
+        expiryDate: toDateOnly(expiryIn90Days),
+        minimumStock: 15,
+      },
+      {
+        key: "maxmilKandungan",
+        name: "Maxmil",
+        category: "Poli Kandungan",
+        dosageForm: "Tablet",
+        unit: "tablet",
+        price: "8000.00",
+        batchPrefix: "KAND-MAXMIL",
+        quantity: 100,
+        remainingQuantity: 76,
+        expiryDate: toDateOnly(expiryIn180Days),
+        minimumStock: 20,
+      },
+      {
+        key: "maxtusifSyrupKandungan",
+        name: "Maxtusif Syrup",
+        category: "Poli Kandungan",
+        dosageForm: "Sirup",
+        unit: "botol",
+        price: "105000.00",
+        batchPrefix: "KAND-MAXTUSIF",
+        quantity: 18,
+        remainingQuantity: 5,
+        expiryDate: toDateOnly(expiryIn30Days),
+        minimumStock: 5,
+      },
+      {
+        key: "progestonKandungan",
+        name: "Progeston",
+        category: "Poli Kandungan",
+        dosageForm: "Tablet",
+        unit: "tablet",
+        price: "5500.00",
+        batchPrefix: "KAND-PROGESTON",
+        quantity: 120,
+        remainingQuantity: 88,
+        expiryDate: toDateOnly(expiryIn180Days),
+        minimumStock: 20,
+      },
+      {
+        key: "provomerKandungan",
+        name: "Provomer",
+        category: "Poli Kandungan",
+        dosageForm: "Tablet",
+        unit: "tablet",
+        price: "4000.00",
+        batchPrefix: "KAND-PROVOMER",
+        quantity: 100,
+        remainingQuantity: 66,
+        expiryDate: toDateOnly(expiryIn180Days),
+        minimumStock: 20,
+      },
+      {
+        key: "tranecKandungan",
+        name: "Tranec",
+        category: "Poli Kandungan",
+        dosageForm: "Tablet",
+        unit: "tablet",
+        price: "6000.00",
+        batchPrefix: "KAND-TRANEC",
+        quantity: 90,
+        remainingQuantity: 54,
+        expiryDate: toDateOnly(expiryIn180Days),
+        minimumStock: 15,
+      },
+      {
+        key: "lactamamKandungan",
+        name: "Lactamam",
+        category: "Poli Kandungan",
+        dosageForm: "Tablet",
+        unit: "tablet",
+        price: "5000.00",
+        batchPrefix: "KAND-LACTAMAM",
+        quantity: 100,
+        remainingQuantity: 78,
+        expiryDate: toDateOnly(expiryIn180Days),
+        minimumStock: 20,
+      },
+      {
+        key: "provarginOvulaKandungan",
+        name: "Provargin Ovula",
+        category: "Poli Kandungan",
+        dosageForm: "Ovula",
+        unit: "sup",
+        price: "20000.00",
+        batchPrefix: "KAND-PROVARGIN",
+        quantity: 40,
+        remainingQuantity: 18,
+        expiryDate: toDateOnly(expiryIn90Days),
+        minimumStock: 8,
+      },
+      {
+        key: "ondansentron8Kandungan",
+        name: "Ondansentron 8 mg",
+        category: "Poli Kandungan",
+        dosageForm: "Tablet",
+        unit: "tablet",
+        price: "5000.00",
+        batchPrefix: "KAND-ONDAN8",
+        quantity: 100,
+        remainingQuantity: 68,
+        expiryDate: toDateOnly(expiryIn180Days),
+        minimumStock: 20,
+      },
+      {
+        key: "microges100Kandungan",
+        name: "Microges 100 mg",
+        category: "Poli Kandungan",
+        dosageForm: "Tablet",
+        unit: "tablet",
+        price: "18000.00",
+        batchPrefix: "KAND-MICROGES100",
+        quantity: 60,
+        remainingQuantity: 34,
+        expiryDate: toDateOnly(expiryIn90Days),
+        minimumStock: 10,
+      },
+      {
+        key: "clinjosGigi",
+        name: "Clinjos",
+        category: "Poli Gigi",
+        dosageForm: "Tablet",
+        unit: "tablet",
+        price: "10000.00",
+        batchPrefix: "GIGI-CLINJOS",
+        quantity: 80,
+        remainingQuantity: 42,
+        expiryDate: toDateOnly(expiryIn90Days),
+        minimumStock: 15,
+      },
+      {
+        key: "orinoxGigi",
+        name: "Orinox",
+        category: "Poli Gigi",
+        dosageForm: "Tablet",
+        unit: "tablet",
+        price: "11000.00",
+        batchPrefix: "GIGI-ORINOX",
+        quantity: 80,
+        remainingQuantity: 46,
+        expiryDate: toDateOnly(expiryIn180Days),
+        minimumStock: 15,
+      },
+      {
+        key: "mefix500Gigi",
+        name: "Mefix 500 mg",
+        category: "Poli Gigi",
+        dosageForm: "Tablet",
+        unit: "tablet",
+        price: "2000.00",
+        batchPrefix: "GIGI-MEFIX500",
+        quantity: 120,
+        remainingQuantity: 86,
+        expiryDate: toDateOnly(expiryIn180Days),
+        minimumStock: 20,
+      },
+      {
+        key: "simfamplasGigi",
+        name: "Simfamplas",
+        category: "Poli Gigi",
+        dosageForm: "Tablet",
+        unit: "tablet",
+        price: "5000.00",
+        batchPrefix: "GIGI-SIMFAMPLAS",
+        quantity: 100,
+        remainingQuantity: 58,
+        expiryDate: toDateOnly(expiryIn180Days),
+        minimumStock: 20,
+      },
+      {
+        key: "supramox500Gigi",
+        name: "Supramox 500 mg",
+        category: "Poli Gigi",
+        dosageForm: "Tablet",
+        unit: "tablet",
+        price: "4000.00",
+        batchPrefix: "GIGI-SUPRAMOX500",
+        quantity: 120,
+        remainingQuantity: 90,
+        expiryDate: toDateOnly(expiryIn180Days),
+        minimumStock: 20,
+      },
+      {
+        key: "pyrexinGigi",
+        name: "Pyrexin",
+        category: "Poli Gigi",
+        dosageForm: "Tablet",
+        unit: "tablet",
+        price: "1000.00",
+        batchPrefix: "GIGI-PYREXIN",
+        quantity: 150,
+        remainingQuantity: 112,
+        expiryDate: toDateOnly(expiryIn180Days),
+        minimumStock: 30,
+      },
+      {
+        key: "turpasParacetamolSyrupGigi",
+        name: "Turpas Paracetamol Syrup",
+        category: "Poli Gigi",
+        dosageForm: "Sirup",
+        unit: "botol",
+        price: "50000.00",
+        batchPrefix: "GIGI-TURPAS",
+        quantity: 10,
+        remainingQuantity: 2,
+        expiryDate: toDateOnly(expiryIn30Days),
+        minimumStock: 5,
+      },
+      {
+        key: "maxcef500Umum",
+        name: "Maxcef 500 mg",
+        category: "Poli Umum",
+        dosageForm: "Tablet",
+        unit: "tablet",
+        price: "16000.00",
+        batchPrefix: "UMUM-MAXCEF500",
+        quantity: 100,
+        remainingQuantity: 70,
+        expiryDate: toDateOnly(expiryIn90Days),
+        minimumStock: 20,
+      },
+      {
+        key: "maxtusifSyrupUmum",
+        name: "Maxtusif Syrup",
+        category: "Poli Umum",
+        dosageForm: "Sirup",
+        unit: "botol",
+        price: "105000.00",
+        batchPrefix: "UMUM-MAXTUSIF",
+        quantity: 20,
+        remainingQuantity: 12,
+        expiryDate: toDateOnly(expiryIn90Days),
+        minimumStock: 5,
+      },
+      {
+        key: "lameson8Umum",
+        name: "Lameson 8 mg",
+        category: "Poli Umum",
+        dosageForm: "Tablet",
+        unit: "tablet",
+        price: "11000.00",
+        batchPrefix: "UMUM-LAMESON8",
+        quantity: 100,
+        remainingQuantity: 78,
+        expiryDate: toDateOnly(expiryIn180Days),
+        minimumStock: 20,
+      },
+      {
+        key: "ondansentron8Umum",
+        name: "Ondansentron 8 mg",
+        category: "Poli Umum",
+        dosageForm: "Tablet",
+        unit: "tablet",
+        price: "5000.00",
+        batchPrefix: "UMUM-ONDAN8",
+        quantity: 100,
+        remainingQuantity: 64,
+        expiryDate: toDateOnly(expiryIn180Days),
+        minimumStock: 20,
+      },
+      {
+        key: "simprofenUmum",
+        name: "Simprofen",
+        category: "Poli Umum",
+        dosageForm: "Tablet",
+        unit: "tablet",
+        price: "10000.00",
+        batchPrefix: "UMUM-SIMPROFEN",
+        quantity: 100,
+        remainingQuantity: 60,
+        expiryDate: toDateOnly(expiryIn180Days),
+        minimumStock: 20,
+      },
+      {
+        key: "amlodipin10Umum",
+        name: "Amlodipin 10 mg",
+        category: "Poli Umum",
+        dosageForm: "Tablet",
+        unit: "strip",
+        price: "20000.00",
+        batchPrefix: "UMUM-AMLODIPIN10",
+        quantity: 40,
+        remainingQuantity: 16,
+        expiryDate: toDateOnly(expiryIn90Days),
+        minimumStock: 8,
+      },
+      {
+        key: "ranitidine150Umum",
+        name: "Ranitidine 150 mg",
+        category: "Poli Umum",
+        dosageForm: "Tablet",
+        unit: "tablet",
+        price: "20000.00",
+        batchPrefix: "UMUM-RANITIDINE150",
+        quantity: 30,
+        remainingQuantity: 0,
+        expiryDate: toDateOnly(expiryIn180Days),
+        minimumStock: 10,
+      },
+    ] as const;
+
+    const insertedMedicineRows = await tx
+      .insert(medicines)
+      .values(
+        medicineSeedRows.map(({ key, batchPrefix, quantity, remainingQuantity, expiryDate, ...medicine }) => ({
+          ...medicine,
+          description: `${medicine.name} - ${medicine.category}`,
+          pharmacistId: pharmacistUser.id,
+          reorderThresholdPercentage: 20,
+          isActive: true,
+          createdAt: now,
+          updatedAt: now,
+        }))
+      )
       .returning({ id: medicines.id, name: medicines.name });
 
-    const [
-      paracetamolStock,
-      amoxicillinStock,
-      vitaminCStock,
-      expiredVitaminC,
-      ibuprofenStock,
-      cetirizineStock,
-      omeprazoleStock,
-      salbutamolStock,
-      expiredSalbutamol,
-      oralitStock,
-      zincStock,
-    ] = await tx
-      .insert(medicineStocks)
-      .values([
-        {
-          medicineId: paracetamol.id,
-          batchNumber: "PARA-001",
-          quantity: 200,
-          remainingQuantity: 176,
-          expiryDate: toDateOnly(expiryIn180Days),
-          supplier: "PT Obat Sehat",
-          purchasePrice: "3500.00",
-          addedAt: addDays(today, -30),
-          isBelowThreshold: false,
-          createdAt: now,
-          updatedAt: now,
-        },
-        {
-          medicineId: amoxicillin.id,
-          batchNumber: "AMOX-001",
-          quantity: 120,
-          remainingQuantity: 96,
-          expiryDate: toDateOnly(expiryIn90Days),
-          supplier: "PT Farma Nusantara",
-          purchasePrice: "5200.00",
-          addedAt: addDays(today, -25),
-          isBelowThreshold: false,
-          createdAt: now,
-          updatedAt: now,
-        },
-        {
-          medicineId: vitaminC.id,
-          batchNumber: "VITC-001",
-          quantity: 20,
-          remainingQuantity: 8,
-          expiryDate: toDateOnly(expiryIn30Days),
-          supplier: "PT Vitamin Prima",
-          purchasePrice: "1800.00",
-          addedAt: addDays(today, -20),
-          isBelowThreshold: true,
-          createdAt: now,
-          updatedAt: now,
-        },
-        {
-          medicineId: vitaminC.id,
-          batchNumber: "VITC-OLD-001",
-          quantity: 15,
-          remainingQuantity: 5,
-          expiryDate: toDateOnly(expired5DaysAgo),
-          supplier: "PT Vitamin Prima",
-          purchasePrice: "1750.00",
-          addedAt: addDays(today, -60),
-          isBelowThreshold: true,
-          createdAt: now,
-          updatedAt: now,
-        },
-        {
-          medicineId: ibuprofen.id,
-          batchNumber: "IBU-001",
-          quantity: 150,
-          remainingQuantity: 140,
-          expiryDate: toDateOnly(expiryIn180Days),
-          supplier: "PT Analgesik Sejahtera",
-          purchasePrice: "3000.00",
-          addedAt: addDays(today, -18),
-          isBelowThreshold: false,
-          createdAt: now,
-          updatedAt: now,
-        },
-        {
-          medicineId: cetirizine.id,
-          batchNumber: "CET-001",
-          quantity: 18,
-          remainingQuantity: 6,
-          expiryDate: toDateOnly(expiryIn90Days),
-          supplier: "PT Alergi Farma",
-          purchasePrice: "2400.00",
-          addedAt: addDays(today, -12),
-          isBelowThreshold: true,
-          createdAt: now,
-          updatedAt: now,
-        },
-        {
-          medicineId: omeprazole.id,
-          batchNumber: "OME-001",
-          quantity: 100,
-          remainingQuantity: 88,
-          expiryDate: toDateOnly(expiryIn90Days),
-          supplier: "PT Gastro Medika",
-          purchasePrice: "4300.00",
-          addedAt: addDays(today, -21),
-          isBelowThreshold: false,
-          createdAt: now,
-          updatedAt: now,
-        },
-        {
-          medicineId: salbutamol.id,
-          batchNumber: "SALB-001",
-          quantity: 24,
-          remainingQuantity: 5,
-          expiryDate: toDateOnly(expiryIn30Days),
-          supplier: "PT Respirasi Prima",
-          purchasePrice: "32000.00",
-          addedAt: addDays(today, -16),
-          isBelowThreshold: true,
-          createdAt: now,
-          updatedAt: now,
-        },
-        {
-          medicineId: salbutamol.id,
-          batchNumber: "SALB-EXP-001",
-          quantity: 12,
-          remainingQuantity: 3,
-          expiryDate: toDateOnly(expired5DaysAgo),
-          supplier: "PT Respirasi Prima",
-          purchasePrice: "31500.00",
-          addedAt: addDays(today, -60),
-          isBelowThreshold: true,
-          createdAt: now,
-          updatedAt: now,
-        },
-        {
-          medicineId: oralit.id,
-          batchNumber: "ORA-001",
-          quantity: 80,
-          remainingQuantity: 75,
-          expiryDate: toDateOnly(expiryIn90Days),
-          supplier: "PT Rehidrasi Nusantara",
-          purchasePrice: "2200.00",
-          addedAt: addDays(today, -9),
-          isBelowThreshold: false,
-          createdAt: now,
-          updatedAt: now,
-        },
-        {
-          medicineId: zinc.id,
-          batchNumber: "ZINC-001",
-          quantity: 30,
-          remainingQuantity: 0,
-          expiryDate: toDateOnly(expiryIn180Days),
-          supplier: "PT Mineral Medika",
-          purchasePrice: "1500.00",
-          addedAt: addDays(today, -14),
-          isBelowThreshold: true,
-          createdAt: now,
-          updatedAt: now,
-        },
+    const medicineByKey = Object.fromEntries(
+      insertedMedicineRows.map((medicine, index) => [
+        medicineSeedRows[index].key,
+        medicine,
       ])
-      .returning({ id: medicineStocks.id, batchNumber: medicineStocks.batchNumber });
+    ) as Record<
+      (typeof medicineSeedRows)[number]["key"],
+      { id: number; name: string }
+    >;
+
+    const insertedPrimaryStockRows = await tx
+      .insert(medicineStocks)
+      .values(
+        medicineSeedRows.map((medicine, index) => ({
+          medicineId: medicineByKey[medicine.key].id,
+          batchNumber: `${medicine.batchPrefix}-${String(index + 1).padStart(
+            3,
+            "0"
+          )}`,
+          quantity: medicine.quantity,
+          remainingQuantity: medicine.remainingQuantity,
+          expiryDate: medicine.expiryDate,
+          supplier: "Supplier klinik",
+          purchasePrice: null,
+          addedAt: addDays(today, -30),
+          isBelowThreshold: medicine.remainingQuantity <= medicine.minimumStock,
+          createdAt: now,
+          updatedAt: now,
+        }))
+      )
+      .returning({
+        id: medicineStocks.id,
+        batchNumber: medicineStocks.batchNumber,
+      });
+
+    const stockByKey = Object.fromEntries(
+      insertedPrimaryStockRows.map((stock, index) => [
+        medicineSeedRows[index].key,
+        stock,
+      ])
+    ) as Record<
+      (typeof medicineSeedRows)[number]["key"],
+      { id: number; batchNumber: string }
+    >;
+
+    await tx.insert(medicineStocks).values([
+      {
+        medicineId: medicineByKey.maxtusifSyrupKandungan.id,
+        batchNumber: "KAND-MAXTUSIF-EXP-001",
+        quantity: 4,
+        remainingQuantity: 1,
+        expiryDate: toDateOnly(expired5DaysAgo),
+        supplier: "Supplier klinik",
+        purchasePrice: null,
+        addedAt: addDays(today, -90),
+        isBelowThreshold: true,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        medicineId: medicineByKey.clinjosGigi.id,
+        batchNumber: "GIGI-CLINJOS-EXP-001",
+        quantity: 20,
+        remainingQuantity: 4,
+        expiryDate: toDateOnly(expired5DaysAgo),
+        supplier: "Supplier klinik",
+        purchasePrice: null,
+        addedAt: addDays(today, -90),
+        isBelowThreshold: true,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ]);
 
     const [reservationWaiting] = await tx
       .insert(reservations)
@@ -1337,7 +1710,7 @@ async function seed() {
       .values({
         patientId: patientTwoUser.id,
         doctorId: doctorUser.id,
-        scheduleId: autoCancelTestSchedule.id,
+        scheduleId: todayScheduleId,
         reservationDate: autoCancelCandidateAt,
         queueNumber: 1,
         status: "Confirmed",
@@ -1368,13 +1741,13 @@ async function seed() {
       .insert(reservations)
       .values({
         patientId: patientTwoUser.id,
-        doctorId: doctorUser.id,
-        scheduleId: fourDaysAgoScheduleId,
+        doctorId: obgynDoctorUser.id,
+        scheduleId: obgynFourDaysAgoScheduleId,
         reservationDate: patientTwoPastAt,
         queueNumber: 1,
         status: "Completed",
         examinationStatus: "Completed",
-        complaint: "Nyeri saat buang air kecil dan anyang-anyangan",
+        complaint: "Kontrol kehamilan dan pemeriksaan USG 2D",
         createdAt: patientTwoPastAt,
         updatedAt: patientTwoPastAt,
       })
@@ -1384,13 +1757,13 @@ async function seed() {
       .insert(reservations)
       .values({
         patientId: patientThreeUser.id,
-        doctorId: doctorUser.id,
-        scheduleId: fiveDaysAgoScheduleId,
+        doctorId: obgynDoctorUser.id,
+        scheduleId: obgynFiveDaysAgoScheduleId,
         reservationDate: patientThreePastAt,
         queueNumber: 1,
         status: "Completed",
         examinationStatus: "Completed",
-        complaint: "Perih ulu hati dan mual ringan",
+        complaint: "Keluhan ginekologi dan pemeriksaan lanjutan",
         createdAt: patientThreePastAt,
         updatedAt: patientThreePastAt,
       })
@@ -1400,13 +1773,13 @@ async function seed() {
       .insert(reservations)
       .values({
         patientId: patientFourUser.id,
-        doctorId: doctorUser.id,
-        scheduleId: threeDaysAgoScheduleId,
+        doctorId: dentistDoctorUser.id,
+        scheduleId: dentistThreeDaysAgoScheduleId,
         reservationDate: patientFourRecentAt,
         queueNumber: 1,
         status: "Completed",
         examinationStatus: "Completed",
-        complaint: "Luka gores pada kaki kanan setelah terjatuh",
+        complaint: "Pemeriksaan gigi rutin",
         createdAt: patientFourRecentAt,
         updatedAt: patientFourRecentAt,
       })
@@ -1416,13 +1789,13 @@ async function seed() {
       .insert(reservations)
       .values({
         patientId: patientFourUser.id,
-        doctorId: doctorUser.id,
-        scheduleId: sevenDaysAgoScheduleId,
+        doctorId: dentistDoctorUser.id,
+        scheduleId: dentistSevenDaysAgoScheduleId,
         reservationDate: patientFourOlderAt,
         queueNumber: 1,
         status: "Completed",
         examinationStatus: "Completed",
-        complaint: "Batuk mengi terutama malam hari",
+        complaint: "Pembersihan karang gigi",
         createdAt: patientFourOlderAt,
         updatedAt: patientFourOlderAt,
       })
@@ -1505,88 +1878,88 @@ async function seed() {
     const historyWaitingPaymentEncrypted = await encryptMedicalHistorySeed(
       demoEncryptionKey,
       {
-        nurseNotes: "Tekanan darah 120/80, suhu 37.3C, nyeri kepala 4/10",
-        condition: "Cephalgia tegang",
-        description: "Sakit kepala tipe tegang sejak dua hari tanpa defisit neurologis",
-        treatment: "Istirahat, hidrasi, dan analgesik oral",
-        doctorNotes: "Kontrol bila nyeri menetap atau muncul muntah hebat",
+        nurseNotes: "Tekanan darah 120/80, suhu 37.3C, keluhan mual ringan",
+        condition: "Keluhan umum ringan",
+        description: "Pasien datang untuk konsultasi dokter umum dengan keluhan tidak enak badan",
+        treatment: "Konsultasi, edukasi istirahat, dan terapi simptomatik",
+        doctorNotes: "Kontrol kembali bila keluhan menetap atau memberat",
       }
     );
 
     const historyCompletedTodayEncrypted = await encryptMedicalHistorySeed(
       demoEncryptionKey,
       {
-        nurseNotes: "Suhu 38.1C, tenggorokan hiperemis, batuk ringan",
-        condition: "ISPA ringan",
-        description: "Flu, demam ringan, dan radang tenggorokan tanpa sesak",
-        treatment: "Antibiotik oral, antipiretik, dan istirahat",
-        doctorNotes: "Perbanyak air hangat dan evaluasi bila belum membaik 3 hari",
+        nurseNotes: "Suhu 37.8C, badan lemas, nafsu makan menurun",
+        condition: "Keluhan lemas dan flu ringan",
+        description: "Pasien datang untuk konsultasi dokter umum dan tindakan injeksi vitamin",
+        treatment: "Konsultasi, injeksi vitamin, dan obat simptomatik",
+        doctorNotes: "Anjurkan istirahat cukup dan hidrasi",
       }
     );
 
     const historyCompletedYesterdayEncrypted = await encryptMedicalHistorySeed(
       demoEncryptionKey,
       {
-        nurseNotes: "Konka hidung bengkak, suhu normal, bersin berulang",
-        condition: "Rhinitis alergi",
-        description: "Pilek dan hidung tersumbat dipicu paparan debu",
-        treatment: "Antihistamin dan edukasi hindari pemicu",
-        doctorNotes: "Gunakan masker saat bersih-bersih rumah",
+        nurseNotes: "Tekanan darah 118/78, suhu normal, mual berkurang",
+        condition: "Kontrol keluhan mual",
+        description: "Pasien kontrol setelah keluhan mual dan tidak enak badan",
+        treatment: "Konsultasi dokter umum dan obat sesuai keluhan",
+        doctorNotes: "Lanjutkan obat bila perlu dan kembali bila keluhan berulang",
       }
     );
 
     const historyPatientTwoPastEncrypted = await encryptMedicalHistorySeed(
       demoEncryptionKey,
       {
-        nurseNotes: "Nyeri tekan suprapubik ringan, suhu 37.5C",
-        condition: "Infeksi saluran kemih ringan",
-        description: "Keluhan anyang-anyangan tanpa nyeri pinggang",
-        treatment: "Antibiotik oral, hidrasi cukup, dan observasi gejala",
-        doctorNotes: "Kembali bila demam tinggi atau nyeri pinggang",
+        nurseNotes: "Pasien kontrol kehamilan, tanda vital stabil",
+        condition: "Kontrol kehamilan",
+        description: "Pemeriksaan USG 2D dan konsultasi dokter kandungan",
+        treatment: "USG 2D, konsultasi, dan vitamin sesuai kebutuhan",
+        doctorNotes: "Kontrol sesuai jadwal dan pantau keluhan selama kehamilan",
       }
     );
 
     const historyPatientThreePastEncrypted = await encryptMedicalHistorySeed(
       demoEncryptionKey,
       {
-        nurseNotes: "Nyeri ulu hati 3/10, nafsu makan menurun",
-        condition: "Dispepsia akut ringan",
-        description: "Keluhan lambung memburuk setelah telat makan dan minum kopi",
-        treatment: "PPI oral dan modifikasi pola makan",
-        doctorNotes: "Hindari kopi, pedas, dan makan larut malam selama satu minggu",
+        nurseNotes: "Pasien datang dengan keluhan ginekologi, tanda vital stabil",
+        condition: "Keluhan ginekologi",
+        description: "Pemeriksaan ginekologi dan konsultasi dokter kandungan",
+        treatment: "Pemeriksaan ginekologi, konsultasi, dan terapi sesuai keluhan",
+        doctorNotes: "Kontrol ulang bila keluhan menetap",
       }
     );
 
     const historyPatientFourRecentEncrypted = await encryptMedicalHistorySeed(
       demoEncryptionKey,
       {
-        nurseNotes: "Luka gores 4 cm dengan kemerahan lokal ringan",
-        condition: "Luka gores terinfeksi ringan",
-        description: "Trauma ringan pada kaki kanan dengan infeksi superfisial",
-        treatment: "Perawatan luka, pembersihan, dan ganti balut",
-        doctorNotes: "Jaga luka tetap kering dan kontrol ulang 2 hari",
+        nurseNotes: "Keluhan gigi ringan, tidak ada pembengkakan wajah",
+        condition: "Pemeriksaan gigi",
+        description: "Periksa gigi dan konsultasi dokter gigi",
+        treatment: "Pemeriksaan gigi, edukasi kebersihan mulut, dan obat bila perlu",
+        doctorNotes: "Kontrol bila nyeri atau bengkak muncul",
       }
     );
 
     const historyPatientFourOlderEncrypted = await encryptMedicalHistorySeed(
       demoEncryptionKey,
       {
-        nurseNotes: "Wheezing ringan, saturasi 98 persen, tanpa distress",
-        condition: "Bronkospasme ringan",
-        description: "Batuk malam disertai mengi ringan tanpa sesak berat",
-        treatment: "Nebulizer dan bronkodilator oral",
-        doctorNotes: "Kembali bila mengi bertambah atau muncul sesak",
+        nurseNotes: "Karang gigi tampak, keluhan gusi mudah berdarah",
+        condition: "Karang gigi",
+        description: "Scalling dan konsultasi dokter gigi",
+        treatment: "Scalling, edukasi kebersihan gigi, dan obat sesuai keluhan",
+        doctorNotes: "Anjurkan kontrol rutin dan sikat gigi teratur",
       }
     );
 
     const historyPatientFivePastEncrypted = await encryptMedicalHistorySeed(
       demoEncryptionKey,
       {
-        nurseNotes: "Mukosa mulut kering, turgor kulit sedikit menurun",
-        condition: "Dehidrasi ringan akibat gastroenteritis",
-        description: "Diare akut tanpa darah dengan lemas dan asupan cairan berkurang",
-        treatment: "Rehidrasi oral, zinc, dan terapi suportif",
-        doctorNotes: "Pantau frekuensi BAB dan minum oralit tiap episode diare",
+        nurseNotes: "Badan lemas, tekanan darah stabil, suhu normal",
+        condition: "Keluhan lemas",
+        description: "Konsultasi dokter umum dengan tindakan injeksi vitamin",
+        treatment: "Konsultasi, injeksi vitamin, dan terapi suportif",
+        doctorNotes: "Istirahat cukup dan kembali bila keluhan tidak membaik",
       }
     );
 
@@ -1672,7 +2045,7 @@ async function seed() {
         encryptedNurseNotes: historyPatientTwoPastEncrypted.encryptedNurseNotes,
         encryptionIvNurse: historyPatientTwoPastEncrypted.encryptionIvNurse,
         nurseCheckupTimestamp: addMinutes(patientTwoPastAt, 10),
-        doctorId: doctorUser.id,
+        doctorId: obgynDoctorUser.id,
         encryptedCondition: historyPatientTwoPastEncrypted.encryptedCondition,
         encryptedDescription:
           historyPatientTwoPastEncrypted.encryptedDescription,
@@ -1696,7 +2069,7 @@ async function seed() {
           historyPatientThreePastEncrypted.encryptedNurseNotes,
         encryptionIvNurse: historyPatientThreePastEncrypted.encryptionIvNurse,
         nurseCheckupTimestamp: addMinutes(patientThreePastAt, 15),
-        doctorId: doctorUser.id,
+        doctorId: obgynDoctorUser.id,
         encryptedCondition:
           historyPatientThreePastEncrypted.encryptedCondition,
         encryptedDescription:
@@ -1722,7 +2095,7 @@ async function seed() {
           historyPatientFourRecentEncrypted.encryptedNurseNotes,
         encryptionIvNurse: historyPatientFourRecentEncrypted.encryptionIvNurse,
         nurseCheckupTimestamp: addMinutes(patientFourRecentAt, 12),
-        doctorId: doctorUser.id,
+        doctorId: dentistDoctorUser.id,
         encryptedCondition:
           historyPatientFourRecentEncrypted.encryptedCondition,
         encryptedDescription:
@@ -1748,7 +2121,7 @@ async function seed() {
           historyPatientFourOlderEncrypted.encryptedNurseNotes,
         encryptionIvNurse: historyPatientFourOlderEncrypted.encryptionIvNurse,
         nurseCheckupTimestamp: addMinutes(patientFourOlderAt, 10),
-        doctorId: doctorUser.id,
+        doctorId: dentistDoctorUser.id,
         encryptedCondition:
           historyPatientFourOlderEncrypted.encryptedCondition,
         encryptedDescription:
@@ -1793,113 +2166,65 @@ async function seed() {
     await tx.insert(medicalHistoryServices).values([
       {
         medicalHistoryId: historyWaitingPayment.id,
-        serviceId: consultationService.id,
+        serviceId: serviceByKey.generalConsultation.id,
         quantity: 1,
-        notes: "Konsultasi utama",
-        createdAt: now,
-        updatedAt: now,
-      },
-      {
-        medicalHistoryId: historyWaitingPayment.id,
-        serviceId: labService.id,
-        quantity: 1,
-        notes: "Pemeriksaan darah",
+        notes: "Konsultasi dokter umum",
         createdAt: now,
         updatedAt: now,
       },
       {
         medicalHistoryId: historyCompletedToday.id,
-        serviceId: consultationService.id,
+        serviceId: serviceByKey.generalVitaminInjectionConsultation.id,
         quantity: 1,
-        notes: "Konsultasi dan evaluasi",
+        notes: "Paket konsultasi dan injeksi vitamin",
         createdAt: now,
         updatedAt: now,
       },
       {
         medicalHistoryId: historyCompletedYesterday.id,
-        serviceId: followUpConsultationService.id,
+        serviceId: serviceByKey.generalConsultation.id,
         quantity: 1,
-        notes: "Kontrol alergi musiman",
+        notes: "Konsultasi dokter umum",
         createdAt: addDays(now, -1),
         updatedAt: addDays(now, -1),
       },
       {
         medicalHistoryId: historyPatientTwoPast.id,
-        serviceId: consultationService.id,
+        serviceId: serviceByKey.obgynUsg2dConsultation.id,
         quantity: 1,
-        notes: "Konsultasi nyeri BAK",
-        createdAt: patientTwoPastAt,
-        updatedAt: patientTwoPastAt,
-      },
-      {
-        medicalHistoryId: historyPatientTwoPast.id,
-        serviceId: urineTestService.id,
-        quantity: 1,
-        notes: "Urinalisis untuk konfirmasi ISK",
+        notes: "USG 2D termasuk konsultasi",
         createdAt: patientTwoPastAt,
         updatedAt: patientTwoPastAt,
       },
       {
         medicalHistoryId: historyPatientThreePast.id,
-        serviceId: followUpConsultationService.id,
+        serviceId: serviceByKey.obgynGynecologyConsultation.id,
         quantity: 1,
-        notes: "Evaluasi keluhan lambung",
-        createdAt: patientThreePastAt,
-        updatedAt: patientThreePastAt,
-      },
-      {
-        medicalHistoryId: historyPatientThreePast.id,
-        serviceId: bloodSugarService.id,
-        quantity: 1,
-        notes: "Skrining gula darah saat kontrol",
+        notes: "Pemeriksaan ginekologi termasuk konsultasi",
         createdAt: patientThreePastAt,
         updatedAt: patientThreePastAt,
       },
       {
         medicalHistoryId: historyPatientFourRecent.id,
-        serviceId: consultationService.id,
+        serviceId: serviceByKey.dentistDentalCheckupConsultation.id,
         quantity: 1,
-        notes: "Konsultasi trauma ringan",
-        createdAt: patientFourRecentAt,
-        updatedAt: patientFourRecentAt,
-      },
-      {
-        medicalHistoryId: historyPatientFourRecent.id,
-        serviceId: woundCareService.id,
-        quantity: 1,
-        notes: "Pembersihan dan balut luka",
+        notes: "Periksa gigi termasuk konsultasi",
         createdAt: patientFourRecentAt,
         updatedAt: patientFourRecentAt,
       },
       {
         medicalHistoryId: historyPatientFourOlder.id,
-        serviceId: consultationService.id,
+        serviceId: serviceByKey.dentistScalingMin.id,
         quantity: 1,
-        notes: "Evaluasi batuk dan mengi",
-        createdAt: patientFourOlderAt,
-        updatedAt: patientFourOlderAt,
-      },
-      {
-        medicalHistoryId: historyPatientFourOlder.id,
-        serviceId: procedureService.id,
-        quantity: 1,
-        notes: "Nebulizer untuk bronkospasme ringan",
+        notes: "Scalling termasuk konsultasi tarif minimum",
         createdAt: patientFourOlderAt,
         updatedAt: patientFourOlderAt,
       },
       {
         medicalHistoryId: historyPatientFivePast.id,
-        serviceId: consultationService.id,
+        serviceId: serviceByKey.generalVitaminInjectionConsultation.id,
         quantity: 1,
-        notes: "Evaluasi diare dan lemas",
-        createdAt: patientFivePastAt,
-        updatedAt: patientFivePastAt,
-      },
-      {
-        medicalHistoryId: historyPatientFivePast.id,
-        serviceId: vitaminInjectionService.id,
-        quantity: 1,
-        notes: "Terapi suportif pemulihan",
+        notes: "Paket konsultasi dan injeksi vitamin",
         createdAt: patientFivePastAt,
         updatedAt: patientFivePastAt,
       },
@@ -2027,14 +2352,14 @@ async function seed() {
         duration: "6 hari",
       });
 
-    const prescriptionPatientFivePastOralitEncrypted =
+    const prescriptionPatientFivePastLamesonEncrypted =
       await encryptPrescriptionSeed(demoEncryptionKey, {
-        dosage: "1 sachet",
-        frequency: "Setelah BAB cair",
+        dosage: "1 tablet",
+        frequency: "2x sehari",
         duration: "3 hari",
       });
 
-    const prescriptionPatientFivePastZincEncrypted =
+    const prescriptionPatientFivePastSimprofenEncrypted =
       await encryptPrescriptionSeed(demoEncryptionKey, {
         dosage: "1 tablet",
         frequency: "1x sehari",
@@ -2044,8 +2369,8 @@ async function seed() {
     await tx.insert(prescriptionMedicines).values([
       {
         prescriptionId: prescriptionWaitingPayment.id,
-        medicineId: paracetamol.id,
-        stockId: paracetamolStock.id,
+        medicineId: medicineByKey.ondansentron8Umum.id,
+        stockId: stockByKey.ondansentron8Umum.id,
         encryptedDosage:
           prescriptionWaitingPaymentEncrypted.encryptedDosage,
         encryptedFrequency:
@@ -2059,8 +2384,8 @@ async function seed() {
       },
       {
         prescriptionId: prescriptionWaitingPayment.id,
-        medicineId: ibuprofen.id,
-        stockId: ibuprofenStock.id,
+        medicineId: medicineByKey.simprofenUmum.id,
+        stockId: stockByKey.simprofenUmum.id,
         encryptedDosage: prescriptionWaitingPaymentEncrypted.encryptedDosage,
         encryptedFrequency:
           prescriptionWaitingPaymentEncrypted.encryptedFrequency,
@@ -2073,32 +2398,32 @@ async function seed() {
       },
       {
         prescriptionId: prescriptionPaidReady.id,
-        medicineId: amoxicillin.id,
-        stockId: amoxicillinStock.id,
+        medicineId: medicineByKey.maxcef500Umum.id,
+        stockId: stockByKey.maxcef500Umum.id,
         encryptedDosage: prescriptionPaidReadyEncrypted.encryptedDosage,
         encryptedFrequency: prescriptionPaidReadyEncrypted.encryptedFrequency,
         encryptedDuration: prescriptionPaidReadyEncrypted.encryptedDuration,
         encryptionIv: prescriptionPaidReadyEncrypted.encryptionIv,
-        quantityUsed: 15,
+        quantityUsed: 10,
         createdAt: now,
         updatedAt: now,
       },
       {
         prescriptionId: prescriptionPaidReady.id,
-        medicineId: paracetamol.id,
-        stockId: paracetamolStock.id,
+        medicineId: medicineByKey.maxtusifSyrupUmum.id,
+        stockId: stockByKey.maxtusifSyrupUmum.id,
         encryptedDosage: prescriptionPaidReadyEncrypted.encryptedDosage,
         encryptedFrequency: prescriptionPaidReadyEncrypted.encryptedFrequency,
         encryptedDuration: prescriptionPaidReadyEncrypted.encryptedDuration,
         encryptionIv: prescriptionPaidReadyEncrypted.encryptionIv,
-        quantityUsed: 15,
+        quantityUsed: 1,
         createdAt: now,
         updatedAt: now,
       },
       {
         prescriptionId: prescriptionDone.id,
-        medicineId: cetirizine.id,
-        stockId: cetirizineStock.id,
+        medicineId: medicineByKey.lameson8Umum.id,
+        stockId: stockByKey.lameson8Umum.id,
         encryptedDosage: prescriptionDoneEncrypted.encryptedDosage,
         encryptedFrequency: prescriptionDoneEncrypted.encryptedFrequency,
         encryptedDuration: prescriptionDoneEncrypted.encryptedDuration,
@@ -2109,8 +2434,8 @@ async function seed() {
       },
       {
         prescriptionId: prescriptionDone.id,
-        medicineId: vitaminC.id,
-        stockId: vitaminCStock.id,
+        medicineId: medicineByKey.ondansentron8Umum.id,
+        stockId: stockByKey.ondansentron8Umum.id,
         encryptedDosage: prescriptionDoneEncrypted.encryptedDosage,
         encryptedFrequency: prescriptionDoneEncrypted.encryptedFrequency,
         encryptedDuration: prescriptionDoneEncrypted.encryptedDuration,
@@ -2121,8 +2446,8 @@ async function seed() {
       },
       {
         prescriptionId: prescriptionPatientTwoPast.id,
-        medicineId: amoxicillin.id,
-        stockId: amoxicillinStock.id,
+        medicineId: medicineByKey.folaplusKandungan.id,
+        stockId: stockByKey.folaplusKandungan.id,
         encryptedDosage: prescriptionPatientTwoPastEncrypted.encryptedDosage,
         encryptedFrequency:
           prescriptionPatientTwoPastEncrypted.encryptedFrequency,
@@ -2135,8 +2460,8 @@ async function seed() {
       },
       {
         prescriptionId: prescriptionPatientTwoPast.id,
-        medicineId: ibuprofen.id,
-        stockId: ibuprofenStock.id,
+        medicineId: medicineByKey.cal95Kandungan.id,
+        stockId: stockByKey.cal95Kandungan.id,
         encryptedDosage: prescriptionPatientTwoPastEncrypted.encryptedDosage,
         encryptedFrequency:
           prescriptionPatientTwoPastEncrypted.encryptedFrequency,
@@ -2149,8 +2474,8 @@ async function seed() {
       },
       {
         prescriptionId: prescriptionPatientThreePast.id,
-        medicineId: omeprazole.id,
-        stockId: omeprazoleStock.id,
+        medicineId: medicineByKey.provomerKandungan.id,
+        stockId: stockByKey.provomerKandungan.id,
         encryptedDosage:
           prescriptionPatientThreePastEncrypted.encryptedDosage,
         encryptedFrequency:
@@ -2164,8 +2489,8 @@ async function seed() {
       },
       {
         prescriptionId: prescriptionPatientFourOlder.id,
-        medicineId: salbutamol.id,
-        stockId: salbutamolStock.id,
+        medicineId: medicineByKey.clinjosGigi.id,
+        stockId: stockByKey.clinjosGigi.id,
         encryptedDosage:
           prescriptionPatientFourOlderSyrupEncrypted.encryptedDosage,
         encryptedFrequency:
@@ -2173,14 +2498,14 @@ async function seed() {
         encryptedDuration:
           prescriptionPatientFourOlderSyrupEncrypted.encryptedDuration,
         encryptionIv: prescriptionPatientFourOlderSyrupEncrypted.encryptionIv,
-        quantityUsed: 1,
+        quantityUsed: 10,
         createdAt: patientFourOlderAt,
         updatedAt: patientFourOlderAt,
       },
       {
         prescriptionId: prescriptionPatientFourOlder.id,
-        medicineId: vitaminC.id,
-        stockId: vitaminCStock.id,
+        medicineId: medicineByKey.pyrexinGigi.id,
+        stockId: stockByKey.pyrexinGigi.id,
         encryptedDosage:
           prescriptionPatientFourOlderSupportEncrypted.encryptedDosage,
         encryptedFrequency:
@@ -2195,42 +2520,36 @@ async function seed() {
       },
       {
         prescriptionId: prescriptionPatientFivePast.id,
-        medicineId: oralit.id,
-        stockId: oralitStock.id,
+        medicineId: medicineByKey.lameson8Umum.id,
+        stockId: stockByKey.lameson8Umum.id,
         encryptedDosage:
-          prescriptionPatientFivePastOralitEncrypted.encryptedDosage,
+          prescriptionPatientFivePastLamesonEncrypted.encryptedDosage,
         encryptedFrequency:
-          prescriptionPatientFivePastOralitEncrypted.encryptedFrequency,
+          prescriptionPatientFivePastLamesonEncrypted.encryptedFrequency,
         encryptedDuration:
-          prescriptionPatientFivePastOralitEncrypted.encryptedDuration,
+          prescriptionPatientFivePastLamesonEncrypted.encryptedDuration,
         encryptionIv:
-          prescriptionPatientFivePastOralitEncrypted.encryptionIv,
+          prescriptionPatientFivePastLamesonEncrypted.encryptionIv,
         quantityUsed: 6,
         createdAt: patientFivePastAt,
         updatedAt: patientFivePastAt,
       },
       {
         prescriptionId: prescriptionPatientFivePast.id,
-        medicineId: zinc.id,
-        stockId: zincStock.id,
+        medicineId: medicineByKey.simprofenUmum.id,
+        stockId: stockByKey.simprofenUmum.id,
         encryptedDosage:
-          prescriptionPatientFivePastZincEncrypted.encryptedDosage,
+          prescriptionPatientFivePastSimprofenEncrypted.encryptedDosage,
         encryptedFrequency:
-          prescriptionPatientFivePastZincEncrypted.encryptedFrequency,
+          prescriptionPatientFivePastSimprofenEncrypted.encryptedFrequency,
         encryptedDuration:
-          prescriptionPatientFivePastZincEncrypted.encryptedDuration,
-        encryptionIv: prescriptionPatientFivePastZincEncrypted.encryptionIv,
+          prescriptionPatientFivePastSimprofenEncrypted.encryptedDuration,
+        encryptionIv: prescriptionPatientFivePastSimprofenEncrypted.encryptionIv,
         quantityUsed: 6,
         createdAt: patientFivePastAt,
         updatedAt: patientFivePastAt,
       },
     ]);
-
-    // Avoid unused variable warning.
-    void expiredVitaminC;
-    void expiredSalbutamol;
-    void adminFeeService;
-    void healthCertificateService;
 
     const [paymentToday] = await tx
       .insert(payments)
@@ -2238,7 +2557,7 @@ async function seed() {
         patientId: patientOneUser.id,
         reservationId: reservationCompletedToday.id,
         receptionistId: receptionistUser.id,
-        totalAmount: "330000.00",
+        totalAmount: "385000.00",
         paymentDate: now,
         paymentMethod: "Cash",
         status: "Paid",
@@ -2254,7 +2573,7 @@ async function seed() {
         patientId: patientOneUser.id,
         reservationId: reservationCompletedYesterday.id,
         receptionistId: receptionistUser.id,
-        totalAmount: "135000.00",
+        totalAmount: "140000.00",
         paymentDate: addDays(now, -1),
         paymentMethod: "Transfer",
         status: "Paid",
@@ -2270,7 +2589,7 @@ async function seed() {
         patientId: patientTwoUser.id,
         reservationId: reservationPatientTwoPast.id,
         receptionistId: receptionistUser.id,
-        totalAmount: "355000.00",
+        totalAmount: "270000.00",
         paymentDate: patientTwoPastAt,
         paymentMethod: "Debit",
         status: "Paid",
@@ -2286,7 +2605,7 @@ async function seed() {
         patientId: patientThreeUser.id,
         reservationId: reservationPatientThreePast.id,
         receptionistId: receptionistUser.id,
-        totalAmount: "276000.00",
+        totalAmount: "256000.00",
         paymentDate: patientThreePastAt,
         paymentMethod: "Credit",
         status: "Paid",
@@ -2302,7 +2621,7 @@ async function seed() {
         patientId: patientFourUser.id,
         reservationId: reservationPatientFourRecent.id,
         receptionistId: receptionistUser.id,
-        totalAmount: "285000.00",
+        totalAmount: "150000.00",
         paymentDate: patientFourRecentAt,
         paymentMethod: "BPJS",
         status: "Paid",
@@ -2318,7 +2637,7 @@ async function seed() {
         patientId: patientFourUser.id,
         reservationId: reservationPatientFourOlder.id,
         receptionistId: receptionistUser.id,
-        totalAmount: "333000.00",
+        totalAmount: "406000.00",
         paymentDate: patientFourOlderAt,
         paymentMethod: "Cash",
         status: "Paid",
@@ -2334,7 +2653,7 @@ async function seed() {
         patientId: patientFiveUser.id,
         reservationId: reservationPatientFivePast.id,
         receptionistId: receptionistUser.id,
-        totalAmount: "296000.00",
+        totalAmount: "246000.00",
         paymentDate: patientFivePastAt,
         paymentMethod: "Debit",
         status: "Paid",
@@ -2348,12 +2667,12 @@ async function seed() {
       {
         paymentId: paymentToday.id,
         itemType: "Service",
-        serviceId: consultationService.id,
+        serviceId: serviceByKey.generalVitaminInjectionConsultation.id,
         prescriptionId: null,
         quantity: 1,
-        unitPrice: "150000.00",
-        subtotal: "150000.00",
-        notes: "Konsultasi dokter",
+        unitPrice: "120000.00",
+        subtotal: "120000.00",
+        notes: "Konsultasi + injeksi vitamin",
         createdAt: now,
         updatedAt: now,
       },
@@ -2363,21 +2682,21 @@ async function seed() {
         serviceId: null,
         prescriptionId: prescriptionPaidReady.id,
         quantity: 1,
-        unitPrice: "180000.00",
-        subtotal: "180000.00",
-        notes: "Resep ISPA ringan",
+        unitPrice: "265000.00",
+        subtotal: "265000.00",
+        notes: "Resep dokter umum",
         createdAt: now,
         updatedAt: now,
       },
       {
         paymentId: paymentYesterday.id,
         itemType: "Service",
-        serviceId: followUpConsultationService.id,
+        serviceId: serviceByKey.generalConsultation.id,
         prescriptionId: null,
         quantity: 1,
-        unitPrice: "100000.00",
-        subtotal: "100000.00",
-        notes: "Kontrol alergi",
+        unitPrice: "60000.00",
+        subtotal: "60000.00",
+        notes: "Konsultasi dokter umum",
         createdAt: addDays(now, -1),
         updatedAt: addDays(now, -1),
       },
@@ -2387,33 +2706,21 @@ async function seed() {
         serviceId: null,
         prescriptionId: prescriptionDone.id,
         quantity: 1,
-        unitPrice: "35000.00",
-        subtotal: "35000.00",
-        notes: "Resep alergi",
+        unitPrice: "80000.00",
+        subtotal: "80000.00",
+        notes: "Resep dokter umum",
         createdAt: addDays(now, -1),
         updatedAt: addDays(now, -1),
       },
       {
         paymentId: paymentPatientTwoPast.id,
         itemType: "Service",
-        serviceId: consultationService.id,
+        serviceId: serviceByKey.obgynUsg2dConsultation.id,
         prescriptionId: null,
         quantity: 1,
         unitPrice: "150000.00",
         subtotal: "150000.00",
-        notes: "Konsultasi ISK",
-        createdAt: patientTwoPastAt,
-        updatedAt: patientTwoPastAt,
-      },
-      {
-        paymentId: paymentPatientTwoPast.id,
-        itemType: "Service",
-        serviceId: urineTestService.id,
-        prescriptionId: null,
-        quantity: 1,
-        unitPrice: "90000.00",
-        subtotal: "90000.00",
-        notes: "Urinalisis sederhana",
+        notes: "USG 2D + konsultasi",
         createdAt: patientTwoPastAt,
         updatedAt: patientTwoPastAt,
       },
@@ -2423,33 +2730,21 @@ async function seed() {
         serviceId: null,
         prescriptionId: prescriptionPatientTwoPast.id,
         quantity: 1,
-        unitPrice: "115000.00",
-        subtotal: "115000.00",
-        notes: "Resep ISK",
+        unitPrice: "120000.00",
+        subtotal: "120000.00",
+        notes: "Resep poli kandungan",
         createdAt: patientTwoPastAt,
         updatedAt: patientTwoPastAt,
       },
       {
         paymentId: paymentPatientThreePast.id,
         itemType: "Service",
-        serviceId: followUpConsultationService.id,
+        serviceId: serviceByKey.obgynGynecologyConsultation.id,
         prescriptionId: null,
         quantity: 1,
-        unitPrice: "100000.00",
-        subtotal: "100000.00",
-        notes: "Kontrol lambung",
-        createdAt: patientThreePastAt,
-        updatedAt: patientThreePastAt,
-      },
-      {
-        paymentId: paymentPatientThreePast.id,
-        itemType: "Service",
-        serviceId: bloodSugarService.id,
-        prescriptionId: null,
-        quantity: 1,
-        unitPrice: "85000.00",
-        subtotal: "85000.00",
-        notes: "Skrining gula darah",
+        unitPrice: "200000.00",
+        subtotal: "200000.00",
+        notes: "Pemeriksaan ginekologi + konsultasi",
         createdAt: patientThreePastAt,
         updatedAt: patientThreePastAt,
       },
@@ -2459,57 +2754,33 @@ async function seed() {
         serviceId: null,
         prescriptionId: prescriptionPatientThreePast.id,
         quantity: 1,
-        unitPrice: "91000.00",
-        subtotal: "91000.00",
-        notes: "Resep lambung",
+        unitPrice: "56000.00",
+        subtotal: "56000.00",
+        notes: "Resep poli kandungan",
         createdAt: patientThreePastAt,
         updatedAt: patientThreePastAt,
       },
       {
         paymentId: paymentPatientFourRecent.id,
         itemType: "Service",
-        serviceId: consultationService.id,
+        serviceId: serviceByKey.dentistDentalCheckupConsultation.id,
         prescriptionId: null,
         quantity: 1,
         unitPrice: "150000.00",
         subtotal: "150000.00",
-        notes: "Konsultasi luka gores",
-        createdAt: patientFourRecentAt,
-        updatedAt: patientFourRecentAt,
-      },
-      {
-        paymentId: paymentPatientFourRecent.id,
-        itemType: "Service",
-        serviceId: woundCareService.id,
-        prescriptionId: null,
-        quantity: 1,
-        unitPrice: "135000.00",
-        subtotal: "135000.00",
-        notes: "Perawatan luka ringan",
+        notes: "Periksa gigi + konsultasi",
         createdAt: patientFourRecentAt,
         updatedAt: patientFourRecentAt,
       },
       {
         paymentId: paymentPatientFourOlder.id,
         itemType: "Service",
-        serviceId: consultationService.id,
+        serviceId: serviceByKey.dentistScalingMin.id,
         prescriptionId: null,
         quantity: 1,
-        unitPrice: "150000.00",
-        subtotal: "150000.00",
-        notes: "Konsultasi bronkospasme",
-        createdAt: patientFourOlderAt,
-        updatedAt: patientFourOlderAt,
-      },
-      {
-        paymentId: paymentPatientFourOlder.id,
-        itemType: "Service",
-        serviceId: procedureService.id,
-        prescriptionId: null,
-        quantity: 1,
-        unitPrice: "120000.00",
-        subtotal: "120000.00",
-        notes: "Tindakan nebulizer",
+        unitPrice: "300000.00",
+        subtotal: "300000.00",
+        notes: "Scalling + konsultasi tarif minimum",
         createdAt: patientFourOlderAt,
         updatedAt: patientFourOlderAt,
       },
@@ -2519,33 +2790,21 @@ async function seed() {
         serviceId: null,
         prescriptionId: prescriptionPatientFourOlder.id,
         quantity: 1,
-        unitPrice: "63000.00",
-        subtotal: "63000.00",
-        notes: "Resep bronkospasme ringan",
+        unitPrice: "106000.00",
+        subtotal: "106000.00",
+        notes: "Resep poli gigi",
         createdAt: patientFourOlderAt,
         updatedAt: patientFourOlderAt,
       },
       {
         paymentId: paymentPatientFivePast.id,
         itemType: "Service",
-        serviceId: consultationService.id,
+        serviceId: serviceByKey.generalVitaminInjectionConsultation.id,
         prescriptionId: null,
         quantity: 1,
-        unitPrice: "150000.00",
-        subtotal: "150000.00",
-        notes: "Konsultasi diare akut",
-        createdAt: patientFivePastAt,
-        updatedAt: patientFivePastAt,
-      },
-      {
-        paymentId: paymentPatientFivePast.id,
-        itemType: "Service",
-        serviceId: vitaminInjectionService.id,
-        prescriptionId: null,
-        quantity: 1,
-        unitPrice: "110000.00",
-        subtotal: "110000.00",
-        notes: "Injeksi vitamin suportif",
+        unitPrice: "120000.00",
+        subtotal: "120000.00",
+        notes: "Konsultasi + injeksi vitamin",
         createdAt: patientFivePastAt,
         updatedAt: patientFivePastAt,
       },
@@ -2555,20 +2814,21 @@ async function seed() {
         serviceId: null,
         prescriptionId: prescriptionPatientFivePast.id,
         quantity: 1,
-        unitPrice: "36000.00",
-        subtotal: "36000.00",
-        notes: "Resep rehidrasi dan zinc",
+        unitPrice: "126000.00",
+        subtotal: "126000.00",
+        notes: "Resep dokter umum",
         createdAt: patientFivePastAt,
         updatedAt: patientFivePastAt,
       },
     ]);
 
       await tx.insert(clinicSettings).values({
-        clinicName: "Klinik Borneo Kasih",
-        address: "Jl. Klinik Sehat No. 123, Banjarmasin",
-        phone: "0541-123456",
-        email: "info@borneokasih.com",
-        morningStart: "08:00",
+        clinicName: "Klinik Praktik Dokter",
+        address:
+          "Jl. RTA Milono No.KM. 1,5, Langkai, Kec. Pahandut, Kota Palangka Raya, Kalimantan Tengah 73111",
+        phone: "-",
+        email: "klinik@local.test",
+        morningStart: "07:30",
         morningEnd: "12:00",
         eveningStart: "17:00",
         eveningEnd: "21:00",
@@ -2585,7 +2845,9 @@ async function seed() {
     console.log("Seed completed successfully.");
     console.log("Demo accounts (all passwords are the same):");
     console.log(`- admin@klinik.local / ${TEST_PASSWORD}`);
-    console.log(`- doctor@klinik.local / ${TEST_PASSWORD}`);
+    console.log(`- silverius@klinik.local / ${TEST_PASSWORD}`);
+    console.log(`- ida.bagus@klinik.local / ${TEST_PASSWORD}`);
+    console.log(`- ida.ayu@klinik.local / ${TEST_PASSWORD}`);
     console.log(`- nurse@klinik.local / ${TEST_PASSWORD}`);
     console.log(`- receptionist@klinik.local / ${TEST_PASSWORD}`);
     console.log(`- pharmacist@klinik.local / ${TEST_PASSWORD}`);
@@ -2607,7 +2869,8 @@ async function seed() {
       "- inactive@klinik.local (status Inactive, untuk uji filter/status)"
     );
     console.log("Seed highlights:");
-    console.log("- 10 layanan aktif, 9 obat, 11 batch stok");
+    console.log("- 3 dokter real dengan jadwal Senin-Sabtu");
+    console.log("- 12 layanan real, 34 obat real, 36 batch stok seed");
     console.log("- 8 riwayat rekam medis tersebar di 5 pasien terverifikasi");
     console.log("- Ada stok low, out-of-stock, dan expired untuk uji resep/farmasi");
     console.log("Reservation timeline (local server time):");
@@ -2636,7 +2899,7 @@ async function seed() {
       })}`
     );
     console.log(
-      `- AutoCancel Test Session: ${autoCancelSessionStartAt.toLocaleString(
+      `- Auto-cancel window: ${autoCancelSessionStartAt.toLocaleString(
         "id-ID",
         { hour12: false }
       )} -> ${autoCancelSessionEndAt.toLocaleString("id-ID", {
@@ -2655,7 +2918,7 @@ async function seed() {
       })} (grace 1 menit)`
     );
     console.log(
-      `- No-show Candidate (Yesterday): ${staleNoShowYesterdayAt.toLocaleString(
+      `- No-show Candidate (previous clinic day): ${staleNoShowYesterdayAt.toLocaleString(
         "id-ID",
         { hour12: false }
       )}`

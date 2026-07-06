@@ -24,6 +24,7 @@ import {
 import { Loader2, FileText, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { useEncryption } from "@/hooks/use-encryption";
+import { formatDateTime } from "@/lib/utils/date";
 
 interface NurseCheckup {
   id: number;
@@ -87,18 +88,6 @@ export default function NurseMedicalRecordsPage() {
   useEffect(() => {
     fetchRecords();
   }, [fetchRecords]);
-
-  const formatDateTime = (dateString: string | null) => {
-    if (!dateString) return "-";
-    const date = new Date(dateString);
-    return date.toLocaleString("id-ID", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
 
   const handleView = (record: NurseCheckup) => {
     setSelectedRecord(record);

@@ -11,7 +11,7 @@ interface EmergencyNotificationProps {
   show: boolean;
   patientId?: string;
   patientName?: string;
-  queueNumber?: number;
+  queueNumber?: number | null;
   onClose?: () => void;
 }
 

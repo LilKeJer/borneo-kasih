@@ -14,6 +14,8 @@ export const serviceSchema = z.object({
   category: z.enum(["Konsultasi", "Pemeriksaan", "Tindakan", "Lainnya"], {
     required_error: "Kategori wajib dipilih",
   }),
+  doctorId: z.number().int().positive().nullable().optional(),
+  isDoctorDefault: z.boolean().optional().default(false),
   isActive: z.boolean().optional().default(true), // Make it optional with default
 });
 
