@@ -2,8 +2,10 @@ import { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { LoginForm } from "@/components/auth/login-form";
+import { DoctorOperatingHoursList } from "@/components/clinic/doctor-operating-hours-list";
 import {
   formatClinicOperatingHours,
+  getDoctorOperatingHours,
   getOrCreateClinicSettings,
 } from "@/lib/clinic-settings";
 
@@ -30,6 +32,7 @@ function LoginFormLoader() {
 export default async function LoginPage() {
   const settings = await getOrCreateClinicSettings();
   const operatingHours = formatClinicOperatingHours(settings);
+  const doctorOperatingHours = await getDoctorOperatingHours();
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-6 py-12">
@@ -59,7 +62,13 @@ export default async function LoginPage() {
             </div>
             <div>
               <dt className="text-slate-400">Jam Layanan</dt>
-              <dd className="mt-1 text-base text-white">{operatingHours}</dd>
+              <dd>
+                <DoctorOperatingHoursList
+                  doctorOperatingHours={doctorOperatingHours}
+                  fallback={operatingHours}
+                  tone="dark"
+                />
+              </dd>
             </div>
           </dl>
         </section>

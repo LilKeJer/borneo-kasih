@@ -16,7 +16,7 @@ import {
   medicines,
   serviceCatalog,
 } from "@/db/schema";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, or } from "drizzle-orm";
 
 export async function GET(
   req: NextRequest,
@@ -190,11 +190,20 @@ export async function GET(
         description: serviceCatalog.description,
         basePrice: serviceCatalog.basePrice,
         category: serviceCatalog.category,
+        doctorId: serviceCatalog.doctorId,
+        isDoctorDefault: serviceCatalog.isDoctorDefault,
         isActive: serviceCatalog.isActive,
       })
       .from(serviceCatalog)
       .where(
-        and(eq(serviceCatalog.isActive, true), isNull(serviceCatalog.deletedAt))
+        and(
+          eq(serviceCatalog.isActive, true),
+          or(
+            isNull(serviceCatalog.doctorId),
+            eq(serviceCatalog.doctorId, reservationData.doctorId)
+          ),
+          isNull(serviceCatalog.deletedAt)
+        )
       )
       .orderBy(serviceCatalog.category, serviceCatalog.name);
 

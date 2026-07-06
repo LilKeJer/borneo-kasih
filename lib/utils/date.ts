@@ -1,57 +1,81 @@
 // lib/utils/date.ts
-export function formatDate(date: Date | string): string {
-  if (!date) return "";
+import { CLINIC_TIME_ZONE, getClinicClockParts } from "@/lib/clinic-time";
 
-  const d = typeof date === "string" ? new Date(date) : date;
+type DateInput = Date | string | null | undefined;
 
-  // Check if date is valid
-  if (isNaN(d.getTime())) return "";
+function parseDate(date: DateInput): Date | null {
+  if (!date) return null;
+
+  const parsed = typeof date === "string" ? new Date(date) : date;
+  return isNaN(parsed.getTime()) ? null : parsed;
+}
+
+export function formatDate(date: DateInput): string {
+  const d = parseDate(date);
+  if (!d) return "";
 
   return new Intl.DateTimeFormat("id-ID", {
+    timeZone: CLINIC_TIME_ZONE,
     year: "numeric",
     month: "long",
     day: "numeric",
   }).format(d);
 }
 
-export function formatDateTime(date: Date | string): string {
-  if (!date) return "";
+export function formatDateTime(date: DateInput): string {
+  const d = parseDate(date);
+  if (!d) return "";
 
-  const d = typeof date === "string" ? new Date(date) : date;
+  return `${formatDate(d)} ${formatTime(d)}`;
+}
 
-  // Check if date is valid
-  if (isNaN(d.getTime())) return "";
+export function formatTime(date: DateInput): string {
+  const d = parseDate(date);
+  if (!d) return "";
+
+  const { hour, minute } = getClinicClockParts(d);
+
+  return `${String(hour).padStart(2, "0")}.${String(minute).padStart(
+    2,
+    "0"
+  )} WIB`;
+}
+
+export function formatDateShort(date: DateInput): string {
+  const d = parseDate(date);
+  if (!d) return "";
 
   return new Intl.DateTimeFormat("id-ID", {
+    timeZone: CLINIC_TIME_ZONE,
     year: "numeric",
-    month: "long",
+    month: "short",
     day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
   }).format(d);
 }
 
-export function formatTime(date: Date | string): string {
-  if (!date) return "";
+export function formatDateTimeShort(date: DateInput): string {
+  const d = parseDate(date);
+  if (!d) return "";
 
-  const d = typeof date === "string" ? new Date(date) : date;
+  return `${formatDateShort(d)} ${formatTime(d)}`;
+}
 
-  // Check if date is valid
-  if (isNaN(d.getTime())) return "";
+export function formatTimeRange(start: DateInput, end: DateInput): string {
+  return `${formatTime(start)} - ${formatTime(end)}`;
+}
 
-  return new Intl.DateTimeFormat("id-ID", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(d);
+export function formatTimeInputPreview(date: DateInput): string {
+  const d = parseDate(date);
+  if (!d) return "";
+
+  const { hour, minute } = getClinicClockParts(d);
+
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
 
 export function getRelativeTime(date: Date | string): string {
-  if (!date) return "";
-
-  const d = typeof date === "string" ? new Date(date) : date;
-
-  // Check if date is valid
-  if (isNaN(d.getTime())) return "";
+  const d = parseDate(date);
+  if (!d) return "";
 
   const now = new Date();
   const diffMs = now.getTime() - d.getTime();

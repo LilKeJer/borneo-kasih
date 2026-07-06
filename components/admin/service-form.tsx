@@ -41,14 +41,39 @@ const serviceSchema = z
       { message: "Harga harus berupa angka positif" }
     ),
     category: z.string().min(1, "Kategori wajib dipilih"),
+    doctorId: z.string().optional(),
+    isDoctorDefault: z.boolean(),
     isActive: z.boolean(),
   })
+  .refine(
+    (data) => !data.isDoctorDefault || data.category === "Konsultasi",
+    {
+      message: "Layanan otomatis dokter harus kategori Konsultasi",
+      path: ["isDoctorDefault"],
+    }
+  )
+  .refine(
+    (data) =>
+      !data.isDoctorDefault ||
+      Boolean(data.doctorId && data.doctorId !== "none"),
+    {
+      message: "Pilih dokter terkait terlebih dahulu",
+      path: ["isDoctorDefault"],
+    }
+  )
   .transform((data) => ({
     ...data,
     isActive: data.isActive ?? true, // Ensure isActive is always boolean
+    isDoctorDefault: data.isDoctorDefault ?? false,
   }));
 
 type ServiceFormValues = z.infer<typeof serviceSchema>;
+
+interface DoctorOption {
+  id: number;
+  name: string | null;
+  specialization: string | null;
+}
 
 interface ServiceFormProps {
   initialData?: {
@@ -57,6 +82,8 @@ interface ServiceFormProps {
     description?: string | null;
     basePrice: string;
     category: string;
+    doctorId?: number | null;
+    isDoctorDefault?: boolean | null;
     isActive: boolean;
   };
   onSuccess?: () => void;
@@ -74,6 +101,7 @@ export function ServiceForm({
   const [categories, setCategories] = useState<{ id: string; name: string }[]>(
     []
   );
+  const [doctors, setDoctors] = useState<DoctorOption[]>([]);
 
   // Inisialisasi form
   const form = useForm<ServiceFormValues>({
@@ -83,26 +111,52 @@ export function ServiceForm({
       description: initialData?.description || "",
       basePrice: initialData?.basePrice || "",
       category: initialData?.category || "",
+      doctorId: initialData?.doctorId ? String(initialData.doctorId) : "none",
+      isDoctorDefault: Boolean(initialData?.isDoctorDefault),
       isActive: initialData?.isActive ?? true, // Use nullish coalescing for cleaner default
     },
   });
+  const selectedCategory = form.watch("category");
+  const selectedDoctorId = form.watch("doctorId");
+  const canUseDoctorDefault =
+    selectedCategory === "Konsultasi" &&
+    Boolean(selectedDoctorId && selectedDoctorId !== "none");
 
   // Ambil kategori layanan
   useEffect(() => {
-    const fetchCategories = async () => {
+    const fetchFormOptions = async () => {
       try {
-        const response = await fetch("/api/services/categories");
-        if (!response.ok) throw new Error("Gagal memuat kategori");
-        const data = await response.json();
-        setCategories(data);
+        const [categoriesResponse, doctorsResponse] = await Promise.all([
+          fetch("/api/services/categories"),
+          fetch("/api/doctors"),
+        ]);
+
+        if (!categoriesResponse.ok) {
+          throw new Error("Gagal memuat kategori");
+        }
+
+        if (!doctorsResponse.ok) {
+          throw new Error("Gagal memuat data dokter");
+        }
+
+        const categoriesData = await categoriesResponse.json();
+        const doctorsData = await doctorsResponse.json();
+        setCategories(categoriesData);
+        setDoctors(Array.isArray(doctorsData) ? doctorsData : []);
       } catch (error) {
-        console.error("Error fetching categories:", error);
-        toast.error("Gagal memuat kategori layanan");
+        console.error("Error fetching service form options:", error);
+        toast.error("Gagal memuat data pendukung layanan");
       }
     };
 
-    fetchCategories();
+    fetchFormOptions();
   }, []);
+
+  useEffect(() => {
+    if (!canUseDoctorDefault && form.getValues("isDoctorDefault")) {
+      form.setValue("isDoctorDefault", false);
+    }
+  }, [canUseDoctorDefault, form]);
 
   // Handle submit form
   const onSubmit = async (values: ServiceFormValues) => {
@@ -110,13 +164,22 @@ export function ServiceForm({
     try {
       const url = isEdit ? `/api/services/${initialData?.id}` : "/api/services";
       const method = isEdit ? "PUT" : "POST";
+      const doctorId =
+        values.doctorId && values.doctorId !== "none"
+          ? Number(values.doctorId)
+          : null;
+      const payload = {
+        ...values,
+        doctorId,
+        isDoctorDefault: values.isDoctorDefault && canUseDoctorDefault,
+      };
 
       const response = await fetch(url, {
         method,
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(values),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -131,6 +194,8 @@ export function ServiceForm({
           description: "",
           basePrice: "",
           category: "",
+          doctorId: "none",
+          isDoctorDefault: false,
           isActive: true,
         });
       }
@@ -215,7 +280,7 @@ export function ServiceForm({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Kategori</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Pilih kategori" />
@@ -229,6 +294,63 @@ export function ServiceForm({
                   ))}
                 </SelectContent>
               </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Dokter Terkait */}
+        <FormField
+          control={form.control}
+          name="doctorId"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Dokter Terkait</FormLabel>
+              <Select
+                onValueChange={field.onChange}
+                value={field.value || "none"}
+              >
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Tidak terkait dokter" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="none">Tidak terkait dokter</SelectItem>
+                  {doctors.map((doctor) => (
+                    <SelectItem key={doctor.id} value={doctor.id.toString()}>
+                      {doctor.name || `Dokter ${doctor.id}`}
+                      {doctor.specialization
+                        ? ` - ${doctor.specialization}`
+                        : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Layanan Otomatis Dokter */}
+        <FormField
+          control={form.control}
+          name="isDoctorDefault"
+          render={({ field }) => (
+            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+              <div className="space-y-0.5">
+                <FormLabel>Otomatis untuk Dokter</FormLabel>
+                <div className="text-sm text-muted-foreground">
+                  Ditambahkan otomatis saat dokter menyimpan rekam medis
+                </div>
+              </div>
+              <FormControl>
+                <Switch
+                  checked={field.value && canUseDoctorDefault}
+                  onCheckedChange={field.onChange}
+                  disabled={!canUseDoctorDefault}
+                />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}

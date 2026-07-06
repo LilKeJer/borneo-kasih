@@ -236,6 +236,8 @@ export async function POST(req: NextRequest) {
         .set({
           status: "Completed",
           examinationStatus: "Completed",
+          isPriority: false,
+          priorityReason: null,
           updatedAt: new Date(),
         })
         .where(eq(reservations.id, reservationId));

@@ -141,6 +141,13 @@ export async function GET() {
 
         return {
           ...patient,
+          isPriority:
+            patient.examinationStatus === "Waiting" &&
+            (patient.isPriority ?? false),
+          priorityReason:
+            patient.examinationStatus === "Waiting"
+              ? patient.priorityReason
+              : null,
           lastVisitDate:
             lastVisit.length > 0
               ? lastVisit[0].dateOfDiagnosis || lastVisit[0].createdAt

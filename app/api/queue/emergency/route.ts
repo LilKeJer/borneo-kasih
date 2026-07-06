@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/db";
 import { reservations, patientDetails } from "@/db/schema";
-import { eq, and, isNull, gte, desc } from "drizzle-orm";
+import { eq, and, isNull, gte, lt, desc } from "drizzle-orm";
 
 export async function GET() {
   try {
@@ -21,16 +21,18 @@ export async function GET() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    const nextDay = new Date(today);
+    nextDay.setDate(nextDay.getDate() + 1);
 
-    // Dapatkan semua kasus darurat untuk hari ini
+    // Dapatkan kasus darurat aktif untuk hari ini.
+    // Status darurat hanya aktif selama pasien masih menunggu dokter.
     const emergencyCases = await db
       .select({
         id: reservations.id,
         patientId: reservations.patientId,
         patientName: patientDetails.name,
         queueNumber: reservations.queueNumber,
+        examinationStatus: reservations.examinationStatus,
         isPriority: reservations.isPriority,
         priorityReason: reservations.priorityReason,
         updatedAt: reservations.updatedAt,
@@ -43,7 +45,10 @@ export async function GET() {
       .where(
         and(
           eq(reservations.isPriority, true),
+          eq(reservations.status, "Confirmed"),
+          eq(reservations.examinationStatus, "Waiting"),
           gte(reservations.reservationDate, today),
+          lt(reservations.reservationDate, nextDay),
           isNull(reservations.deletedAt)
         )
       )

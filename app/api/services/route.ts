@@ -3,8 +3,36 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/db";
-import { serviceCatalog } from "@/db/schema";
-import { eq, and, isNull, ilike, desc } from "drizzle-orm";
+import { doctorDetails, serviceCatalog, users } from "@/db/schema";
+import { eq, and, isNull, ilike, desc, or } from "drizzle-orm";
+
+const VALID_CATEGORIES = ["Konsultasi", "Pemeriksaan", "Tindakan", "Lainnya"];
+
+const normalizeDoctorId = (value: unknown) => {
+  if (value === undefined || value === null || value === "" || value === "none") {
+    return null;
+  }
+
+  const doctorId = Number(value);
+  return Number.isInteger(doctorId) && doctorId > 0 ? doctorId : NaN;
+};
+
+const validateDoctor = async (doctorId: number) => {
+  const [doctor] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(
+      and(
+        eq(users.id, doctorId),
+        eq(users.role, "Doctor"),
+        eq(users.status, "Active"),
+        isNull(users.deletedAt)
+      )
+    )
+    .limit(1);
+
+  return doctor;
+};
 
 // GET - Mendapatkan semua layanan
 export async function GET(req: NextRequest) {
@@ -23,6 +51,7 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "10");
     const offset = (page - 1) * limit;
     const active = searchParams.get("active");
+    const doctorIdParam = searchParams.get("doctorId");
 
     // Buat kondisi query
     const conditions = [isNull(serviceCatalog.deletedAt)];
@@ -44,10 +73,46 @@ export async function GET(req: NextRequest) {
       conditions.push(eq(serviceCatalog.isActive, false));
     }
 
+    const sessionDoctorId =
+      session.user.role === "Doctor" ? Number(session.user.id) : null;
+    const requestedDoctorId =
+      sessionDoctorId ?? (doctorIdParam ? Number(doctorIdParam) : null);
+
+    if (requestedDoctorId !== null) {
+      if (!Number.isInteger(requestedDoctorId) || requestedDoctorId <= 0) {
+        return NextResponse.json(
+          { message: "ID dokter tidak valid" },
+          { status: 400 }
+        );
+      }
+
+      conditions.push(
+        or(
+          isNull(serviceCatalog.doctorId),
+          eq(serviceCatalog.doctorId, requestedDoctorId)
+        )!
+      );
+    }
+
     // Query dengan kondisi
     const services = await db
-      .select()
+      .select({
+        id: serviceCatalog.id,
+        name: serviceCatalog.name,
+        description: serviceCatalog.description,
+        basePrice: serviceCatalog.basePrice,
+        category: serviceCatalog.category,
+        doctorId: serviceCatalog.doctorId,
+        doctorName: doctorDetails.name,
+        doctorSpecialization: doctorDetails.specialization,
+        isDoctorDefault: serviceCatalog.isDoctorDefault,
+        isActive: serviceCatalog.isActive,
+        createdAt: serviceCatalog.createdAt,
+        updatedAt: serviceCatalog.updatedAt,
+        deletedAt: serviceCatalog.deletedAt,
+      })
       .from(serviceCatalog)
+      .leftJoin(doctorDetails, eq(serviceCatalog.doctorId, doctorDetails.userId))
       .where(and(...conditions))
       .orderBy(desc(serviceCatalog.updatedAt))
       .limit(limit)
@@ -87,7 +152,17 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { name, description, basePrice, category, isActive = true } = body;
+    const {
+      name,
+      description,
+      basePrice,
+      category,
+      doctorId,
+      isDoctorDefault = false,
+      isActive = true,
+    } = body;
+    const normalizedDoctorId = normalizeDoctorId(doctorId);
+    const shouldUseDoctorDefault = Boolean(isDoctorDefault);
 
     // Validasi input
     if (!name || !basePrice || !category) {
@@ -107,26 +182,66 @@ export async function POST(req: NextRequest) {
     }
 
     // Validasi kategori
-    const validCategories = [
-      "Konsultasi",
-      "Pemeriksaan",
-      "Tindakan",
-      "Lainnya",
-    ];
-    if (!validCategories.includes(category)) {
+    if (!VALID_CATEGORIES.includes(category)) {
       return NextResponse.json(
         { message: "Kategori tidak valid" },
         { status: 400 }
       );
     }
 
+    if (Number.isNaN(normalizedDoctorId)) {
+      return NextResponse.json(
+        { message: "Dokter terkait tidak valid" },
+        { status: 400 }
+      );
+    }
+
+    if (normalizedDoctorId !== null && !(await validateDoctor(normalizedDoctorId))) {
+      return NextResponse.json(
+        { message: "Dokter terkait tidak ditemukan atau tidak aktif" },
+        { status: 400 }
+      );
+    }
+
+    if (shouldUseDoctorDefault) {
+      if (category !== "Konsultasi") {
+        return NextResponse.json(
+          { message: "Layanan otomatis dokter harus kategori Konsultasi" },
+          { status: 400 }
+        );
+      }
+
+      if (normalizedDoctorId === null) {
+        return NextResponse.json(
+          { message: "Pilih dokter terkait untuk layanan otomatis" },
+          { status: 400 }
+        );
+      }
+
+      if (isActive === false) {
+        return NextResponse.json(
+          { message: "Layanan otomatis dokter harus aktif" },
+          { status: 400 }
+        );
+      }
+    }
+
     // Cek apakah layanan dengan nama yang sama sudah ada
+    const duplicateConditions = [
+      eq(serviceCatalog.name, name),
+      isNull(serviceCatalog.deletedAt),
+    ];
+
+    if (normalizedDoctorId === null) {
+      duplicateConditions.push(isNull(serviceCatalog.doctorId));
+    } else {
+      duplicateConditions.push(eq(serviceCatalog.doctorId, normalizedDoctorId));
+    }
+
     const existingService = await db
       .select()
       .from(serviceCatalog)
-      .where(
-        and(eq(serviceCatalog.name, name), isNull(serviceCatalog.deletedAt))
-      )
+      .where(and(...duplicateConditions))
       .limit(1);
 
     if (existingService.length > 0) {
@@ -143,18 +258,38 @@ export async function POST(req: NextRequest) {
       );
     }
     // Buat layanan baru
-    const [newService] = await db
-      .insert(serviceCatalog)
-      .values({
-        name,
-        description: description || null,
-        basePrice: priceString,
-        category,
-        isActive: isActive === false ? false : true, // Default true jika tidak disebutkan
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning();
+    const [newService] = await db.transaction(async (tx) => {
+      if (shouldUseDoctorDefault && normalizedDoctorId !== null) {
+        await tx
+          .update(serviceCatalog)
+          .set({
+            isDoctorDefault: false,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(serviceCatalog.doctorId, normalizedDoctorId),
+              eq(serviceCatalog.isDoctorDefault, true),
+              isNull(serviceCatalog.deletedAt)
+            )
+          );
+      }
+
+      return tx
+        .insert(serviceCatalog)
+        .values({
+          name,
+          description: description || null,
+          basePrice: priceString,
+          category,
+          doctorId: normalizedDoctorId,
+          isDoctorDefault: shouldUseDoctorDefault,
+          isActive: isActive === false ? false : true, // Default true jika tidak disebutkan
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .returning();
+    });
 
     return NextResponse.json(
       {

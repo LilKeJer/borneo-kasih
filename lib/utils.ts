@@ -1,6 +1,7 @@
 // lib/utils.ts (Updated dengan fungsi formatDateTime)
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { formatDateTimeShort } from "@/lib/utils/date";
 
 // Utility function for merging Tailwind classes
 export function cn(...inputs: ClassValue[]) {
@@ -18,20 +19,7 @@ export function formatRupiah(amount: number): string {
 
 // Format date dan time untuk tampilan yang lebih lengkap
 export function formatDateTime(date: Date | string): string {
-  if (!date) return "";
-
-  const d = typeof date === "string" ? new Date(date) : date;
-
-  // Check if date is valid
-  if (isNaN(d.getTime())) return "";
-
-  return new Intl.DateTimeFormat("id-ID", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(d);
+  return formatDateTimeShort(date);
 }
 
 // Truncate text with ellipsis

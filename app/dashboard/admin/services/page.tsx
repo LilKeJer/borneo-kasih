@@ -32,6 +32,10 @@ export interface Service {
   description?: string | null;
   basePrice: string;
   category: ServiceCategory;
+  doctorId?: number | null;
+  doctorName?: string | null;
+  doctorSpecialization?: string | null;
+  isDoctorDefault?: boolean | null;
   isActive: boolean;
 }
 

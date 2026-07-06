@@ -12,6 +12,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { sql, relations } from "drizzle-orm";
 
+import { doctorDetails, users } from "./auth";
 import { payments } from "./reservation";
 import { prescriptions } from "./pharmacy";
 
@@ -24,6 +25,8 @@ export const serviceCatalog = pgTable(
     description: varchar("description", { length: 255 }),
     basePrice: decimal("base_price", { precision: 10, scale: 2 }).notNull(),
     category: varchar("category", { length: 50 }).notNull(),
+    doctorId: integer("doctor_id").references(() => users.id),
+    isDoctorDefault: boolean("is_doctor_default").default(false),
     isActive: boolean("is_active").default(true),
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
@@ -33,18 +36,35 @@ export const serviceCatalog = pgTable(
     return {
       nameIdx: index("idx_service_name").on(table.name),
       categoryIdx: index("idx_service_category").on(table.category),
+      doctorIdx: index("idx_service_doctor").on(table.doctorId),
+      doctorDefaultIdx: index("idx_service_doctor_default").on(
+        table.doctorId,
+        table.isDoctorDefault
+      ),
       isActiveIdx: index("idx_service_active").on(table.isActive),
       priceCheck: check("check_base_price", sql`${table.basePrice} >= 0`),
       categoryCheck: check(
         "check_service_category",
         sql`${table.category} IN ('Konsultasi', 'Pemeriksaan', 'Tindakan', 'Lainnya')`
       ),
+      doctorDefaultCheck: check(
+        "check_doctor_default_service",
+        sql`${table.isDoctorDefault} = false OR (${table.doctorId} IS NOT NULL AND ${table.category} = 'Konsultasi')`
+      ),
     };
   }
 );
 export const serviceCatalogRelations = relations(
   serviceCatalog,
-  ({ many }) => ({
+  ({ one, many }) => ({
+    doctor: one(users, {
+      fields: [serviceCatalog.doctorId],
+      references: [users.id],
+    }),
+    doctorDetails: one(doctorDetails, {
+      fields: [serviceCatalog.doctorId],
+      references: [doctorDetails.userId],
+    }),
     paymentDetails: many(paymentDetails),
   })
 );

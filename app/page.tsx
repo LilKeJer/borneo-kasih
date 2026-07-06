@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { Metadata } from "next";
+import { DoctorOperatingHoursList } from "@/components/clinic/doctor-operating-hours-list";
 import { Button } from "@/components/ui/button";
 import {
   formatClinicOperatingHours,
+  getDoctorOperatingHours,
   getOrCreateClinicSettings,
 } from "@/lib/clinic-settings";
 
@@ -20,6 +22,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function Home() {
   const settings = await getOrCreateClinicSettings();
   const operatingHours = formatClinicOperatingHours(settings);
+  const doctorOperatingHours = await getDoctorOperatingHours();
 
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-10 text-slate-900">
@@ -57,7 +60,11 @@ export default async function Home() {
             </div>
             <div>
               <p className="font-medium text-white">Jam Layanan</p>
-              <p className="mt-1">{operatingHours}</p>
+              <DoctorOperatingHoursList
+                doctorOperatingHours={doctorOperatingHours}
+                fallback={operatingHours}
+                tone="dark"
+              />
             </div>
           </div>
         </section>

@@ -26,6 +26,8 @@ import {
 import { toast } from "sonner";
 import { Loader2, RefreshCw, Search } from "lucide-react";
 import { useEncryption } from "@/hooks/use-encryption";
+import { formatDateTime } from "@/lib/utils/date";
+import { getClinicDateString } from "@/lib/clinic-time";
 
 interface QueueItem {
   id: number;
@@ -52,7 +54,7 @@ export default function NursePatientsPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split("T")[0]
+    getClinicDateString()
   );
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -216,18 +218,6 @@ export default function NursePatientsPage() {
     } finally {
       setSaving(false);
     }
-  };
-
-  const formatDateTime = (dateString: string | null) => {
-    if (!dateString) return "-";
-    const date = new Date(dateString);
-    return date.toLocaleString("id-ID", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
   };
 
   return (

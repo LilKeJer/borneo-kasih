@@ -9,7 +9,7 @@ import {
   doctorDetails,
   payments,
 } from "@/db/schema";
-import { eq, and, isNull, desc, notExists } from "drizzle-orm";
+import { eq, and, isNull, desc, notExists, ilike, or, sql } from "drizzle-orm";
 
 export async function GET(req: NextRequest) {
   try {
@@ -25,6 +25,34 @@ export async function GET(req: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "10");
     const offset = (page - 1) * limit;
+
+    const conditions = [
+      eq(reservations.examinationStatus, "Waiting for Payment"),
+      eq(reservations.status, "Confirmed"),
+      isNull(reservations.deletedAt),
+      // Subquery untuk memastikan tidak ada pembayaran
+      notExists(
+        db
+          .select()
+          .from(payments)
+          .where(
+            and(
+              eq(payments.reservationId, reservations.id),
+              isNull(payments.deletedAt)
+            )
+          )
+      ),
+    ];
+
+    if (search) {
+      conditions.push(
+        or(
+          ilike(patientDetails.name, `%${search}%`),
+          ilike(doctorDetails.name, `%${search}%`),
+          sql`${reservations.queueNumber}::text ILIKE ${`%${search}%`}`
+        )!
+      );
+    }
 
     // Query reservasi yang menunggu pembayaran
     const completedReservations = await db
@@ -46,68 +74,24 @@ export async function GET(req: NextRequest) {
         eq(reservations.patientId, patientDetails.userId)
       )
       .leftJoin(doctorDetails, eq(reservations.doctorId, doctorDetails.userId))
-      .where(
-        and(
-          eq(reservations.examinationStatus, "Waiting for Payment"),
-          eq(reservations.status, "Confirmed"),
-          isNull(reservations.deletedAt),
-          // Subquery untuk memastikan tidak ada pembayaran
-          notExists(
-            db
-              .select()
-              .from(payments)
-              .where(
-                and(
-                  eq(payments.reservationId, reservations.id),
-                  isNull(payments.deletedAt)
-                )
-              )
-          )
-        )
-      )
+      .where(and(...conditions))
       .orderBy(desc(reservations.updatedAt))
       .limit(limit)
       .offset(offset);
 
-    // Filter berdasarkan pencarian jika ada
-    const filteredReservations = search
-      ? completedReservations.filter(
-          (reservation) =>
-            reservation.patientName
-              ?.toLowerCase()
-              .includes(search.toLowerCase()) ||
-            reservation.doctorName
-              ?.toLowerCase()
-              .includes(search.toLowerCase()) ||
-            reservation.queueNumber?.toString().includes(search)
-        )
-      : completedReservations;
-
     // Hitung total untuk paginasi
     const totalQuery = await db
-      .select({ count: reservations.id })
+      .select({ count: sql<number>`COUNT(*)` })
       .from(reservations)
-      .where(
-        and(
-          eq(reservations.examinationStatus, "Waiting for Payment"),
-          eq(reservations.status, "Confirmed"),
-          isNull(reservations.deletedAt),
-          notExists(
-            db
-              .select()
-              .from(payments)
-              .where(
-                and(
-                  eq(payments.reservationId, reservations.id),
-                  isNull(payments.deletedAt)
-                )
-              )
-          )
-        )
-      );
+      .leftJoin(
+        patientDetails,
+        eq(reservations.patientId, patientDetails.userId)
+      )
+      .leftJoin(doctorDetails, eq(reservations.doctorId, doctorDetails.userId))
+      .where(and(...conditions));
 
     return NextResponse.json({
-      data: filteredReservations.map((reservation) => ({
+      data: completedReservations.map((reservation) => ({
         ...reservation,
         hasPayment: false, // Sudah dipastikan belum ada pembayaran
       })),

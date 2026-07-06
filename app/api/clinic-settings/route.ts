@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   formatClinicOperatingHours,
+  getDoctorOperatingHours,
   getOrCreateClinicSettings,
 } from "@/lib/clinic-settings";
 
@@ -9,6 +10,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const settings = await getOrCreateClinicSettings();
+    const doctorOperatingHours = await getDoctorOperatingHours();
 
     return NextResponse.json({
       clinicName: settings.clinicName,
@@ -20,6 +22,7 @@ export async function GET() {
       eveningStart: settings.eveningStart,
       eveningEnd: settings.eveningEnd,
       operatingHours: formatClinicOperatingHours(settings),
+      doctorOperatingHours,
     });
   } catch (error) {
     console.error("Error fetching public clinic settings:", error);

@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { formatDate, formatTime } from "@/lib/utils/date";
 import { useClinicSettings } from "@/hooks/use-clinic-settings";
 
 interface DoctorQueueItem {
@@ -80,16 +81,6 @@ export default function QueueDisplayPage() {
     // Clear interval on component unmount
     return () => clearInterval(intervalId);
   }, []);
-
-  // Format time for last update
-  const formatTime = (date: Date | null) => {
-    if (!date) return "";
-    return date.toLocaleTimeString("id-ID", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
-  };
 
   // Check if current queue is being examined
   const isCurrentlyExamined = (status: string) => status === "In Progress";
@@ -174,15 +165,10 @@ export default function QueueDisplayPage() {
             {clinicName.toUpperCase()}
           </h2>
           <p className="text-gray-600 mb-2">
-            {new Date().toLocaleDateString("id-ID", {
-              weekday: "long",
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            })}
+            {formatDate(new Date())}
           </p>
           <p className="text-sm">
-            Pembaruan Terakhir: {formatTime(lastUpdated)}
+            Pembaruan Terakhir: {lastUpdated ? formatTime(lastUpdated) : "-"}
           </p>
         </div>
 

@@ -9,7 +9,25 @@ import {
   medicalHistories,
   prescriptions,
 } from "@/db/schema";
-import { and, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, or, sql } from "drizzle-orm";
+import {
+  addDaysToClinicDateString,
+  createClinicDateTime,
+  getClinicDateString,
+} from "@/lib/clinic-time";
+
+const DOCTOR_ACTIONABLE_EXAM_STATUSES = [
+  "Not Started",
+  "Waiting",
+  "In Progress",
+];
+
+function doctorActionableExamStatusFilter() {
+  return or(
+    isNull(reservations.examinationStatus),
+    inArray(reservations.examinationStatus, DOCTOR_ACTIONABLE_EXAM_STATUSES)
+  )!;
+}
 
 export async function GET() {
   try {
@@ -20,11 +38,13 @@ export async function GET() {
     }
 
     const doctorId = Number(session.user.id);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const now = new Date();
+    const clinicToday = getClinicDateString();
+    const today = createClinicDateTime(clinicToday, 0, 0);
+    const tomorrow = createClinicDateTime(
+      addDaysToClinicDateString(clinicToday, 1),
+      0,
+      0
+    );
 
     const totalPatientsResult = await db
       .select({ count: sql<number>`COUNT(*)` })
@@ -99,9 +119,11 @@ export async function GET() {
       .where(
         and(
           eq(reservations.doctorId, doctorId),
-          gte(reservations.reservationDate, now),
+          gte(reservations.reservationDate, today),
+          sql`${reservations.reservationDate} < ${tomorrow}`,
           isNull(reservations.deletedAt),
-          inArray(reservations.status, ["Pending", "Confirmed"])
+          inArray(reservations.status, ["Pending", "Confirmed"]),
+          doctorActionableExamStatusFilter()
         )
       )
       .orderBy(reservations.reservationDate)
@@ -122,9 +144,11 @@ export async function GET() {
       .where(
         and(
           eq(reservations.doctorId, doctorId),
-          gte(reservations.reservationDate, now),
+          gte(reservations.reservationDate, today),
+          sql`${reservations.reservationDate} < ${tomorrow}`,
           isNull(reservations.deletedAt),
-          inArray(reservations.status, ["Pending", "Confirmed"])
+          inArray(reservations.status, ["Pending", "Confirmed"]),
+          doctorActionableExamStatusFilter()
         )
       )
       .orderBy(reservations.reservationDate)

@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -67,6 +68,15 @@ interface PaymentDetail {
   notes?: string;
 }
 
+interface PendingReservation {
+  id: number;
+  patientName: string | null;
+  doctorName: string | null;
+  reservationDate: string;
+  queueNumber: number | null;
+  examinationStatus: string;
+}
+
 interface PaginationInfo {
   page: number;
   limit: number;
@@ -84,6 +94,11 @@ export default function PaymentsPage() {
   const [paymentDetails, setPaymentDetails] = useState<PaymentDetail[]>([]);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [pendingReservations, setPendingReservations] = useState<
+    PendingReservation[]
+  >([]);
+  const [loadingPending, setLoadingPending] = useState(true);
+  const [pendingTotal, setPendingTotal] = useState(0);
 
   // Filter states
   const [statusFilter, setStatusFilter] = useState<PaymentStatus | "all">(
@@ -140,6 +155,35 @@ export default function PaymentsPage() {
     endDate,
   ]);
 
+  const fetchPendingReservations = useCallback(async () => {
+    try {
+      setLoadingPending(true);
+
+      const queryParams = new URLSearchParams({
+        page: "1",
+        limit: "10",
+        ...(searchTerm && { search: searchTerm }),
+      });
+
+      const response = await fetch(
+        `/api/reservations/completed-unpaid?${queryParams}`
+      );
+
+      if (!response.ok) {
+        throw new Error("Gagal memuat pasien menunggu pembayaran");
+      }
+
+      const data = await response.json();
+      setPendingReservations(data.data || []);
+      setPendingTotal(Number(data.pagination?.total || 0));
+    } catch (error) {
+      console.error("Error fetching pending payment reservations:", error);
+      toast.error("Gagal memuat pasien menunggu pembayaran");
+    } finally {
+      setLoadingPending(false);
+    }
+  }, [searchTerm]);
+
   // Fetch payment details
   const fetchPaymentDetails = async (paymentId: number) => {
     try {
@@ -166,6 +210,10 @@ export default function PaymentsPage() {
     fetchPayments();
   }, [fetchPayments]);
 
+  useEffect(() => {
+    fetchPendingReservations();
+  }, [fetchPendingReservations]);
+
   const handleViewDetail = async (payment: Payment) => {
     setSelectedPayment(payment);
     setShowDetailDialog(true);
@@ -175,6 +223,7 @@ export default function PaymentsPage() {
   const handleSearch = () => {
     setPagination((prev) => ({ ...prev, page: 1 }));
     fetchPayments();
+    fetchPendingReservations();
   };
 
   const handlePageChange = (newPage: number) => {
@@ -219,6 +268,74 @@ export default function PaymentsPage() {
         title="Daftar Pembayaran"
         description="Kelola pembayaran pasien"
       />
+
+      <Card className="mb-6">
+        <CardHeader>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <CardTitle>Pasien Menunggu Pembayaran</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Pasien yang sudah selesai diperiksa dan belum dibuatkan
+                pembayaran.
+              </p>
+            </div>
+            {pendingTotal > 0 && (
+              <Badge variant="secondary">{pendingTotal} menunggu</Badge>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loadingPending ? (
+            <div className="flex h-24 items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin" />
+            </div>
+          ) : pendingReservations.length === 0 ? (
+            <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+              Tidak ada pasien yang sedang menunggu pembayaran.
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>No. Antrian</TableHead>
+                  <TableHead>Pasien</TableHead>
+                  <TableHead>Dokter</TableHead>
+                  <TableHead>Waktu Reservasi</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Aksi</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pendingReservations.map((reservation) => (
+                  <TableRow key={reservation.id}>
+                    <TableCell>{reservation.queueNumber ?? "-"}</TableCell>
+                    <TableCell className="font-medium">
+                      {reservation.patientName || "-"}
+                    </TableCell>
+                    <TableCell>{reservation.doctorName || "-"}</TableCell>
+                    <TableCell>
+                      {formatDateTime(reservation.reservationDate)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">Menunggu Pembayaran</Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button asChild size="sm">
+                        <Link
+                          href={`/dashboard/receptionist/payments/create?reservationId=${reservation.id}`}
+                        >
+                          <CreditCard className="mr-2 h-4 w-4" />
+                          Proses Pembayaran
+                        </Link>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -282,9 +399,7 @@ export default function PaymentsPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Menunggu</p>
-                <p className="text-xl font-semibold">
-                  {payments.filter((p) => p.status === "Pending").length}
-                </p>
+                <p className="text-xl font-semibold">{pendingTotal}</p>
               </div>
             </div>
           </CardContent>

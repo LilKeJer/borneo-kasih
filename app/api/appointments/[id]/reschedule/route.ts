@@ -5,13 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { db } from "@/db";
 import { reservations, dailyScheduleStatuses, payments } from "@/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
-
-function toDateOnly(value: Date): string {
-  const year = value.getFullYear();
-  const month = String(value.getMonth() + 1).padStart(2, "0");
-  const day = String(value.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
+import { getClinicDateString } from "@/lib/clinic-time";
 
 export async function PUT(
   req: NextRequest,
@@ -99,7 +93,9 @@ export async function PUT(
     if (appointment.scheduleId) {
       const oldAppointmentDate = appointment.reservationDate;
       if (oldAppointmentDate) {
-        const oldFormattedDate = toDateOnly(new Date(oldAppointmentDate));
+        const oldFormattedDate = getClinicDateString(
+          new Date(oldAppointmentDate)
+        );
 
         const oldDailyStatus = await db
           .select({
@@ -137,7 +133,7 @@ export async function PUT(
         { status: 400 }
       );
     }
-    const newFormattedDate = toDateOnly(newScheduleDateObj);
+    const newFormattedDate = getClinicDateString(newScheduleDateObj);
 
     // Check NEW daily schedule status
     const newDailyStatus = await db

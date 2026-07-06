@@ -153,7 +153,8 @@ export async function GET(req: NextRequest) {
         examinationStatus: queue.examinationStatus || "Not Started",
         checkedInAt: queue.checkedInAt,
         complaint: queue.complaint ?? null,
-        isPriority: queue.isPriority ?? false,
+        isPriority:
+          queue.examinationStatus === "Waiting" && (queue.isPriority ?? false),
         priorityReason: queue.priorityReason ?? null,
         hasNurseCheckup: nurseCheckupMap.get(queue.id) || false,
       });

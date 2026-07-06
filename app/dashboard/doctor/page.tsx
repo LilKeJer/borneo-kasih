@@ -5,6 +5,7 @@ import Link from "next/link";
 import { DashboardCard } from "@/components/dashboard/dashboard-card";
 import { RecentActivity } from "@/components/dashboard/recent-activity";
 import { Button } from "@/components/ui/button";
+import { formatDateTimeShort, formatTime } from "@/lib/utils/date";
 import {
   Card,
   CardContent,
@@ -70,22 +71,8 @@ export default function DoctorDashboardPage() {
     fetchDashboard();
   }, []);
 
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString("id-ID", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
   const formatDateTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString("id-ID", {
-      day: "numeric",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return formatDateTimeShort(dateString);
   };
 
   const currentQueue = data?.currentQueue;
@@ -157,7 +144,7 @@ export default function DoctorDashboardPage() {
           <CardHeader>
             <CardTitle>Upcoming Appointments</CardTitle>
             <CardDescription>
-              Your schedule for the rest of the day
+              Jadwal aktif yang masih perlu ditangani hari ini
             </CardDescription>
           </CardHeader>
           <CardContent>

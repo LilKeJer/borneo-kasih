@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { formatDate, formatTime } from "@/lib/utils/date";
 import {
   CalendarIcon,
   ClockIcon,
@@ -97,17 +98,9 @@ export default function AppointmentDetailPage() {
   };
 
   const formatDateTime = (dateString: string) => {
-    const date = new Date(dateString);
     return {
-      date: date.toLocaleDateString("id-ID", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      }),
-      time: date.toLocaleTimeString("id-ID", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
+      date: formatDate(dateString),
+      time: formatTime(dateString),
     };
   };
 

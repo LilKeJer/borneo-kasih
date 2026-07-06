@@ -41,6 +41,7 @@ import {
   Calendar as CalendarIcon,
   ChevronLeft,
   ChevronRight,
+  CreditCard,
 } from "lucide-react";
 import Link from "next/link";
 import { UserPlus, AlertTriangle } from "lucide-react";
@@ -48,6 +49,11 @@ import { PriorityToggle } from "@/components/receptionist/priority-toggle";
 import { useEmergencyPolling } from "@/hooks/use-emergency-polling";
 import { EmergencyNotification } from "@/components/receptionist/emergency-notification";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { formatDate, formatTime } from "@/lib/utils/date";
+import {
+  addDaysToClinicDateString,
+  getClinicDateString,
+} from "@/lib/clinic-time";
 interface Patient {
   id: number;
   patientId: number;
@@ -75,7 +81,7 @@ export default function QueueManagementPage() {
   const [reservationIdToCheckIn, setReservationIdToCheckIn] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split("T")[0]
+    getClinicDateString()
   );
 
   const { emergencyPatients, lastEmergency, dismissLatest } =
@@ -187,41 +193,17 @@ export default function QueueManagementPage() {
     }
   };
 
-  const formatTime = (dateString: string) => {
-    if (!dateString) return "-";
-    const date = new Date(dateString);
-    return date.toLocaleTimeString("id-ID", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  // Format tanggal untuk tampilan
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("id-ID", {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
-  };
-
   // Navigasi tanggal
   const goToNextDay = () => {
-    const date = new Date(selectedDate);
-    date.setDate(date.getDate() + 1);
-    setSelectedDate(date.toISOString().split("T")[0]);
+    setSelectedDate(addDaysToClinicDateString(selectedDate, 1));
   };
 
   const goToPreviousDay = () => {
-    const date = new Date(selectedDate);
-    date.setDate(date.getDate() - 1);
-    setSelectedDate(date.toISOString().split("T")[0]);
+    setSelectedDate(addDaysToClinicDateString(selectedDate, -1));
   };
 
   const goToToday = () => {
-    setSelectedDate(new Date().toISOString().split("T")[0]);
+    setSelectedDate(getClinicDateString());
   };
 
   // Filter queue dari pencarian
@@ -246,7 +228,7 @@ export default function QueueManagementPage() {
     );
   }
 
-  const isToday = new Date().toISOString().split("T")[0] === selectedDate;
+  const isToday = getClinicDateString() === selectedDate;
 
   return (
     <div className="space-y-6">
@@ -472,11 +454,28 @@ export default function QueueManagementPage() {
                                           Selesai
                                         </Button>
                                       )}
-                                      <PriorityToggle
-                                        reservationId={patient.id.toString()}
-                                        isPriority={patient.isPriority}
-                                        onStatusChange={() => fetchQueueData()}
-                                      />
+                                      {patient.examinationStatus ===
+                                        "Waiting for Payment" && (
+                                        <Button asChild size="sm">
+                                          <Link
+                                            href={`/dashboard/receptionist/payments/create?reservationId=${patient.id}`}
+                                          >
+                                            <CreditCard className="h-4 w-4 mr-1" />
+                                            Proses Pembayaran
+                                          </Link>
+                                        </Button>
+                                      )}
+                                      {["Not Started", "Waiting"].includes(
+                                        patient.examinationStatus
+                                      ) && (
+                                        <PriorityToggle
+                                          reservationId={patient.id.toString()}
+                                          isPriority={patient.isPriority}
+                                          onStatusChange={() =>
+                                            fetchQueueData()
+                                          }
+                                        />
+                                      )}
                                     </div>
                                   </TableCell>
                                 </TableRow>

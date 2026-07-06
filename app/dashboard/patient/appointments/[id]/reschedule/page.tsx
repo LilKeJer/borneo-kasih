@@ -14,6 +14,12 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { ArrowLeft, Calendar, Clock, Loader2, AlertCircle } from "lucide-react";
 import Link from "next/link";
+import { formatDate, formatTime, formatTimeInputPreview } from "@/lib/utils/date";
+import {
+  addDaysToClinicDateString,
+  createClinicDateTimeFromTimeInput,
+  getClinicDateString,
+} from "@/lib/clinic-time";
 
 interface TimeSlot {
   scheduleId: number;
@@ -109,19 +115,13 @@ export default function RescheduleAppointmentPage() {
     try {
       setIsSubmitting(true);
 
-      const [year, month, day] = selectedDate
-        .split("-")
-        .map((value) => Number(value));
-      const appointmentDate = new Date(year, month - 1, day);
-      const timeComponents = new Date(selectedSlot.time);
-
-      // Mengambil jam dan menit dari time slot
-      appointmentDate.setHours(
-        timeComponents.getHours(),
-        timeComponents.getMinutes(),
-        0,
-        0
+      const appointmentDate = createClinicDateTimeFromTimeInput(
+        selectedDate,
+        formatTimeInputPreview(selectedSlot.time)
       );
+      if (!appointmentDate) {
+        throw new Error("Waktu janji temu tidak valid");
+      }
 
       const response = await fetch(
         `/api/appointments/${appointmentId}/reschedule`,
@@ -160,47 +160,22 @@ export default function RescheduleAppointmentPage() {
     }
   };
 
-  // Format tanggal untuk input date (YYYY-MM-DD)
-  const formatDateForInput = (date: Date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
-
   // Mendapatkan tanggal hari ini dan tanggal maksimal (30 hari ke depan)
-  const today = new Date();
-  const minDate = formatDateForInput(today);
-
-  const maxDate = new Date();
-  maxDate.setDate(today.getDate() + 30);
-  const maxDateStr = formatDateForInput(maxDate);
+  const minDate = getClinicDateString();
+  const maxDateStr = addDaysToClinicDateString(minDate, 30);
 
   // Format waktu untuk ditampilkan (HH:MM)
   const formatTimeDisplay = (dateTimeStr: string) => {
-    const date = new Date(dateTimeStr);
-    return date.toLocaleTimeString("id-ID", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return formatTime(dateTimeStr);
   };
 
   // Format tanggal appointment saat ini
   const formatAppointmentDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString("id-ID", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
+    return formatDate(dateStr);
   };
 
   const formatAppointmentTime = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleTimeString("id-ID", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return formatTime(dateStr);
   };
 
   if (isLoading) {

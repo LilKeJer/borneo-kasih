@@ -206,15 +206,30 @@ export async function PUT(
         cancellationReason = null;
       }
 
+      const shouldClearPriority = finalExaminationStatus !== "Waiting";
+      const reservationUpdate: {
+        examinationStatus: string;
+        status: string;
+        cancellationReason: string | null;
+        updatedAt: Date;
+        isPriority?: boolean;
+        priorityReason?: string | null;
+      } = {
+        examinationStatus: finalExaminationStatus,
+        status: reservationStatus,
+        cancellationReason,
+        updatedAt: new Date(),
+      };
+
+      if (shouldClearPriority) {
+        reservationUpdate.isPriority = false;
+        reservationUpdate.priorityReason = null;
+      }
+
       // Update kedua status
       await tx
         .update(reservations)
-        .set({
-          examinationStatus: finalExaminationStatus,
-          status: reservationStatus,
-          cancellationReason,
-          updatedAt: new Date(),
-        })
+        .set(reservationUpdate)
         .where(eq(reservations.id, reservationId));
 
       return {

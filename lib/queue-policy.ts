@@ -1,3 +1,9 @@
+import {
+  createClinicDateTime,
+  getClinicClockParts,
+  getClinicDateString,
+} from "@/lib/clinic-time";
+
 export type QueuePolicySettings = {
   enableStrictCheckIn: boolean;
   checkInEarlyMinutes: number;
@@ -49,21 +55,20 @@ export function normalizeQueuePolicy(
 }
 
 export function toDateOnlyLocal(value: Date): string {
-  const year = value.getFullYear();
-  const month = String(value.getMonth() + 1).padStart(2, "0");
-  const day = String(value.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return getClinicDateString(value);
 }
 
 function combineDateAndTime(baseDate: Date, sessionTime: Date): Date {
-  const result = new Date(baseDate);
-  result.setHours(
-    sessionTime.getHours(),
-    sessionTime.getMinutes(),
-    sessionTime.getSeconds(),
+  const dateString = getClinicDateString(baseDate);
+  const { hour, minute, second } = getClinicClockParts(sessionTime);
+
+  return createClinicDateTime(
+    dateString,
+    hour,
+    minute,
+    second,
     sessionTime.getMilliseconds()
   );
-  return result;
 }
 
 function addMinutes(value: Date, minutes: number): Date {

@@ -19,6 +19,7 @@ import {
   type PrescriptionItemFormValues, // Menggunakan tipe dari validasi
 } from "@/lib/validations/medical-record"; // Sesuaikan path
 import { eq, and, isNull, sql, desc, inArray, asc, gt } from "drizzle-orm";
+import { getClinicDateString } from "@/lib/clinic-time";
 // import { encryptData, generateEncryptionKey } from "@/lib/utils/encryption"; // Jika enkripsi dilakukan di backend
 
 class MedicalRecordRequestError extends Error {
@@ -96,7 +97,7 @@ export async function POST(req: NextRequest) {
           .update(medicalHistories)
           .set({
             doctorId: doctorId,
-            dateOfDiagnosis: new Date().toISOString().split("T")[0],
+            dateOfDiagnosis: getClinicDateString(),
             encryptedCondition: condition,
             encryptedDescription: description,
             encryptedTreatment: treatment,
@@ -118,7 +119,7 @@ export async function POST(req: NextRequest) {
             encryptedNurseNotes: null,
             encryptionIvNurse: null,
             nurseCheckupTimestamp: null,
-            dateOfDiagnosis: new Date().toISOString().split("T")[0],
+            dateOfDiagnosis: getClinicDateString(),
             encryptedCondition: condition,
             encryptedDescription: description,
             encryptedTreatment: treatment,
@@ -143,6 +144,63 @@ export async function POST(req: NextRequest) {
           notes: service.notes || null,
         };
       });
+
+      const selectedServiceIds = Array.from(
+        new Set(normalizedServices.map((service) => service.serviceId))
+      );
+      const selectedServices =
+        selectedServiceIds.length > 0
+          ? await tx
+              .select({
+                id: serviceCatalog.id,
+                name: serviceCatalog.name,
+                category: serviceCatalog.category,
+              })
+              .from(serviceCatalog)
+              .where(
+                and(
+                  inArray(serviceCatalog.id, selectedServiceIds),
+                  eq(serviceCatalog.isActive, true),
+                  isNull(serviceCatalog.deletedAt)
+                )
+              )
+          : [];
+      const selectedIncludesConsultation = selectedServices.some(
+        (service) =>
+          service.category === "Konsultasi" ||
+          service.name.toLowerCase().includes("konsultasi")
+      );
+
+      const [defaultDoctorService] = await tx
+        .select({
+          id: serviceCatalog.id,
+        })
+        .from(serviceCatalog)
+        .where(
+          and(
+            eq(serviceCatalog.doctorId, doctorId),
+            eq(serviceCatalog.isDoctorDefault, true),
+            eq(serviceCatalog.category, "Konsultasi"),
+            eq(serviceCatalog.isActive, true),
+            isNull(serviceCatalog.deletedAt)
+          )
+        )
+        .orderBy(desc(serviceCatalog.updatedAt))
+        .limit(1);
+
+      if (
+        defaultDoctorService &&
+        !selectedIncludesConsultation &&
+        !normalizedServices.some(
+          (service) => service.serviceId === defaultDoctorService.id
+        )
+      ) {
+        normalizedServices.unshift({
+          serviceId: defaultDoctorService.id,
+          quantity: 1,
+          notes: "Konsultasi dokter",
+        });
+      }
 
       if (normalizedServices.length > 0) {
         const uniqueServiceIds = Array.from(
@@ -353,6 +411,8 @@ export async function POST(req: NextRequest) {
             .set({
               status: "Confirmed",
               examinationStatus: "Waiting for Payment",
+              isPriority: false,
+              priorityReason: null,
               updatedAt: new Date(),
             })
             .where(eq(reservations.id, reservationIdValue));

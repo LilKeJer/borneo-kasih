@@ -9,6 +9,7 @@ import {
   practiceSessions,
 } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
+import { createClinicDateTime, getClockMinutes } from "@/lib/clinic-time";
 
 export async function GET(req: NextRequest) {
   try {
@@ -125,8 +126,8 @@ export async function GET(req: NextRequest) {
         const hourSlots = [];
 
         // Buat time slot dengan interval 1 jam
-        const startHour = start.getHours();
-        const endHour = end.getHours();
+        const startHour = Math.floor(getClockMinutes(start) / 60);
+        const endHour = Math.floor(getClockMinutes(end) / 60);
         const totalHours =
           endHour > startHour
             ? endHour - startHour
@@ -134,8 +135,7 @@ export async function GET(req: NextRequest) {
 
         for (let i = 0; i < totalHours; i++) {
           const hour = (startHour + i) % 24;
-          const slotTime = new Date(date);
-          slotTime.setHours(hour, 0, 0, 0);
+          const slotTime = createClinicDateTime(formattedDate, hour, 0);
 
           hourSlots.push({
             scheduleId: s.scheduleId,

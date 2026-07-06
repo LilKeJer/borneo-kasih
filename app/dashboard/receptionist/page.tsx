@@ -1,7 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { DashboardCard } from "@/components/dashboard/dashboard-card";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Calendar, Users, Clock, CreditCard } from "lucide-react";
 
 interface ReceptionistDashboardData {
@@ -79,6 +82,28 @@ export default function ReceptionistDashboardPage() {
           loading={loading}
         />
       </div>
+
+      {!loading && (data?.waitingForPayment ?? 0) > 0 && (
+        <Card className="border-amber-200 bg-amber-50">
+          <CardContent className="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="font-medium text-amber-900">
+                {data?.waitingForPayment ?? 0} pasien menunggu pembayaran
+              </p>
+              <p className="text-sm text-amber-800">
+                Pasien sudah selesai diperiksa dan perlu dibuatkan transaksi
+                pembayaran.
+              </p>
+            </div>
+            <Button asChild>
+              <Link href="/dashboard/receptionist/payments">
+                <CreditCard className="mr-2 h-4 w-4" />
+                Buka Pembayaran
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

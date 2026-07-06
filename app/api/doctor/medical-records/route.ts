@@ -20,6 +20,7 @@ import {
   ne,
   or,
 } from "drizzle-orm";
+import { createClinicDateTime } from "@/lib/clinic-time";
 
 export async function GET(req: NextRequest) {
   try {
@@ -81,7 +82,7 @@ export async function GET(req: NextRequest) {
     }
 
     if (dateFromParam) {
-      const dateFrom = new Date(`${dateFromParam}T00:00:00`);
+      const dateFrom = createClinicDateTime(dateFromParam, 0, 0);
       if (Number.isNaN(dateFrom.getTime())) {
         return NextResponse.json(
           { message: "dateFrom tidak valid" },
@@ -93,7 +94,7 @@ export async function GET(req: NextRequest) {
     }
 
     if (dateToParam) {
-      const dateTo = new Date(`${dateToParam}T23:59:59.999`);
+      const dateTo = createClinicDateTime(dateToParam, 23, 59, 59, 999);
       if (Number.isNaN(dateTo.getTime())) {
         return NextResponse.json(
           { message: "dateTo tidak valid" },
