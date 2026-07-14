@@ -7,6 +7,20 @@ type DoctorOperatingHoursListProps = {
   tone?: "light" | "dark" | "blue";
 };
 
+function getScheduleGroups(doctor: DoctorOperatingHours) {
+  if (doctor.scheduleGroups?.length) {
+    return doctor.scheduleGroups;
+  }
+
+  return [
+    {
+      daySummary: doctor.daySummary,
+      sessions: doctor.sessions,
+      displayText: doctor.displayText,
+    },
+  ];
+}
+
 export function DoctorOperatingHoursList({
   doctorOperatingHours = [],
   fallback,
@@ -18,42 +32,54 @@ export function DoctorOperatingHoursList({
 
   return (
     <div className="mt-2 space-y-2">
-      {doctorOperatingHours.map((doctor) => (
-        <div
-          key={doctor.doctorId}
-          className={cn(
-            "rounded-md border px-3 py-2",
-            tone === "dark" && "border-white/10 bg-white/5 text-white",
-            tone === "blue" && "border-sky-200 bg-white/70 text-slate-800",
-            tone === "light" && "border-slate-200 bg-slate-50 text-slate-800"
-          )}
-        >
-          <p
+      {doctorOperatingHours.map((doctor) => {
+        const scheduleGroups = getScheduleGroups(doctor);
+
+        return (
+          <div
+            key={doctor.doctorId}
             className={cn(
-              "text-sm font-medium",
-              tone === "dark" ? "text-white" : "text-slate-950"
+              "rounded-md border px-3 py-2",
+              tone === "dark" && "border-white/10 bg-white/5 text-white",
+              tone === "blue" && "border-sky-200 bg-white/70 text-slate-800",
+              tone === "light" && "border-slate-200 bg-slate-50 text-slate-800"
             )}
           >
-            Jam Layanan {doctor.doctorName}
-          </p>
-          <p
-            className={cn(
-              "mt-0.5 text-xs",
-              tone === "dark" ? "text-slate-300" : "text-slate-500"
-            )}
-          >
-            {doctor.specialization || "Dokter"}
-          </p>
-          <p
-            className={cn(
-              "mt-1 text-sm",
-              tone === "dark" ? "text-slate-100" : "text-slate-700"
-            )}
-          >
-            {doctor.daySummary}: {doctor.displayText}
-          </p>
-        </div>
-      ))}
+            <p
+              className={cn(
+                "text-sm font-medium",
+                tone === "dark" ? "text-white" : "text-slate-950"
+              )}
+            >
+              Jam Layanan {doctor.doctorName}
+            </p>
+            <p
+              className={cn(
+                "mt-0.5 text-xs",
+                tone === "dark" ? "text-slate-300" : "text-slate-500"
+              )}
+            >
+              {doctor.specialization || "Dokter"}
+            </p>
+            <div
+              className={cn(
+                "mt-1 space-y-1 text-sm",
+                tone === "dark" ? "text-slate-100" : "text-slate-700"
+              )}
+            >
+              {scheduleGroups.map((scheduleGroup) => (
+                <p key={`${doctor.doctorId}-${scheduleGroup.daySummary}`}>
+                  <span className="font-medium">
+                    {scheduleGroup.daySummary}
+                  </span>
+                  {": "}
+                  {scheduleGroup.displayText}
+                </p>
+              ))}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
